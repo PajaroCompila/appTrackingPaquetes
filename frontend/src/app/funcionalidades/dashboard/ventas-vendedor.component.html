@@ -1,0 +1,30 @@
+<section class="pagina ventas-vendedor">
+  <a class="boton boton-secundario volver" routerLink="/dashboard">← Volver al dashboard general</a>
+  <header class="encabezado-pagina"><div><p class="sobrelinea">Detalle de sucursal</p><h1>Pedidos por vendedor</h1><p>Pedidos por vendedor para {{ datos()?.nombreSucursal || codigoSucursal }}.</p></div></header>
+  <form class="panel filtros-ventas" (ngSubmit)="aplicarFiltros()">
+    <div class="campo"><label for="fechaDesde">Fecha desde</label><input id="fechaDesde" name="fechaDesde" type="date" required [(ngModel)]="filtros.fechaDesde"></div>
+    <div class="campo"><label for="fechaHasta">Fecha hasta</label><input id="fechaHasta" name="fechaHasta" type="date" required [(ngModel)]="filtros.fechaHasta"></div>
+    <div class="acciones"><button class="boton boton-primario">Aplicar filtros</button><button class="boton boton-secundario" type="button" (click)="limpiarFiltros()">Limpiar filtros</button></div>
+  </form>
+  @if (advertencia()) { <p class="advertencia" role="status">{{ advertencia() }}</p> }
+  @if (cargando() && !datos()) { <div class="estado-interfaz"><span class="cargador"></span><p>Cargando pedidos…</p></div> }
+  @if (datos(); as resumen) {
+    <div class="tarjetas-resumen">
+      <article class="panel tarjeta-metrica"><span>Pedidos entregados</span><strong>{{ resumen.totales.ventasValidadas }}</strong></article>
+      <article class="panel tarjeta-metrica"><span>Vendedores con pedidos</span><strong>{{ resumen.totales.vendedoresConVentas }}</strong></article>
+    </div>
+    @if (resumen.porVendedor.length === 0) {
+      <div class="estado-interfaz"><p>No hay pedidos entregados para esas fechas.</p></div>
+    } @else {
+      <section class="panel grafica-vendedores" aria-labelledby="tituloGrafica"><h2 id="tituloGrafica">Pedidos por vendedor</h2>
+        @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) {
+          <div class="fila-vendedor"><strong>{{ nombreVendedor(vendedor.nombreVendedor) }}</strong><div class="pista"><span class="barra" [style.width.%]="ancho(vendedor.ventasValidadas)" tabindex="0"><span class="tooltip">{{ nombreVendedor(vendedor.nombreVendedor) }} · {{ vendedor.ventasValidadas }} pedidos</span></span></div><span class="cantidad">{{ vendedor.ventasValidadas }}</span></div>
+        }
+      </section>
+      <div class="panel tabla-contenedor"><table><caption>Valores exactos por vendedor</caption><thead><tr><th>Código</th><th>Vendedor</th><th>Pedidos entregados</th></tr></thead><tbody>
+        @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) { <tr><td>{{ vendedor.codigoVendedor || '—' }}</td><td>{{ nombreVendedor(vendedor.nombreVendedor) }}</td><td>{{ vendedor.ventasValidadas }}</td></tr> }
+      </tbody></table></div>
+    }
+    <p class="actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ resumen.consultadoEn | date:'hh:mm:ss a' }}</p>
+  }
+</section>

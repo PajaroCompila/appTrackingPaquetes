@@ -1,0 +1,237 @@
+<section class="pagina" aria-labelledby="titulo-pedidos">
+  <div class="encabezado-pagina">
+    <div>
+      <p class="sobrelinea">Pedidos</p>
+      <h1 id="titulo-pedidos">Pedidos de bodega</h1>
+      <p>Buscá y revisá los pedidos de bodega.</p>
+    </div>
+  </div>
+
+  <form class="panel filtros" (ngSubmit)="buscar()">
+    <div class="campo">
+      <label for="numeroPedido">Número de pedido</label>
+      <input id="numeroPedido" name="numeroPedido" [(ngModel)]="filtrosFormulario.numeroPedido" />
+    </div>
+    <div class="campo">
+      <label for="fechaDesde">Fecha desde</label>
+      <input id="fechaDesde" name="fechaDesde" type="date" [(ngModel)]="filtrosFormulario.fechaDesde" />
+    </div>
+    <div class="campo">
+      <label for="fechaHasta">Fecha hasta</label>
+      <input id="fechaHasta" name="fechaHasta" type="date" [(ngModel)]="filtrosFormulario.fechaHasta" />
+    </div>
+    <div class="campo campo-amplio">
+      <span id="etiqueta-almacenes" class="etiqueta-campo">Almacenes</span>
+      <details class="selector-multiple">
+        <summary aria-labelledby="etiqueta-almacenes">{{ resumenAlmacenes() }}</summary>
+        <fieldset>
+          <legend class="solo-lectores">Seleccionar almacenes</legend>
+          <div class="opciones-almacenes">
+            @for (almacen of almacenes(); track almacen.codigoAlmacen) {
+              <label class="opcion-almacen">
+                <input
+                  type="checkbox"
+                  [checked]="estaSeleccionado(almacen.codigoAlmacen)"
+                  (change)="alternarAlmacen(almacen.codigoAlmacen, $any($event.target).checked)"
+                />
+                <span class="datos-almacen">
+                  <strong>{{ almacen.codigoAlmacen }}</strong>
+                  <small>{{ almacen.nombreAlmacen }} · {{ almacen.nombreSucursal }}</small>
+                </span>
+              </label>
+            }
+          </div>
+          @if (filtrosFormulario.codigosAlmacen.length > 0) {
+            <button class="limpiar-seleccion" type="button" (click)="limpiarAlmacenes()">
+              Limpiar selección
+            </button>
+          }
+        </fieldset>
+      </details>
+      @if (filtrosFormulario.codigosAlmacen.length > 0) {
+        <div class="etiquetas-almacenes" aria-label="Almacenes seleccionados">
+          @for (codigoAlmacen of filtrosFormulario.codigosAlmacen; track codigoAlmacen) {
+            <span class="etiqueta-almacen">
+              {{ codigoAlmacen }}
+              <button
+                type="button"
+                (click)="quitarAlmacen(codigoAlmacen)"
+                [attr.aria-label]="'Quitar ' + nombreAlmacen(codigoAlmacen)"
+              >×</button>
+            </span>
+          }
+        </div>
+      }
+      @if (errorAlmacenes()) {
+        <small class="texto-error">No pudimos cargar las bodegas.</small>
+      }
+    </div>
+    <div class="campo">
+      <label for="cantidadPorPagina">Pedidos por página</label>
+      <select
+        id="cantidadPorPagina"
+        name="cantidadPorPagina"
+        [(ngModel)]="filtrosFormulario.cantidadPorPagina"
+        (change)="cambiarCantidadPorPagina()"
+      >
+        <option [ngValue]="25">25</option>
+        <option [ngValue]="50">50</option>
+        <option [ngValue]="100">100</option>
+      </select>
+    </div>
+    <div class="acciones-filtros">
+      <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
+      <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">
+        Limpiar filtros
+      </button>
+    </div>
+  </form>
+
+  @if (informacionIncompleta()) {
+    <p class="aviso-fuente" role="status">Una fuente no respondió. Los datos pueden estar incompletos.</p>
+  }
+
+  @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
+  @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
+  @if (!actualizando() && ultimaActualizacion()) {
+    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a' }}</p>
+  }
+
+  @if (cargando()) {
+    <div class="estado-interfaz" role="status" aria-live="polite">
+      <span class="cargador" aria-hidden="true"></span>
+      <p>Cargando pedidos…</p>
+    </div>
+  } @else if (error(); as mensajeError) {
+    <div class="estado-interfaz estado-error" role="alert">
+      <h2>{{ mensajeError.titulo }}</h2>
+      <p>{{ mensajeError.detalle }}</p>
+      @if (mensajeError.idSeguimiento) {
+        <p class="seguimiento">Seguimiento: {{ mensajeError.idSeguimiento }}</p>
+      }
+      <button class="boton boton-primario" type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  } @else if (pedidos().length === 0) {
+    <div class="estado-interfaz" role="status">
+      <h2>Sin resultados</h2>
+      <p>No hay pedidos con esos filtros.</p>
+    </div>
+  } @else {
+    <div class="acciones-transferencia">
+      <button
+        class="boton boton-secundario boton-imprimir-seleccionados"
+        type="button"
+        [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion()"
+        (click)="imprimirSeleccionados()"
+      >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
+      <button
+        class="boton boton-primario"
+        type="button"
+        [disabled]="lineasSeleccionadasTransferencia().size === 0 || transfiriendo()"
+        (click)="transferir()"
+      >Transferir a despachados ({{ lineasSeleccionadasTransferencia().size }})</button>
+    </div>
+    @if (mensajeTransferencia()) { <p class="mensaje-transferencia" role="status">{{ mensajeTransferencia() }}</p> }
+    @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
+    <div class="panel tabla-contenedor">
+      <table>
+        <caption class="solo-lectores">Listado de pedidos encontrados</caption>
+        <thead>
+          <tr>
+            <th class="columna-seleccion" scope="col"><span class="solo-lectores">Seleccionar</span></th>
+            <th scope="col">Pedido</th>
+            <th scope="col">Código</th>
+            <th scope="col">Descripción</th>
+            <th scope="col">Cantidad</th>
+            <th scope="col">Bodega</th>
+            <th scope="col">Fecha y hora</th>
+            <th scope="col">Vendedor</th>
+            <th scope="col">Ver detalle</th>
+            <th class="columna-seleccion" scope="col">Imprimir</th>
+          </tr>
+        </thead>
+        @for (pedido of pedidos(); track pedido.idOrigen) {
+          <tbody class="grupo-pedido">
+            @for (articulo of pedido.articulos; track claveArticulo(articulo, $index)) {
+              <tr>
+                <td class="columna-seleccion" data-label="Seleccionar">
+                  <label class="selector-linea selector-transferencia" title="Seleccionar para transferir">
+                    <input
+                      type="checkbox"
+                      [checked]="estaSeleccionadoParaTransferencia(pedido, articulo, $index)"
+                      [attr.aria-label]="'Seleccionar artículo ' + marcador(articulo.codigoArticulo)"
+                      (click)="$event.stopPropagation()"
+                      (change)="alternarSeleccionTransferencia(pedido, articulo, $index, $any($event.target).checked)"
+                    />
+                    <span aria-hidden="true">✓</span>
+                  </label>
+                </td>
+                <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+                <td
+                  class="codigo-consultable codigo-articulo-en-linea"
+                  data-label="Código"
+                  title="Doble clic para consultar inventario"
+                  (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"
+                >{{ marcador(articulo.codigoArticulo) }}</td>
+                <td
+                  class="descripcion-consultable"
+                  data-label="Descripción"
+                  title="Doble clic para consultar inventario"
+                  (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"
+                >{{ marcador(articulo.descripcion) }}</td>
+                <td data-label="Cantidad">{{ marcador(articulo.cantidad) }}</td>
+                <td data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
+                <td data-label="Fecha y hora">{{ formatearFechaHora(pedido.fechaHoraPedido) }}</td>
+                <td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td>
+                <td class="accion-tabla">
+                  <a
+                    class="enlace-detalle"
+                    [routerLink]="['/pedidos', pedido.idOrigen]"
+                    [queryParams]="{
+                      retorno: rutaRetorno(),
+                      codigoAlmacen: filtrosFormulario.codigosAlmacen
+                    }"
+                  >Ver detalle</a>
+                </td>
+                <td class="columna-seleccion" data-label="Imprimir">
+                  <label class="selector-linea selector-impresion" title="Seleccionar para impresión">
+                    <input
+                      type="checkbox"
+                      [checked]="estaSeleccionadoParaImpresion(pedido, articulo, $index)"
+                      [attr.aria-label]="'Seleccionar ' + marcador(articulo.codigoArticulo) + ' para impresión'"
+                      (click)="$event.stopPropagation()"
+                      (change)="alternarSeleccionImpresion(pedido, articulo, $index, $any($event.target).checked)"
+                    />
+                    <span aria-hidden="true">✓</span>
+                  </label>
+                </td>
+              </tr>
+            }
+          </tbody>
+        }
+      </table>
+    </div>
+  }
+
+  <nav class="paginacion" aria-label="Paginación de pedidos">
+    <button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">
+      Anterior
+    </button>
+    <span aria-live="polite">Página {{ pagina() }} · {{ totalRegistros() }} pedidos</span>
+    <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">
+      Siguiente
+    </button>
+  </nav>
+
+  @if (dialogoInventarioAbierto()) {
+    <app-dialogo-inventario-articulo
+      [estado]="estadoInventario()"
+      [inventario]="inventarioArticulo()"
+      (cerrar)="cerrarInformacionArticulo()"
+    />
+  }
+  <app-vista-impresion-pedido
+    [articulos]="articulosImpresion()"
+    [fechaHora]="fechaHoraImpresion()"
+  />
+</section>

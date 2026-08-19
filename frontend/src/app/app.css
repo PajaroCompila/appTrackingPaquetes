@@ -1,0 +1,150 @@
+.estructura-aplicacion {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+.estructura-aplicacion.modo-login { display: block; }
+.estructura-aplicacion.modo-login .area-aplicacion { min-height: 100vh; }
+
+.barra-lateral {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  width: 4.75rem;
+  height: 100vh;
+  height: 100dvh;
+  align-items: center;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: .85rem .6rem;
+  overflow: visible;
+  background: linear-gradient(180deg, #10285b, #1e5591);
+  box-shadow: 4px 0 18px rgb(7 30 63 / 16%);
+}
+
+.marca-icono {
+  display: block;
+  width: 3.55rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.navegacion-principal {
+  display: grid;
+  width: 100%;
+  gap: .55rem;
+  overflow: visible;
+}
+
+.navegacion-principal a,
+.navegacion-principal button {
+  position: relative;
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border-radius: .65rem;
+  color: #dceafb;
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: visible;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+
+.navegacion-principal .pi { font-size: 1.4rem; }
+.etiqueta-nav {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 10px);
+  z-index: 2000;
+  width: max-content;
+  max-width: 14rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #123568;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
+  color: white;
+  font-family: var(--fuente-interfaz);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translate(-6px, -50%);
+  transition: opacity 160ms ease, transform 180ms ease, visibility 160ms ease;
+}
+.navegacion-principal a:hover .etiqueta-nav,
+.navegacion-principal a:focus-visible .etiqueta-nav,
+.navegacion-principal a:focus-within .etiqueta-nav,
+.navegacion-principal button:hover .etiqueta-nav,
+.navegacion-principal button:focus-within .etiqueta-nav,
+.navegacion-principal button:focus-visible .etiqueta-nav {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.navegacion-principal a:hover,
+.navegacion-principal a:focus-visible,
+.navegacion-principal button:hover,
+.navegacion-principal button:focus-visible,
+.navegacion-principal a.activo {
+  background: rgb(255 255 255 / 16%);
+  color: white;
+}
+
+.area-aplicacion { display: flex; grid-column: 2; min-width: 0; min-height: 100vh; flex-direction: column; }
+.modo-login .area-aplicacion { grid-column: auto; }
+.area-aplicacion > main { flex: 1 0 auto; }
+.pie-aplicacion { flex: 0 0 auto; padding: .8rem max(1rem, calc((100vw - 4.75rem - 1200px) / 2)); color: var(--gris-600); font-size: .75rem; text-align: left; }
+.barra-superior {
+  position: relative;
+  min-height: 4.5rem;
+  display: flex;
+  align-items: center;
+  padding: .75rem max(1rem, calc((100vw - 4.75rem - 1200px) / 2));
+  background: linear-gradient(110deg, #10285b, #1e5591);
+  color: white;
+  box-shadow: 0 4px 18px rgb(7 30 63 / 18%);
+  overflow: hidden;
+}
+.barra-superior::after {
+  position: absolute;
+  top: .35rem;
+  right: max(1rem, calc((100vw - 4.75rem - 1200px) / 2));
+  bottom: .35rem;
+  width: min(34vw, 22rem);
+  background: url('/imagenes/banner-pajaro-azul-49-anios-transparente.png') right center / contain no-repeat;
+  content: '';
+  pointer-events: none;
+}
+.marca { position: relative; z-index: 1; display: grid; gap: .1rem; }
+.marca strong { font-size: 1.05rem; }
+.marca span { color: #cfdef1; font-size: .78rem; }
+.sesion-actual { position: relative; z-index: 1; display: grid; margin-left: auto; margin-right: min(35vw, 23rem); text-align: right; }
+.sesion-actual strong { font-size: .82rem; }
+.sesion-actual span { color: #cfdef1; font-size: .7rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .etiqueta-nav { transition: none; }
+}
+
+@media (max-width: 680px) {
+  .estructura-aplicacion { grid-template-columns: 4rem minmax(0, 1fr); }
+  .barra-lateral { width: 4rem; padding-inline: .35rem; }
+  .navegacion-principal a, .navegacion-principal button { width: 3.3rem; }
+  .barra-superior { padding-inline: 1rem; }
+  .barra-superior::after { right: .5rem; width: min(42vw, 11rem); opacity: .92; }
+  .sesion-actual { display: none; }
+}
+@media print { .pie-aplicacion { display: none; } }

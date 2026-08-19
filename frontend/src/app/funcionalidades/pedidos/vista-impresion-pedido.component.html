@@ -1,0 +1,28 @@
+<section class="area-impresion" aria-label="Artículos para imprimir">
+  <header class="encabezado-impresion">
+    <img src="/imagenes/logo-pajaro-azul.png" alt="Pájaro Azul" />
+  </header>
+  <table>
+    <caption>{{ fechaHora }}</caption>
+    <colgroup>
+      <col class="columna-codigo" />
+      <col class="columna-cantidad" />
+      <col class="columna-bodega" />
+    </colgroup>
+    <thead>
+      <tr><th>CÓDIGO</th><th class="cantidad">CANT.</th><th class="bodega">BODEGA</th></tr>
+    </thead>
+    @for (articulo of articulos; track $index) {
+      <tbody class="articulo-impreso">
+        <tr class="datos-principales">
+          <td class="codigo-articulo-en-linea">{{ articulo.codigo }}</td>
+          <td class="cantidad">{{ articulo.cantidad ?? '—' }}</td>
+          <td class="bodega">{{ articulo.bodega }}</td>
+        </tr>
+        <tr class="fila-descripcion">
+          <td colspan="3">{{ articulo.descripcion }}</td>
+        </tr>
+      </tbody>
+    }
+  </table>
+</section>

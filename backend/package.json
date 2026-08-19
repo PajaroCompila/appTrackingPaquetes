@@ -1,0 +1,62 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "API de Pedidos Bodega",
+  "main": "dist/servidor.js",
+  "scripts": {
+    "db:provision": "tsx scripts/aprovisionarBaseDatos.ts",
+    "db:migrate:auth": "tsx scripts/migrarAutenticacion.ts",
+    "db:migrate:despachos": "tsx scripts/migrarPedidosDespachados.ts",
+    "db:migrate:despacho-parcial": "tsx scripts/migrarDespachoParcial.ts",
+    "db:migrate:flujo-estados": "tsx scripts/migrarFlujoEstados.ts",
+    "db:migrate:usuarios": "tsx scripts/migrarUsuariosLocales.ts",
+    "db:migrate:pedidos-cerrados": "tsx scripts/migrarPedidosCerrados.ts",
+    "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",
+    "usuario:cambiar-contrasena": "tsx scripts/cambiarContrasenaUsuario.ts",
+    "dev": "tsx watch src/servidor.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/servidor.js",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mssql": "^12.7.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^26.1.2",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^10.8.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true,
+    "esbuild@0.28.1": true
+  }
+}

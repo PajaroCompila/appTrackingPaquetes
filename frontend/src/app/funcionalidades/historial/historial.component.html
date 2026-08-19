@@ -1,0 +1,70 @@
+<section class="pagina" [class.pagina-detalle]="idOrigen()" aria-labelledby="titulo-historial">
+  @if (idOrigen()) {
+    <app-detalle-pedido-vista
+      [configuracion]="configuracionDetalle"
+      [pedido]="detalleVisual()"
+      [cargando]="cargando()"
+      [error]="error()"
+      (regresar)="regresar()"
+      (reintentar)="reintentarDetalle()"
+    />
+  } @else {
+    <div class="encabezado-pagina">
+      <div>
+        <p class="sobrelinea">Registro local</p>
+        <h1 id="titulo-historial">Historial de pedidos entregados</h1>
+        <p>Pedidos que R1 marca como entregados.</p>
+      </div>
+      <span class="aviso-seguridad">Solo consulta</span>
+    </div>
+
+    <form class="panel filtros" (ngSubmit)="buscar()">
+      <div class="campo"><label for="numeroPedido">Número de pedido</label><input id="numeroPedido" name="numeroPedido" inputmode="numeric" maxlength="20" [(ngModel)]="filtros.numeroPedido" /></div>
+      <div class="campo"><label for="fechaDesde">Fecha del pedido desde</label><input id="fechaDesde" name="fechaDesde" type="date" required [(ngModel)]="filtros.fechaDesde" /></div>
+      <div class="campo"><label for="fechaHasta">Fecha del pedido hasta</label><input id="fechaHasta" name="fechaHasta" type="date" required [(ngModel)]="filtros.fechaHasta" /></div>
+      <div class="campo campo-almacenes">
+        <span id="etiqueta-almacenes" class="etiqueta-campo">Almacenes</span>
+        <details class="selector-multiple">
+          <summary aria-labelledby="etiqueta-almacenes">{{ resumenAlmacenes() }}</summary>
+          <fieldset>
+            <legend class="solo-lectores">Seleccionar almacenes</legend>
+            <div class="opciones-almacenes">
+              @for (almacen of almacenes(); track almacen.codigoAlmacen) {
+                <label class="opcion-almacen"><input type="checkbox"
+                  [checked]="estaSeleccionado(almacen.codigoAlmacen)"
+                  (change)="alternarAlmacen(almacen.codigoAlmacen, $any($event.target).checked)" />
+                  <span><strong>{{ almacen.codigoAlmacen }}</strong><small>{{ almacen.nombreAlmacen }}</small></span>
+                </label>
+              }
+            </div>
+            @if (filtros.codigosAlmacen.length > 0) {
+              <button class="limpiar-seleccion" type="button" (click)="limpiarAlmacenes()">Limpiar selección</button>
+            }
+          </fieldset>
+        </details>
+      </div>
+      <div class="acciones-filtros"><button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button></div>
+    </form>
+
+    @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
+    @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
+
+    @if (cargando()) {
+      <div class="estado-interfaz" role="status"><p>Cargando historial…</p></div>
+    } @else if (error(); as mensaje) {
+      <div class="estado-interfaz estado-error" role="alert"><h2>{{ mensaje.titulo }}</h2><p>{{ mensaje.detalle }}</p></div>
+    } @else if (registros().length === 0) {
+      <div class="estado-interfaz" role="status"><h2>Sin resultados</h2><p>No hay pedidos entregados en el rango.</p></div>
+    } @else {
+      <div class="panel tabla-contenedor">
+        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Despacho local</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+          <tbody>@for (pedido of registros(); track pedido.idOrigen) {
+            <tr><td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Entregado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ pedido.fechaHoraPedido | date:'dd/MM/yyyy HH:mm':'UTC' }}</td><td data-label="Despacho local">{{ pedido.despachadoEn ? (pedido.despachadoEn | date:'dd/MM/yyyy HH:mm':'UTC') : '—' }}</td><td data-label="Usuario">{{ marcador(pedido.usuarioDespacho) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
+          }</tbody>
+        </table>
+      </div>
+    }
+
+    <nav class="paginacion" aria-label="Paginación del historial"><button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button><span>Página {{ pagina() }}</span><button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button></nav>
+  }
+</section>

@@ -1,0 +1,31 @@
+<div class="estructura-aplicacion" [class.modo-login]="esLogin()">
+  @if (!esLogin()) {
+    <aside class="barra-lateral" aria-label="Navegación principal">
+      <img class="marca-icono" src="/imagenes/isotipo-pajaro-azul.png" alt="Pájaro Azul" />
+      <nav class="navegacion-principal">
+        @if (usuario()?.codigoRol === 'ADMINISTRADOR') {
+          <a routerLink="/dashboard" routerLinkActive="activo" aria-label="Dashboard"><i class="pi pi-chart-bar" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Dashboard</span></a>
+        }
+        <a routerLink="/pedidos" routerLinkActive="activo" aria-label="Pedidos pendientes"><i class="pi pi-list-check" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos pendientes</span></a>
+        <a routerLink="/pedidos-despachados" routerLinkActive="activo" aria-label="Pedidos despachados"><i class="pi pi-check-circle" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos despachados</span></a>
+        <a routerLink="/historial-validados" routerLinkActive="activo" aria-label="Historial"><i class="pi pi-history" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Historial</span></a>
+        @if (usuario()?.codigoRol === 'ADMINISTRADOR') {
+          <a routerLink="/configuracion/usuarios" routerLinkActive="activo" aria-label="Configuración, Usuarios"><i class="pi pi-cog" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Configuración · Usuarios</span></a>
+        }
+        <button type="button" aria-label="Cerrar sesión" (click)="cerrarSesion()"><i class="pi pi-sign-out" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Cerrar sesión</span></button>
+      </nav>
+    </aside>
+  }
+  <div class="area-aplicacion">
+    @if (!esLogin()) {
+      <header class="barra-superior">
+        <div class="marca"><strong>Pedidos Bodega</strong><span>Control de pedidos</span></div>
+        @if (usuario(); as sesion) { <div class="sesion-actual"><strong>{{ sesion.nombreVisible }}</strong><span>{{ sesion.codigoRol }}</span></div> }
+      </header>
+    }
+    <main><router-outlet /></main>
+    @if (!esLogin()) {
+      <footer class="pie-aplicacion">Todos los derechos reservados. 2026© Almacén Pájaro Azul.</footer>
+    }
+  </div>
+</div>

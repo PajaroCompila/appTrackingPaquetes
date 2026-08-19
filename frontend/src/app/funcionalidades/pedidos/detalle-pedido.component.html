@@ -1,0 +1,10 @@
+<section class="pagina pagina-detalle">
+  <app-detalle-pedido-vista
+    [configuracion]="configuracionDetalle"
+    [pedido]="detalleVisual()"
+    [cargando]="cargando()"
+    [error]="error()"
+    (regresar)="regresar()"
+    (reintentar)="reintentar()"
+  />
+</section>

@@ -1,0 +1,16 @@
+<main class="pagina-login">
+  <div class="panel-botanico" aria-hidden="true">
+    <img class="logo-login" src="/imagenes/logo-pajaro-azul.png" alt="Pájaro Azul" />
+    <div class="identidad-login"><span>Todos los derechos reservados. 2026© Almacén Pájaro Azul.</span></div>
+  </div>
+  <section class="panel-acceso" aria-labelledby="titulo-login">
+    <form class="formulario-login" (ngSubmit)="ingresar()">
+      <div class="encabezado-login"><p>Bienvenido</p><h1 id="titulo-login">Iniciá sesión</h1><span>Ingresá tus datos para continuar.</span></div>
+      <div class="campo-login"><label for="nombreUsuario">Usuario</label><input id="nombreUsuario" name="nombreUsuario" autocomplete="username" placeholder="Ingresá tu usuario" required maxlength="100" [(ngModel)]="nombreUsuario" /></div>
+      <div class="campo-login"><label for="contrasena">Contraseña</label><input id="contrasena" name="contrasena" [type]="mostrarContrasena() ? 'text' : 'password'" autocomplete="current-password" placeholder="Ingresá tu contraseña" required maxlength="128" [(ngModel)]="contrasena" /><button class="mostrar-contrasena" type="button" (click)="alternarContrasena()">{{ mostrarContrasena() ? 'Ocultar contraseña' : 'Mostrar contraseña' }}</button></div>
+      @if (error()) { <p class="mensaje-error" role="alert">{{ error() }}</p> }
+      <button class="boton-acceso" type="submit" [disabled]="procesando() || !nombreUsuario || !contrasena">{{ procesando() ? 'Ingresando…' : 'Iniciar sesión' }}</button>
+      <div class="identidad-sistema"><strong>Pedidos Bodega</strong><span>Control de pedidos</span></div>
+    </form>
+  </section>
+</main>
