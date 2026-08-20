@@ -1,4 +1,4 @@
-<section class="pagina" aria-labelledby="titulo-pedidos">
+<section class="pagina vista-pedidos" aria-labelledby="titulo-pedidos">
   <div class="encabezado-pagina">
     <div>
       <p class="sobrelinea">Pedidos</p>
@@ -94,7 +94,7 @@
   @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
   @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
   @if (!actualizando() && ultimaActualizacion()) {
-    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a' }}</p>
+    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a':'-0600' }}</p>
   }
 
   @if (cargando()) {

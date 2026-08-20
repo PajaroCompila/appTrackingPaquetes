@@ -36,6 +36,7 @@ describe('ListaPedidosComponent', () => {
 
   beforeEach(async () => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 7, 3, 12, 0, 0));
     pedidosService = {

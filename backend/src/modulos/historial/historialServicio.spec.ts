@@ -22,6 +22,8 @@ describe('HistorialServicio', () => {
         { idOrigen: 'R1:F2', folioPedido: 'F2' },
         { idOrigen: 'R1:F3', folioPedido: 'F3' },
       ]),
+      obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
+      obtenerCerradosSap: vi.fn().mockResolvedValue([]),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map([
         ['R1:F1', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: false }],
         ['R1:F2', { codigoSucursal: 'SPS', codigoEstadoVenta: 'A', verificado: true }],
@@ -48,6 +50,8 @@ describe('HistorialServicio', () => {
   it('es idempotente cuando ya no quedan cabeceras en DESPACHADO', async () => {
     const repositorio = {
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([]),
+      obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
+      obtenerCerradosSap: vi.fn().mockResolvedValue([]),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map()),
       marcarCerrados: vi.fn().mockResolvedValue(0),
       marcarValidados: vi.fn().mockResolvedValue(0),
@@ -58,8 +62,31 @@ describe('HistorialServicio', () => {
     expect(repositorio.marcarValidados).toHaveBeenCalledWith([]);
   });
 
-  it('combina el historial validado de R1 con despachos SAP conservados localmente', async () => {
-    const sap = registro('SAP:10', 'DESPACHADO', '2026-08-15T12:00:00.000Z');
+  it('mueve al historial únicamente pedidos SAP cerrados', async () => {
+    const repositorio = {
+      obtenerDespachadosPendientes: vi.fn().mockResolvedValue([]),
+      obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([
+        { idOrigen: 'SAP:10', sapDocEntry: '10' },
+        { idOrigen: 'SAP:11', sapDocEntry: '11' },
+      ]),
+      obtenerEstadosR1: vi.fn().mockResolvedValue(new Map()),
+      obtenerCerradosSap: vi.fn().mockResolvedValue(['SAP:10']),
+      marcarCerrados: vi.fn().mockResolvedValue(0),
+      marcarValidados: vi.fn().mockResolvedValue(1),
+    } as unknown as HistorialRepositorio;
+
+    await expect(new HistorialServicio(repositorio).sincronizar()).resolves.toBe(1);
+    expect(repositorio.obtenerCerradosSap).toHaveBeenCalledWith([
+      { idOrigen: 'SAP:10', sapDocEntry: '10' },
+      { idOrigen: 'SAP:11', sapDocEntry: '11' },
+    ]);
+    expect(repositorio.marcarValidados).toHaveBeenCalledWith([
+      { idOrigen: 'SAP:10', codigoSucursal: null },
+    ]);
+  });
+
+  it('combina el historial validado de R1 con pedidos SAP cerrados conservados localmente', async () => {
+    const sap = registro('SAP:10', 'VALIDADO', '2026-08-15T12:00:00.000Z');
     const r1 = registro('R1:TSPS01:F1', 'VALIDADO', '2026-08-15T11:00:00.000Z');
     const repositorio = { buscarHistorial: vi.fn().mockResolvedValue({ registros: [sap], pagina: 1,
       cantidadPorPagina: 25, hayMas: false }) } as unknown as HistorialRepositorio;
@@ -72,12 +99,12 @@ describe('HistorialServicio', () => {
     });
 
     expect(resultado.registros).toEqual([sap, r1]);
-    expect(sap.estadoLocal).toBe('DESPACHADO');
-    expect(sap.validadoDetectadoEn).toBeNull();
+    expect(sap.estadoLocal).toBe('VALIDADO');
+    expect(sap.validadoDetectadoEn).toBe('2026-08-15T12:00:00.000Z');
   });
 
   it('recupera el detalle SAP desde PedidosBodega sin consultar nuevamente SAP', async () => {
-    const sap = registro('SAP:10', 'DESPACHADO', '2026-08-15T12:00:00.000Z');
+    const sap = registro('SAP:10', 'VALIDADO', '2026-08-15T12:00:00.000Z');
     const repositorio = { obtenerHistorial: vi.fn().mockResolvedValue(sap) } as unknown as HistorialRepositorio;
     const repositorioR1 = { obtener: vi.fn() } as unknown as HistorialR1Repositorio;
 
