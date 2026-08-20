@@ -1,4 +1,4 @@
-<section class="pagina" [class.pagina-detalle]="idOrigen()" aria-labelledby="titulo-historial">
+<section class="pagina vista-pedidos" [class.pagina-detalle]="idOrigen()" aria-labelledby="titulo-historial">
   @if (idOrigen()) {
     <app-detalle-pedido-vista
       [configuracion]="configuracionDetalle"
@@ -11,11 +11,9 @@
   } @else {
     <div class="encabezado-pagina">
       <div>
-        <p class="sobrelinea">Registro local</p>
-        <h1 id="titulo-historial">Historial de pedidos entregados</h1>
-        <p>Pedidos que R1 marca como entregados.</p>
+        <h1 id="titulo-historial">Historial</h1>
+        <p>Pedidos entregados</p>
       </div>
-      <span class="aviso-seguridad">Solo consulta</span>
     </div>
 
     <form class="panel filtros" (ngSubmit)="buscar()">
@@ -43,7 +41,10 @@
           </fieldset>
         </details>
       </div>
-      <div class="acciones-filtros"><button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button></div>
+      <div class="acciones-filtros">
+        <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
+        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
+      </div>
     </form>
 
     @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
@@ -57,9 +58,9 @@
       <div class="estado-interfaz" role="status"><h2>Sin resultados</h2><p>No hay pedidos entregados en el rango.</p></div>
     } @else {
       <div class="panel tabla-contenedor">
-        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Despacho local</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (pedido of registros(); track pedido.idOrigen) {
-            <tr><td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Entregado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ pedido.fechaHoraPedido | date:'dd/MM/yyyy HH:mm':'UTC' }}</td><td data-label="Despacho local">{{ pedido.despachadoEn ? (pedido.despachadoEn | date:'dd/MM/yyyy HH:mm':'UTC') : '—' }}</td><td data-label="Usuario">{{ marcador(pedido.usuarioDespacho) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
+            <tr><td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Entregado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ marcador(pedido.usuarioDespacho) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
           }</tbody>
         </table>
       </div>

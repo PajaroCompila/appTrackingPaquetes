@@ -22,8 +22,12 @@ export class HistorialServicio {
   }
 
   private async conciliar(): Promise<number> {
-    const candidatos = await this.repositorio.obtenerDespachadosPendientes();
+    const [candidatos, candidatosSap] = await Promise.all([
+      this.repositorio.obtenerDespachadosPendientes(),
+      this.repositorio.obtenerDespachadosSapPendientes(),
+    ]);
     const estados = await this.repositorio.obtenerEstadosR1(candidatos);
+    const cerradosSap = await this.repositorio.obtenerCerradosSap(candidatosSap);
     const cerrados = candidatos.filter(({ idOrigen }) =>
       estados.get(idOrigen)?.codigoEstadoVenta === 'C' && !estados.get(idOrigen)?.verificado);
     const validados = candidatos.filter(({ idOrigen }) => {
@@ -33,9 +37,11 @@ export class HistorialServicio {
     const cantidadCerrados = await this.repositorio.marcarCerrados(
       cerrados.map(({ idOrigen }) => idOrigen),
     );
-    const cantidadValidados = await this.repositorio.marcarValidados(validados
-      .map(({ idOrigen }) =>
-        ({ idOrigen, codigoSucursal: estados.get(idOrigen)?.codigoSucursal ?? null })));
+    const cantidadValidados = await this.repositorio.marcarValidados([
+      ...validados.map(({ idOrigen }) =>
+        ({ idOrigen, codigoSucursal: estados.get(idOrigen)?.codigoSucursal ?? null })),
+      ...cerradosSap.map((idOrigen) => ({ idOrigen, codigoSucursal: null })),
+    ]);
     return cantidadCerrados + cantidadValidados;
   }
 

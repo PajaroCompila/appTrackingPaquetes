@@ -12,6 +12,8 @@ import type { ArticuloPedidoResumen, FiltrosPedidos, InventarioArticulo, PedidoR
 import { PedidosService } from './pedidos.service';
 import { DialogoInventarioArticuloComponent, type EstadoConsultaInventario } from './dialogo-inventario-articulo.component';
 import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from './vista-impresion-pedido.component';
+import { guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
+import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -30,7 +32,7 @@ const formularioInicial = (fechaActual = ''): FormularioFiltros => ({
   codigoSincronizacion: '',
   cantidadPorPagina: 25,
 });
-const claveFiltrosPedidos = 'pedidosBodega.pedidos.filtros';
+const claveFiltrosPedidos = 'pedidos';
 
 @Component({
   selector: 'app-lista-pedidos',
@@ -106,7 +108,7 @@ export class ListaPedidosComponent implements OnInit {
 
   public limpiarFiltros(): void {
     this.limpiarSeleccionTransferencia();
-    this.filtrosFormulario = formularioInicial(this.obtenerFechaLocalActual());
+    this.filtrosFormulario = formularioInicial(obtenerFechaLocalActual());
     this.guardarFiltros();
     void this.actualizarRuta(1);
   }
@@ -404,18 +406,7 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public formatearFechaHora(valor: string | null): string {
-    if (!valor) return '—';
-    const partes = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(valor);
-    if (!partes) return valor;
-    const [, anio, mes, dia, hora, minuto, segundo] = partes;
-    const fecha = new Date(
-      Number(anio), Number(mes) - 1, Number(dia),
-      Number(hora), Number(minuto), Number(segundo),
-    );
-    return new Intl.DateTimeFormat('es-HN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: 'numeric', minute: '2-digit', hour12: true,
-    }).format(fecha).replace(',', '');
+    return formatearFechaHoraHonduras(valor);
   }
 
   public rutaRetorno(): string {
@@ -504,19 +495,8 @@ export class ListaPedidosComponent implements OnInit {
     });
   }
 
-  private obtenerFechaLocalActual(): string {
-    const fechaActual = new Date();
-    const anio = fechaActual.getFullYear();
-    const mes = String(fechaActual.getMonth() + 1).padStart(2, '0');
-    const dia = String(fechaActual.getDate()).padStart(2, '0');
-    return `${anio}-${mes}-${dia}`;
-  }
-
   private formatearMomentoImpresion(fecha: Date): string {
-    return new Intl.DateTimeFormat('es-HN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
-    }).format(fecha).replace(',', '');
+    return formatearFechaHoraHonduras(fecha, true);
   }
 
   private construirFiltros(): FiltrosPedidos {
@@ -559,7 +539,7 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private restaurarEstadoDesdeUrl(parametros: ParamMap): void {
-    const fechaActual = this.obtenerFechaLocalActual();
+    const fechaActual = obtenerFechaLocalActual();
     const guardados = this.leerFiltrosGuardados();
     const cantidadSolicitada = Number(parametros.get('cantidadPorPagina') ?? guardados.cantidadPorPagina);
     const paginaSolicitada = Number(parametros.get('pagina') ?? guardados.pagina);
@@ -582,15 +562,15 @@ export class ListaPedidosComponent implements OnInit {
 
   private guardarFiltros(): void {
     try {
-      localStorage.setItem(claveFiltrosPedidos, JSON.stringify({
+      guardarFiltrosSesion(claveFiltrosPedidos, {
         ...this.filtrosFormulario, pagina: this.pagina(),
-      }));
+      });
     } catch { /* La pantalla conserva los filtros mientras permanece abierta. */ }
   }
 
   private leerFiltrosGuardados(): Partial<FormularioFiltros> & { pagina?: number } {
     try {
-      const valor = JSON.parse(localStorage.getItem(claveFiltrosPedidos) ?? '{}');
+      const valor = leerFiltrosSesion(claveFiltrosPedidos);
       return valor && typeof valor === 'object' ? valor as Partial<FormularioFiltros> & { pagina?: number } : {};
     } catch { return {}; }
   }
