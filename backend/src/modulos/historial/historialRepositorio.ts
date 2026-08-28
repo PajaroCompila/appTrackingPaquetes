@@ -2,14 +2,11 @@ import sql from 'mssql';
 import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedidosBodega.js';
 import { obtenerPoolSistemaOrigen } from '../../infraestructura/sql/conexionSistemaOrigen.js';
 import { consultarSistemaOrigen } from '../../infraestructura/sql/consultaSistemaOrigen.js';
-import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import type { FiltrosHistorial, PaginaHistorial, PedidoHistorial } from './historial.interface.js';
 import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionBaseDatos.js';
-import { fechaSqlSinZona } from '../../compartido/fechaSql.js';
 
 export interface CandidatoValidacion { idOrigen: string; folioPedido: string }
-export interface CandidatoSap { idOrigen: string; sapDocEntry: string }
 export interface EstadoR1Detectado {
   codigoSucursal: string | null;
   codigoEstadoVenta: string | null;
@@ -34,39 +31,6 @@ export class HistorialRepositorio {
       ORDER BY despachadoEn, idPedidoDespachado;
     `);
     return resultado.recordset;
-  }
-
-  public async obtenerDespachadosSapPendientes(): Promise<CandidatoSap[]> {
-    const resultado = await this.proveedorPedidosBodega().request().query<CandidatoSap>(`
-      SELECT TOP (1000) idOrigen, sapDocEntry
-      FROM dbo.PedidoDespachado
-      WHERE estadoLocal = 'DESPACHADO'
-        AND origenPedido = 'SAP'
-        AND NULLIF(LTRIM(RTRIM(sapDocEntry)), '') IS NOT NULL
-      ORDER BY despachadoEn, idPedidoDespachado;
-    `);
-    return resultado.recordset;
-  }
-
-  public async obtenerCerradosSap(candidatos: CandidatoSap[]): Promise<string[]> {
-    if (candidatos.length === 0) return [];
-    const unicos = [...new Map(candidatos.slice(0, 1000)
-      .map((candidato) => [candidato.sapDocEntry, candidato])).values()];
-    const parametros = unicos.map((_, indice) => `@docEntry${indice}`);
-    const resultado = await consultarSap<{ docEntry: number }>(`
-      SELECT pedido.[DocEntry] AS docEntry
-      FROM [dbo].[ORDR] pedido
-      WHERE pedido.[DocEntry] IN (${parametros.join(', ')})
-        AND pedido.[DocStatus] = @estadoCerrado;
-    `, (solicitud) => {
-      solicitud.input('estadoCerrado', sql.Char(1), 'C');
-      unicos.forEach(({ sapDocEntry }, indice) =>
-        solicitud.input(`docEntry${indice}`, sql.Int, Number(sapDocEntry)));
-      return solicitud;
-    });
-    const cerrados = new Set(resultado.recordset.map(({ docEntry }) => String(docEntry)));
-    return unicos.filter(({ sapDocEntry }) => cerrados.has(sapDocEntry))
-      .map(({ idOrigen }) => idOrigen);
   }
 
   public async obtenerEstadosR1(candidatos: CandidatoValidacion[]): Promise<Map<string, EstadoR1Detectado>> {
@@ -193,18 +157,16 @@ export class HistorialRepositorio {
         SELECT pedido.*, usuario.nombreVisible usuarioDespacho, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
-        WHERE pedido.origenPedido = 'SAP'
-          AND pedido.creadoEnR1 = 0
-          AND pedido.estadoLocal = 'VALIDADO'
+        WHERE pedido.estadoLocal = 'VALIDADO'
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
-          AND pedido.despachadoEn >= @fechaDesde
-          AND pedido.despachadoEn < DATEADD(day, 1, @fechaHasta)
-          AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido))
+          AND pedido.validadoDetectadoEn >= @fechaDesde
+          AND pedido.validadoDetectadoEn < DATEADD(day, 1, @fechaHasta)
+          AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
           ${parametrosAlmacen.length > 0 ? `AND EXISTS (
             SELECT 1 FROM dbo.PedidoDespachadoDetalle filtro
             WHERE filtro.idPedidoDespachado = pedido.idPedidoDespachado
               AND filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')}))` : ''}
-        ORDER BY pedido.despachadoEn DESC, pedido.idPedidoDespachado DESC
+        ORDER BY pedido.validadoDetectadoEn DESC, pedido.idPedidoDespachado DESC
         OFFSET @inicio ROWS FETCH NEXT @cantidad ROWS ONLY
       )
       SELECT pedido.*, detalle.identificadorDetalle, detalle.numeroLinea,
@@ -216,7 +178,7 @@ export class HistorialRepositorio {
       JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
       ${parametrosAlmacen.length > 0
         ? `WHERE detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
-      ORDER BY pedido.despachadoEn DESC, pedido.idPedidoDespachado DESC,
+      ORDER BY pedido.validadoDetectadoEn DESC, pedido.idPedidoDespachado DESC,
         TRY_CONVERT(bigint, detalle.identificadorDetalle), detalle.identificadorDetalle, detalle.numeroLinea;
     `);
     const mapa = new Map<string, PedidoHistorial>();
@@ -227,11 +189,10 @@ export class HistorialRepositorio {
           sapDocEntry: fila.sapDocEntry, folioPedido: fila.folioPedido ?? '', numeroPedido: fila.numeroPedido,
           codigoVenta: null, codigoVendedor: null, nombreVendedor: fila.nombreVendedor,
           codigosAlmacen: [], nombresBodega: null,
-          fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
-          codigoEstadoVenta: 'C', codigoSincronizacion: null, articulos: [],
+          fechaHoraPedido: fila.fechaHoraPedido?.toISOString() ?? null,
+          codigoEstadoVenta: 'VALIDADO', codigoSincronizacion: null, articulos: [],
           estadoLocal: 'VALIDADO', despachadoEn: fila.despachadoEn.toISOString(),
-          validadoDetectadoEn: fila.validadoDetectadoEn?.toISOString() ?? null,
-          usuarioDespacho: fila.usuarioDespacho,
+          validadoDetectadoEn: fila.validadoDetectadoEn.toISOString(), usuarioDespacho: fila.usuarioDespacho,
         });
       }
       mapa.get(fila.idOrigen)!.articulos.push({

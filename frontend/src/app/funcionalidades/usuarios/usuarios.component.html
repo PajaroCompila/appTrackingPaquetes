@@ -7,7 +7,7 @@
     <button class="boton boton-primario">Buscar</button>
   </form>
   @if(error()){<p class="texto-error" role="alert">{{error()}}</p>}
-  <div class="panel tabla-contenedor"><table><thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>@for(u of usuarios();track u.usuarioId){<tr><td>{{u.nombreCompleto}}</td><td>{{u.nombreUsuario}}</td><td>{{u.nombreRol}}</td><td>{{u.activo?'Activo':'Inactivo'}}</td><td>{{fecha(u.ultimoAcceso)}}</td><td class="acciones"><button (click)="editar(u)">Editar</button><button (click)="cambiarEstado(u)">{{u.activo?'Desactivar':'Activar'}}</button><button (click)="restablecer(u)">Restablecer contraseña</button></td></tr>}</tbody></table></div>
+  <div class="panel tabla-contenedor"><table><thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>@for(u of usuarios();track u.usuarioId){<tr><td>{{u.nombreCompleto}}</td><td>{{u.nombreUsuario}}</td><td>{{u.nombreRol}}</td><td>{{u.activo?'Activo':'Inactivo'}}</td><td>{{u.ultimoAcceso?(u.ultimoAcceso|date:'dd/MM/yyyy HH:mm':'UTC'):'—'}}</td><td class="acciones"><button (click)="editar(u)">Editar</button><button (click)="cambiarEstado(u)">{{u.activo?'Desactivar':'Activar'}}</button><button (click)="restablecer(u)">Restablecer contraseña</button></td></tr>}</tbody></table></div>
   <nav class="paginacion"><button class="boton boton-secundario" (click)="anterior()" [disabled]="pagina()===1">Anterior</button><span>Página {{pagina()}}</span><button class="boton boton-secundario" (click)="siguiente()" [disabled]="!hayMas()">Siguiente</button></nav>
   @if(modal()){
     <div class="fondo-modal">

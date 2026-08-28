@@ -1,4 +1,4 @@
-<section class="pagina vista-pedidos vista-despachados" [class.pagina-detalle]="idOrigen()">
+<section class="pagina" [class.pagina-detalle]="idOrigen()">
   @if (idOrigen()) {
     <app-detalle-pedido-vista
       [configuracion]="configuracionDetalle()"
@@ -9,59 +9,7 @@
       (reintentar)="reintentarDetalle()"
     />
   } @else {
-    <div class="encabezado-pagina">
-      <div>
-        <p class="sobrelinea">Pedidos</p>
-        <h1>Pedidos despachados</h1>
-        <p>Pedidos preparados por bodega que esperan confirmación de entrega.</p>
-      </div>
-    </div>
-
-    <form class="panel filtros" (ngSubmit)="buscar()">
-      <div class="campo">
-        <label for="numeroPedidoDespachado">Número de pedido</label>
-        <input id="numeroPedidoDespachado" name="numeroPedido" inputmode="numeric" maxlength="20" [(ngModel)]="filtros.numeroPedido" />
-      </div>
-      <div class="campo">
-        <label for="fechaDesdeDespachado">Fecha desde</label>
-        <input id="fechaDesdeDespachado" name="fechaDesde" type="date" [(ngModel)]="filtros.fechaDesde" />
-      </div>
-      <div class="campo">
-        <label for="fechaHastaDespachado">Fecha hasta</label>
-        <input id="fechaHastaDespachado" name="fechaHasta" type="date" [(ngModel)]="filtros.fechaHasta" />
-      </div>
-      <div class="campo campo-amplio">
-        <span id="etiqueta-almacenes-despachados" class="etiqueta-campo">Almacenes</span>
-        <details class="selector-multiple">
-          <summary aria-labelledby="etiqueta-almacenes-despachados">{{ resumenAlmacenes() }}</summary>
-          <fieldset>
-            <legend class="solo-lectores">Seleccionar almacenes</legend>
-            <div class="opciones-almacenes">
-              @for (almacen of almacenes(); track almacen.codigoAlmacen) {
-                <label class="opcion-almacen">
-                  <input type="checkbox" [checked]="estaSeleccionado(almacen.codigoAlmacen)"
-                    (change)="alternarAlmacen(almacen.codigoAlmacen, $any($event.target).checked)" />
-                  <span class="datos-almacen"><strong>{{ almacen.codigoAlmacen }}</strong><small>{{ almacen.nombreAlmacen }} · {{ almacen.nombreSucursal }}</small></span>
-                </label>
-              }
-            </div>
-            @if (filtros.codigosAlmacen.length > 0) {
-              <button class="limpiar-seleccion" type="button" (click)="limpiarAlmacenes()">Limpiar selección</button>
-            }
-          </fieldset>
-        </details>
-      </div>
-      <div class="campo">
-        <label for="cantidadDespachados">Pedidos por página</label>
-        <select id="cantidadDespachados" name="cantidadPorPagina" [(ngModel)]="filtros.cantidadPorPagina" (change)="cambiarCantidadPorPagina()">
-          <option [ngValue]="25">25</option><option [ngValue]="50">50</option><option [ngValue]="100">100</option>
-        </select>
-      </div>
-      <div class="acciones-filtros">
-        <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
-        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
-      </div>
-    </form>
+    <div class="encabezado-pagina"><h1>Pedidos despachados</h1></div>
 
     @if (cargando()) {
       <div class="estado-interfaz"><p>Cargando pedidos…</p></div>
@@ -72,42 +20,24 @@
     } @else {
       <div class="panel tabla-contenedor">
         <table>
-          <colgroup>
-            <col class="ancho-pedido" />
-            <col class="ancho-codigo" />
-            <col class="ancho-descripcion" />
-            <col class="ancho-cantidad" />
-            <col class="ancho-bodega" />
-            <col class="ancho-fecha" />
-            <col class="ancho-estado" />
-            <col class="ancho-vendedor" />
-            <col class="ancho-despachado" />
-            <col class="ancho-usuario" />
-            <col class="ancho-detalle" />
-          </colgroup>
           <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
           @for (pedido of pedidos(); track pedido.idOrigen) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
                 <tr>
-                  <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td class="codigo-articulo-en-linea" data-label="Código" [title]="articulo.codigoArticulo || '—'">{{ articulo.codigoArticulo || '—' }}</td>
-                  <td data-label="Descripción" [title]="articulo.descripcion || '—'"><span class="texto-dos-lineas descripcion-despachado">{{ articulo.descripcion || '—' }}</span></td><td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
-                  <td data-label="Bodega">{{ articulo.codigoAlmacen || '—' }}</td><td data-label="Fecha y hora" [title]="fecha(pedido.fechaHoraPedido)"><span class="texto-dos-lineas">{{ fecha(pedido.fechaHoraPedido) }}</span></td>
-                  <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td><td data-label="Vendedor" [title]="pedido.nombreVendedor || '—'"><span class="texto-dos-lineas">{{ pedido.nombreVendedor || '—' }}</span></td>
-                  <td data-label="Despachado" [title]="fecha(articulo.transferidoEn || pedido.despachadoEn)"><span class="texto-dos-lineas">{{ fecha(articulo.transferidoEn || pedido.despachadoEn) }}</span></td>
-                  <td data-label="Usuario" [title]="articulo.usuarioTransferencia || pedido.usuarioDespacho"><span class="texto-dos-lineas">{{ articulo.usuarioTransferencia || pedido.usuarioDespacho }}</span></td>
-                  <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
+                  <td>{{ pedido.numeroPedido }}</td><td>{{ articulo.codigoArticulo || '—' }}</td>
+                  <td>{{ articulo.descripcion || '—' }}</td><td>{{ articulo.cantidad ?? '—' }}</td>
+                  <td>{{ articulo.codigoAlmacen || '—' }}</td><td>{{ fecha(pedido.fechaHoraPedido) }}</td>
+                  <td>Esperando entrega en R1</td><td>{{ pedido.nombreVendedor || '—' }}</td>
+                  <td>{{ fecha(articulo.transferidoEn || pedido.despachadoEn) }}</td>
+                  <td>{{ articulo.usuarioTransferencia || pedido.usuarioDespacho }}</td>
+                  <td><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
                 </tr>
               }
             </tbody>
           }
         </table>
       </div>
-      <nav class="paginacion" aria-label="Paginación de pedidos despachados">
-        <button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button>
-        <span>Página {{ pagina() }} · {{ totalRegistros() }} pedidos</span>
-        <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button>
-      </nav>
     }
   }
 </section>

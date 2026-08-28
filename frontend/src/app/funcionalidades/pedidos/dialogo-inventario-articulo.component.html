@@ -32,7 +32,7 @@
         </div>
       } @else if (inventario) {
         <dl class="datos-inventario">
-          <div><dt>Código</dt><dd class="codigo-articulo-en-linea">{{ inventario.codigoArticulo }}</dd></div>
+          <div><dt>Código</dt><dd>{{ inventario.codigoArticulo }}</dd></div>
           <div class="dato-descripcion"><dt>Descripción</dt><dd>{{ inventario.descripcion }}</dd></div>
           <div><dt>Almacén consultado</dt><dd>{{ inventario.codigoAlmacen }} — {{ inventario.nombreAlmacen }}</dd></div>
           <div class="existencia"><dt>Existencia física en SAP</dt><dd>{{ formatearUnidades(inventario.existenciaFisica) }} unidades</dd></div>

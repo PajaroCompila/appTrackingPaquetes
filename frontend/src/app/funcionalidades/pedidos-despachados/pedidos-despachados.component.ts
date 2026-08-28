@@ -1,7 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
@@ -11,10 +9,6 @@ import type {
   PedidoDetalleVisual,
 } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
 import type { PedidoResumen } from '../pedidos/pedido.interface';
-import type { Almacen } from '../pedidos/almacen.interface';
-import { AlmacenesService } from '../pedidos/almacenes.service';
-import { guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
-import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -23,38 +17,20 @@ interface Despachado extends PedidoResumen {
   esParcial?: boolean | null;
 }
 
-interface FiltrosDespachados {
-  numeroPedido: string;
-  fechaDesde: string;
-  fechaHasta: string;
-  codigosAlmacen: string[];
-  cantidadPorPagina: 25 | 50 | 100;
-}
-
-const claveFiltrosDespachados = 'pedidosDespachados';
-const filtrosIniciales = (): FiltrosDespachados => ({
-  numeroPedido: '', fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
-  codigosAlmacen: [], cantidadPorPagina: 25,
-});
-
 @Component({
   selector: 'app-pedidos-despachados',
-  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent],
+  imports: [RouterLink, DetallePedidoVistaComponent],
   templateUrl: './pedidos-despachados.component.html',
   styleUrl: '../pedidos/lista-pedidos.component.css',
 })
 export class PedidosDespachadosComponent implements OnInit {
   private readonly clienteHttp = inject(HttpClient);
-  private readonly almacenesServicio = inject(AlmacenesService);
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
   private readonly destruirRef = inject(DestroyRef);
+  private pagina = 1;
+  private cantidadPorPagina = 100;
   private temporizador?: ReturnType<typeof setInterval>;
-  public filtros = filtrosIniciales();
-  public readonly pagina = signal(1);
-  public readonly hayMas = signal(false);
-  public readonly totalRegistros = signal(0);
-  public readonly almacenes = signal<Almacen[]>([]);
   public readonly pedidos = signal<Despachado[]>([]);
   public readonly idOrigen = signal<string | null>(null);
   public readonly cargando = signal(true);
@@ -116,97 +92,20 @@ export class PedidosDespachadosComponent implements OnInit {
       return;
     }
 
-    this.hidratarFiltros();
-    this.cargarAlmacenes();
+    this.pagina = Math.max(1, Number(this.ruta.snapshot.queryParamMap.get('pagina')) || 1);
+    const cantidadSolicitada = Number(this.ruta.snapshot.queryParamMap.get('cantidadPorPagina'));
+    this.cantidadPorPagina = [25, 50, 100].includes(cantidadSolicitada) ? cantidadSolicitada : 100;
     this.cargarListado();
     this.temporizador = setInterval(() => this.cargarListado(), 5000);
     this.destruirRef.onDestroy(() => this.temporizador && clearInterval(this.temporizador));
   }
 
   private cargarListado(): void {
-    let parametros = new HttpParams()
-      .set('pagina', this.pagina())
-      .set('cantidadPorPagina', this.filtros.cantidadPorPagina)
-      .set('fechaDesde', this.filtros.fechaDesde)
-      .set('fechaHasta', this.filtros.fechaHasta);
-    if (this.filtros.numeroPedido.trim()) {
-      parametros = parametros.set('numeroPedido', this.filtros.numeroPedido.trim());
-    }
-    for (const codigo of this.filtros.codigosAlmacen) {
-      parametros = parametros.append('codigoAlmacen', codigo);
-    }
     this.clienteHttp.get<{ datos: Despachado[] }>(
       `${environment.urlApi}/pedidos-despachados`,
-      { params: parametros },
-    ).subscribe({ next: (respuesta) => {
-      const paginacion = (respuesta as { paginacion?: { hayMas?: boolean; totalRegistros?: number } }).paginacion;
-      this.hayMas.set(Boolean(paginacion?.hayMas));
-      this.totalRegistros.set(paginacion?.totalRegistros ?? respuesta.datos.length);
-      this.finalizarCarga(respuesta.datos);
-    }, error: () => this.marcarError() });
-  }
-
-  public buscar(): void { this.actualizarListado(1); }
-  public limpiarFiltros(): void { this.filtros = filtrosIniciales(); this.actualizarListado(1); }
-  public cambiarCantidadPorPagina(): void { this.actualizarListado(1); }
-  public estaSeleccionado(codigo: string): boolean { return this.filtros.codigosAlmacen.includes(codigo); }
-  public alternarAlmacen(codigo: string, seleccionado: boolean): void {
-    this.filtros.codigosAlmacen = seleccionado
-      ? [...new Set([...this.filtros.codigosAlmacen, codigo])]
-      : this.filtros.codigosAlmacen.filter((actual) => actual !== codigo);
-    this.guardarFiltros();
-  }
-  public limpiarAlmacenes(): void { this.filtros.codigosAlmacen = []; this.guardarFiltros(); }
-  public resumenAlmacenes(): string {
-    const cantidad = this.filtros.codigosAlmacen.length;
-    return cantidad === 0 ? 'Todos los almacenes'
-      : cantidad === 1 ? this.filtros.codigosAlmacen[0]! : `${cantidad} almacenes seleccionados`;
-  }
-  public paginaAnterior(): void { if (this.pagina() > 1 && !this.cargando()) this.actualizarListado(this.pagina() - 1); }
-  public paginaSiguiente(): void { if (this.hayMas() && !this.cargando()) this.actualizarListado(this.pagina() + 1); }
-
-  private actualizarListado(pagina: number): void {
-    this.pagina.set(pagina); this.guardarFiltros(); this.actualizarUrl();
-    this.cargando.set(true); this.error.set(false); this.cargarListado();
-  }
-
-  private actualizarUrl(): void {
-    const queryParams: Record<string, string | number | string[]> = {
-      pagina: this.pagina(), cantidadPorPagina: this.filtros.cantidadPorPagina,
-      fechaDesde: this.filtros.fechaDesde, fechaHasta: this.filtros.fechaHasta,
-    };
-    if (this.filtros.numeroPedido.trim()) queryParams['numeroPedido'] = this.filtros.numeroPedido.trim();
-    if (this.filtros.codigosAlmacen.length) queryParams['codigoAlmacen'] = this.filtros.codigosAlmacen;
-    void this.enrutador.navigate([], { relativeTo: this.ruta, queryParams, replaceUrl: true });
-  }
-
-  private hidratarFiltros(): void {
-    const parametros = this.ruta.snapshot.queryParamMap;
-    const guardados = leerFiltrosSesion(claveFiltrosDespachados);
-    const fechaValida = (valor: unknown): valor is string => typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor);
-    const codigosGuardados = Array.isArray(guardados['codigosAlmacen'])
-      ? guardados['codigosAlmacen'].filter((codigo): codigo is string => typeof codigo === 'string') : [];
-    const codigosUrl = parametros.getAll('codigoAlmacen').map((codigo) => codigo.trim()).filter(Boolean);
-    const cantidad = Number(parametros.get('cantidadPorPagina') ?? guardados['cantidadPorPagina']);
-    this.filtros = {
-      numeroPedido: parametros.get('numeroPedido') ?? (typeof guardados['numeroPedido'] === 'string' ? guardados['numeroPedido'] : ''),
-      fechaDesde: parametros.get('fechaDesde') ?? (fechaValida(guardados['fechaDesde']) ? guardados['fechaDesde'] : obtenerFechaLocalActual()),
-      fechaHasta: parametros.get('fechaHasta') ?? (fechaValida(guardados['fechaHasta']) ? guardados['fechaHasta'] : obtenerFechaLocalActual()),
-      codigosAlmacen: [...new Set(codigosUrl.length ? codigosUrl : codigosGuardados)],
-      cantidadPorPagina: cantidad === 50 || cantidad === 100 ? cantidad : 25,
-    };
-    this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados['pagina']) || 1));
-    this.guardarFiltros(); this.actualizarUrl();
-  }
-
-  private guardarFiltros(): void {
-    guardarFiltrosSesion(claveFiltrosDespachados, { ...this.filtros, pagina: this.pagina() });
-  }
-
-  private cargarAlmacenes(): void {
-    this.almacenesServicio.obtenerAlmacenes().pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
-      next: ({ datos }) => this.almacenes.set(datos), error: () => this.almacenes.set([]),
-    });
+      { params: new HttpParams().set('pagina', this.pagina)
+        .set('cantidadPorPagina', this.cantidadPorPagina) },
+    ).subscribe({ next: ({ datos }) => this.finalizarCarga(datos), error: () => this.marcarError() });
   }
 
   public regresar(): void {
@@ -226,7 +125,7 @@ export class PedidosDespachadosComponent implements OnInit {
   }
 
   public fecha(valor: string | null | undefined): string {
-    return formatearFechaHoraHonduras(valor);
+    return valor ? new Date(valor).toLocaleString('es-HN') : '—';
   }
 
   public reintentarDetalle(): void {

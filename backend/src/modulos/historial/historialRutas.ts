@@ -30,6 +30,21 @@ historialRutas.get('/', async (solicitud, respuesta, siguiente) => {
   }
 });
 
+historialRutas.get('/articulos', async (solicitud, respuesta, siguiente) => {
+  const validacion = esquemaFiltrosHistorial.safeParse(solicitud.query);
+  if (!validacion.success) {
+    siguiente(new ErrorAplicacion(400, 'FILTROS_HISTORIAL_INVALIDOS', 'Los filtros del historial no son válidos.'));
+    return;
+  }
+  try {
+    const pagina = await servicio.buscarArticulos(validacion.data);
+    respuesta.json({ datos: pagina.registros, paginacion: {
+      pagina: pagina.pagina, cantidadPorPagina: pagina.cantidadPorPagina,
+      cantidadDevuelta: pagina.registros.length, hayMas: pagina.hayMas,
+    } });
+  } catch (error) { siguiente(error); }
+});
+
 historialRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
   try {
     const pedido = await servicio.obtener(idOrigen.parse(solicitud.params.idOrigen));

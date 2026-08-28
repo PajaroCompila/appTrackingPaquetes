@@ -20,7 +20,6 @@ const pedido = {
 
 describe('PedidosDespachadosComponent', () => {
   function configurar(idOrigen: string | null, retorno: string | null = null): void {
-    sessionStorage.clear();
     TestBed.configureTestingModule({
       imports: [PedidosDespachadosComponent],
       providers: [
@@ -35,7 +34,7 @@ describe('PedidosDespachadosComponent', () => {
             },
           },
         },
-        { provide: Router, useValue: { url: '/pedidos-despachados?pagina=2&cantidadPorPagina=25', navigate: vi.fn().mockResolvedValue(true), navigateByUrl: vi.fn() } },
+        { provide: Router, useValue: { url: '/pedidos-despachados?pagina=2&cantidadPorPagina=25', navigateByUrl: vi.fn() } },
       ],
     });
   }
@@ -79,30 +78,5 @@ describe('PedidosDespachadosComponent', () => {
     expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith(
       '/pedidos-despachados?pagina=2&cantidadPorPagina=25',
     );
-  });
-
-  it('muestra filtros y envía pedido, fechas, almacenes y paginación', () => {
-    configurar(null);
-    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
-    fixture.detectChanges();
-    const http = TestBed.inject(HttpTestingController);
-    const inicial = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
-    expect(inicial.request.params.get('fechaDesde')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    inicial.flush({ datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false } });
-    http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [] });
-    const componente = fixture.componentInstance;
-    componente.filtros.numeroPedido = '101469987';
-    componente.filtros.fechaDesde = '2026-08-15';
-    componente.filtros.fechaHasta = '2026-08-19';
-    componente.alternarAlmacen('BSPS01', true);
-    componente.alternarAlmacen('BSPS02', true);
-    componente.buscar();
-    const filtrada = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
-    expect(filtrada.request.params.get('numeroPedido')).toBe('101469987');
-    expect(filtrada.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01', 'BSPS02']);
-    expect(filtrada.request.params.get('fechaDesde')).toBe('2026-08-15');
-    expect(filtrada.request.params.get('fechaHasta')).toBe('2026-08-19');
-    filtrada.flush({ datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false } });
-    fixture.destroy();
   });
 });

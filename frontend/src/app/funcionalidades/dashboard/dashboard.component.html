@@ -58,6 +58,6 @@
     </section>
 
     <div class="panel tabla-contenedor surface-card shadow-2 border-round-xl"><table><caption>Valores exactos por tienda</caption><thead><tr><th>Código de tienda</th><th>Nombre de tienda</th><th>Pedidos pendientes</th><th>Pedidos entregados</th></tr></thead><tbody>@for (tienda of datos()!.porTienda; track tienda.codigoTienda ?? $index) {<tr><td data-label="Código de tienda">{{ tienda.codigoTienda || '—' }}</td><td data-label="Nombre de tienda">{{ tienda.nombreTienda || '—' }}</td><td data-label="Pedidos pendientes">{{ tienda.disponible ? tienda.pendientes : '—' }}</td><td data-label="Pedidos entregados">{{ tienda.disponible ? tienda.validados : '—' }}</td></tr>}</tbody></table></div>
-    <p class="ultima-actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ datos()!.consultadoEn | date:'hh:mm:ss a':'-0600' }}</p>
+    <p class="ultima-actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ datos()!.consultadoEn | date:'hh:mm:ss a' }}</p>
   }
 </section>

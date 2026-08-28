@@ -1,4 +1,4 @@
-<section class="pagina vista-pedidos" aria-labelledby="titulo-pedidos">
+<section class="pagina" aria-labelledby="titulo-pedidos">
   <div class="encabezado-pagina">
     <div>
       <p class="sobrelinea">Pedidos</p>
@@ -94,7 +94,7 @@
   @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
   @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
   @if (!actualizando() && ultimaActualizacion()) {
-    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a':'-0600' }}</p>
+    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a' }}</p>
   }
 
   @if (cargando()) {
@@ -168,7 +168,7 @@
                 </td>
                 <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
                 <td
-                  class="codigo-consultable codigo-articulo-en-linea"
+                  class="codigo-consultable"
                   data-label="Código"
                   title="Doble clic para consultar inventario"
                   (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"

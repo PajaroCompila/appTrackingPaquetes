@@ -21,4 +21,21 @@ describe('HistorialService', () => {
       cantidadDevuelta: 0, hayMas: false } });
     http.verify();
   });
+
+  it('consulta partidas históricas con los mismos filtros y paginación por artículo', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const servicio = TestBed.inject(HistorialService);
+    const http = TestBed.inject(HttpTestingController);
+    servicio.buscarArticulos({ fechaDesde: '2026-08-01', fechaHasta: '2026-08-28',
+      numeroPedido: '101500100', codigosAlmacen: ['BSPS01'], pagina: 2,
+      cantidadPorPagina: 25 }).subscribe();
+    const solicitud = http.expectOne((peticion) =>
+      peticion.url.endsWith('/api/historial-validados/articulos'));
+    expect(solicitud.request.params.get('numeroPedido')).toBe('101500100');
+    expect(solicitud.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01']);
+    expect(solicitud.request.params.get('pagina')).toBe('2');
+    solicitud.flush({ datos: [], paginacion: { pagina: 2, cantidadPorPagina: 25,
+      cantidadDevuelta: 0, hayMas: false } });
+    http.verify();
+  });
 });
