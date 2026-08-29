@@ -54,5 +54,9 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true,
+    "esbuild@0.28.1": true
   }
 }

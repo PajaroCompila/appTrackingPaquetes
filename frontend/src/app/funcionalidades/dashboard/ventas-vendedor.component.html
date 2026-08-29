@@ -25,6 +25,6 @@
         @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) { <tr><td>{{ vendedor.codigoVendedor || '—' }}</td><td>{{ nombreVendedor(vendedor.nombreVendedor) }}</td><td>{{ vendedor.ventasValidadas }}</td></tr> }
       </tbody></table></div>
     }
-    <p class="actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ resumen.consultadoEn | date:'hh:mm:ss a' }}</p>
+    <p class="actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ resumen.consultadoEn | date:'hh:mm:ss a':'-0600' }}</p>
   }
 </section>

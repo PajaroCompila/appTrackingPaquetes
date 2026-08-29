@@ -1,5 +1,5 @@
 .filtros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-.acciones-filtros { display: flex; align-items: end; }
+.acciones-filtros { display: flex; align-items: end; gap: .75rem; }
 .etiqueta-campo { color: #34495d; font-size: 13px; font-weight: 600; }
 .selector-multiple { position: relative; }
 .selector-multiple summary { display: flex; min-height: 2.65rem; align-items: center; justify-content: space-between; padding: .58rem .7rem; border: 1px solid #aebdca; border-radius: .48rem; background: #fff; cursor: pointer; list-style: none; }

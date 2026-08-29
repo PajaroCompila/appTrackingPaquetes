@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import cookieParser from 'cookie-parser';
@@ -18,6 +21,8 @@ import { inventarioArticuloRutas } from './modulos/articulos/inventarioArticuloR
 import { dashboardRutas } from './modulos/dashboard/dashboardRutas.js';
 
 export const aplicacion = express();
+const directorioFrontend = join(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist/frontend/browser');
+const archivoIndiceFrontend = join(directorioFrontend, 'index.html');
 
 function esOrigenLocalPermitido(origen: string): boolean {
   try {
@@ -72,5 +77,20 @@ aplicacion.use('/api/articulos', requerirAutenticacion, requerirContrasenaActual
 aplicacion.use('/api/historial-validados', requerirAutenticacion, requerirContrasenaActualizada, historialRutas);
 aplicacion.use('/api/pedidos-despachados', requerirAutenticacion, requerirContrasenaActualizada, despachoRutas);
 aplicacion.use('/api/dashboard', requerirAutenticacion, requerirContrasenaActualizada, dashboardRutas);
+
+if (configuracion.servirFrontend) {
+  if (existsSync(archivoIndiceFrontend)) {
+    aplicacion.use(express.static(directorioFrontend, {
+      index: false,
+      maxAge: configuracion.entorno === 'produccion' ? '1h' : 0,
+    }));
+    aplicacion.get(/^\/(?!api(?:\/|$)).*/, (_solicitud, respuesta) => {
+      respuesta.sendFile(archivoIndiceFrontend);
+    });
+  } else {
+    console.warn('SERVIR_FRONTEND está activo, pero no existe el build de Angular.');
+  }
+}
+
 aplicacion.use(manejarRutaNoEncontrada);
 aplicacion.use(manejarError);

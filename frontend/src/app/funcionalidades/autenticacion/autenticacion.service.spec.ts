@@ -8,6 +8,7 @@ describe('AutenticacionService', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const servicio = TestBed.inject(AutenticacionService);
     const http = TestBed.inject(HttpTestingController);
+    sessionStorage.setItem('pedidosBodega.filtros.pedidos', '{"fechaDesde":"2026-08-15"}');
     servicio.iniciarSesion('operador', 'secreto').subscribe();
     const solicitud = http.expectOne((peticion) => peticion.url.endsWith('/autenticacion/iniciar-sesion'));
     expect(solicitud.request.body).toEqual({ nombreUsuario: 'operador', contrasena: 'secreto' });

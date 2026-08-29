@@ -5,7 +5,7 @@ import type {
   ErrorDetalleVisual,
   PedidoDetalleVisual,
 } from './detalle-pedido-vista.interface';
-import { formatearFechaHoraHonduras } from '../formatear-fecha-honduras';
+import { formatearFechaHoraHonduras } from '../fechas/fecha-honduras';
 
 @Component({
   selector: 'app-detalle-pedido-vista',
@@ -27,7 +27,7 @@ export class DetallePedidoVistaComponent {
   }
 
   public fecha(valor: string | null | undefined): string {
-    return formatearFechaHoraHonduras(valor);
+    return valor ? formatearFechaHoraHonduras(valor) : 'No disponible';
   }
 
   public totalUnidades(articulos: ArticuloDetalleVisual[]): number | string {

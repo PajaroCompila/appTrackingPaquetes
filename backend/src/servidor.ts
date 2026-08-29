@@ -19,6 +19,63 @@ import {
 
 let servidor: Server | undefined;
 let cerrando = false;
+let dependenciasDatosDisponibles = false;
+let inicializandoDependenciasDatos = false;
+let temporizadorReintentoDependencias: NodeJS.Timeout | undefined;
+
+const tiempoMaximoInicializacionDatosMs = 35000;
+const retrasoReintentoInicializacionDatosMs = 15000;
+
+function conTiempoMaximo<T>(promesa: Promise<T>, tiempoMaximoMs: number, descripcion: string): Promise<T> {
+  let temporizador: NodeJS.Timeout | undefined;
+  const tiempoAgotado = new Promise<never>((_, rechazar) => {
+    temporizador = setTimeout(() => {
+      rechazar(new Error(`${descripcion} superó ${tiempoMaximoMs} ms.`));
+    }, tiempoMaximoMs);
+    temporizador.unref();
+  });
+
+  return Promise.race([promesa, tiempoAgotado]).finally(() => {
+    if (temporizador) {
+      clearTimeout(temporizador);
+    }
+  });
+}
+
+function programarReintentoDependenciasDatos(): void {
+  if (cerrando || temporizadorReintentoDependencias) {
+    return;
+  }
+
+  temporizadorReintentoDependencias = setTimeout(() => {
+    temporizadorReintentoDependencias = undefined;
+    void inicializarDependenciasDatos();
+  }, retrasoReintentoInicializacionDatosMs);
+  temporizadorReintentoDependencias.unref();
+}
+
+async function inicializarDependenciasDatos(): Promise<void> {
+  if (dependenciasDatosDisponibles || inicializandoDependenciasDatos || cerrando) {
+    return;
+  }
+
+  inicializandoDependenciasDatos = true;
+  try {
+    await conTiempoMaximo(
+      Promise.all([inicializarConexionSistemaOrigen(), inicializarConexionPedidosBodega()]),
+      tiempoMaximoInicializacionDatosMs,
+      'La inicialización de conexiones SQL',
+    );
+    dependenciasDatosDisponibles = true;
+    iniciarSincronizadorHistorial();
+    console.info('Conexiones SQL disponibles.');
+  } catch (error) {
+    console.error('No fue posible inicializar las conexiones SQL; se reintentará en segundo plano.', error);
+    programarReintentoDependenciasDatos();
+  } finally {
+    inicializandoDependenciasDatos = false;
+  }
+}
 
 async function cerrarServidor(senal: NodeJS.Signals): Promise<void> {
   if (cerrando) {
@@ -27,6 +84,10 @@ async function cerrarServidor(senal: NodeJS.Signals): Promise<void> {
 
   cerrando = true;
   detenerSincronizadorHistorial();
+  if (temporizadorReintentoDependencias) {
+    clearTimeout(temporizadorReintentoDependencias);
+    temporizadorReintentoDependencias = undefined;
+  }
   console.info(`Se recibió ${senal}; cerrando la API.`);
 
   if (servidor) {
@@ -41,11 +102,10 @@ async function cerrarServidor(senal: NodeJS.Signals): Promise<void> {
 
 async function iniciarServidor(): Promise<void> {
   validarSeparacionConexiones();
-  await Promise.all([inicializarConexionSistemaOrigen(), inicializarConexionPedidosBodega()]);
-  iniciarSincronizadorHistorial();
   servidor = aplicacion.listen(configuracion.puerto, () => {
     console.info(`API disponible en el puerto ${configuracion.puerto}.`);
   });
+  void inicializarDependenciasDatos();
 }
 
 process.once('SIGINT', () => {

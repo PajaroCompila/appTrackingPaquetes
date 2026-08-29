@@ -10,7 +10,8 @@ import type {
 } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
 import type { MensajeError } from '../../compartido/error-api.interface';
 import { obtenerMensajeError } from '../../compartido/manejar-error-http';
-import { formatearFechaHoraHonduras } from '../../compartido/formatear-fecha-honduras';
+import { guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
+import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import type { ArticuloHistorial, HistorialValidado, RespuestaArticulosHistorial, RespuestaHistorial } from './historial.interface';
 import { HistorialService } from './historial.service';
 import type { Almacen } from '../pedidos/almacen.interface';
@@ -19,8 +20,8 @@ import { DialogoInventarioArticuloComponent, type EstadoConsultaInventario } fro
 import type { InventarioArticulo } from '../pedidos/pedido.interface';
 import { PedidosService } from '../pedidos/pedidos.service';
 
-function fechaIso(fecha: Date): string { return fecha.toISOString().slice(0, 10); }
-const claveFiltrosHistorial = 'pedidosBodega.historial.filtros';
+const claveFiltrosHistorial = 'historial';
+const intervaloActualizacionHistorialMs = 15000;
 
 interface FiltrosHistorialGuardados {
   fechaDesde?: string;
@@ -28,6 +29,8 @@ interface FiltrosHistorialGuardados {
   numeroPedido?: string;
   codigosAlmacen?: string[];
   vista?: VistaHistorial;
+  pagina?: number;
+  cantidadPorPagina?: number;
 }
 type VistaHistorial = 'pedido' | 'articulos';
 
@@ -45,14 +48,13 @@ export class HistorialComponent implements OnInit {
   private readonly destruirRef = inject(DestroyRef);
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
-  private readonly hoy = new Date();
   private temporizador?: ReturnType<typeof setInterval>;
   private haCargado = false;
   private consultaInventarioPendiente: string | null = null;
   public readonly idOrigen = signal<string | null>(null);
   public filtros = {
-    fechaDesde: fechaIso(new Date(this.hoy.getTime() - 30 * 86400000)),
-    fechaHasta: fechaIso(this.hoy), numeroPedido: '', codigosAlmacen: [] as string[], cantidadPorPagina: 25,
+    fechaDesde: obtenerFechaLocalActual(),
+    fechaHasta: obtenerFechaLocalActual(), numeroPedido: '', codigosAlmacen: [] as string[], cantidadPorPagina: 25,
   };
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly registros = signal<HistorialValidado[]>([]);
@@ -114,18 +116,27 @@ export class HistorialComponent implements OnInit {
     this.hidratarFiltros();
     this.cargarAlmacenes();
     this.cargar();
-    this.temporizador = setInterval(() => this.cargar(true), 5000);
+    this.temporizador = setInterval(() => this.cargar(true), intervaloActualizacionHistorialMs);
     this.destruirRef.onDestroy(() => this.temporizador && clearInterval(this.temporizador));
   }
 
   public buscar(): void {
     this.pagina.set(1);
     this.guardarFiltros();
+    this.actualizarUrl();
     this.cargar();
   }
   public cambiarVista(vista: VistaHistorial): void {
     if (this.vista() === vista) return;
-    this.vista.set(vista); this.pagina.set(1); this.guardarFiltros(); this.cargar();
+    this.vista.set(vista); this.pagina.set(1); this.haCargado = false; this.hayMas.set(false);
+    this.avisoActualizacion.set('');
+    if (vista === 'articulos') this.articulos.set([]); else this.registros.set([]);
+    this.guardarFiltros(); this.actualizarUrl(); this.cargar();
+  }
+  public limpiarFiltros(): void {
+    this.filtros = { fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
+      numeroPedido: '', codigosAlmacen: [], cantidadPorPagina: 25 };
+    this.pagina.set(1); this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
   public abrirInformacionArticulo(articulo: ArticuloHistorial): void {
     const codigoArticulo = articulo.codigoArticulo?.trim();
@@ -172,10 +183,10 @@ export class HistorialComponent implements OnInit {
       : cantidad === 1 ? this.filtros.codigosAlmacen[0]! : `${cantidad} almacenes seleccionados`;
   }
   public paginaAnterior(): void {
-    if (this.pagina() > 1 && !this.cargando()) { this.pagina.update((valor) => valor - 1); this.cargar(); }
+    if (this.pagina() > 1 && !this.cargando()) { this.pagina.update((valor) => valor - 1); this.guardarFiltros(); this.actualizarUrl(); this.cargar(); }
   }
   public paginaSiguiente(): void {
-    if (this.hayMas() && !this.cargando()) { this.pagina.update((valor) => valor + 1); this.cargar(); }
+    if (this.hayMas() && !this.cargando()) { this.pagina.update((valor) => valor + 1); this.guardarFiltros(); this.actualizarUrl(); this.cargar(); }
   }
   public marcador(valor: string | null): string { return valor?.trim() || '—'; }
   public fechaHora(valor: string | null, hora12 = false): string {
@@ -202,12 +213,13 @@ export class HistorialComponent implements OnInit {
       .map((codigo) => codigo.trim()).filter(Boolean);
     this.filtros.codigosAlmacen = codigosUrl.length > 0
       ? [...new Set(codigosUrl)] : guardados.codigosAlmacen ?? [];
-    this.guardarFiltros();
-    const cantidad = Number(parametros.get('cantidadPorPagina'));
+    const cantidad = Number(parametros.get('cantidadPorPagina') ?? guardados.cantidadPorPagina);
     if ([25, 50, 100].includes(cantidad)) this.filtros.cantidadPorPagina = cantidad;
-    this.pagina.set(Math.max(1, Number(parametros.get('pagina')) || 1));
+    this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados.pagina) || 1));
     const vista = parametros.get('vista') ?? guardados.vista;
     this.vista.set(vista === 'articulos' ? 'articulos' : 'pedido');
+    this.guardarFiltros();
+    this.actualizarUrl();
   }
 
   private parametrosActuales(): URLSearchParams {
@@ -220,28 +232,46 @@ export class HistorialComponent implements OnInit {
     return parametros;
   }
 
+  private actualizarUrl(): void {
+    const parametros = this.parametrosActuales();
+    const queryParams: Record<string, string | string[]> = {};
+    parametros.forEach((valor, clave) => {
+      const existente = queryParams[clave];
+      queryParams[clave] = existente === undefined ? valor
+        : Array.isArray(existente) ? [...existente, valor] : [existente, valor];
+    });
+    void this.enrutador.navigate([], { relativeTo: this.ruta, queryParams, replaceUrl: true });
+  }
+
   private cargar(esAutomatica = false): void {
     if (this.cargando() || this.actualizando()) return;
     if (this.haCargado) this.actualizando.set(true); else this.cargando.set(true);
     if (!esAutomatica) this.error.set(null);
-    const consulta: Observable<RespuestaHistorial | RespuestaArticulosHistorial> = this.vista() === 'articulos' ? this.servicio.buscarArticulos({ ...this.filtros, pagina: this.pagina() })
+    const vistaConsulta = this.vista();
+    const consulta: Observable<RespuestaHistorial | RespuestaArticulosHistorial> = vistaConsulta === 'articulos' ? this.servicio.buscarArticulos({ ...this.filtros, pagina: this.pagina() })
       : this.servicio.buscar({ ...this.filtros, pagina: this.pagina() });
     consulta
       .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
         next: ({ datos, paginacion }) => {
-          if (this.vista() === 'articulos') this.articulos.set(datos as ArticuloHistorial[]);
+          if (vistaConsulta === 'articulos') this.articulos.set(datos as ArticuloHistorial[]);
           else this.registros.set(datos as HistorialValidado[]);
-          this.hayMas.set(paginacion.hayMas); this.haCargado = true;
-          this.avisoActualizacion.set(''); this.cargando.set(false); this.actualizando.set(false);
+          if (this.vista() === vistaConsulta) {
+            this.hayMas.set(paginacion.hayMas); this.haCargado = true; this.avisoActualizacion.set('');
+          } else {
+            this.hayMas.set(false); this.haCargado = false;
+          }
+          this.cargando.set(false); this.actualizando.set(false);
+          if (this.vista() !== vistaConsulta) this.cargar();
         },
         error: (error: unknown) => {
-          if (!this.haCargado) {
+          if (!this.haCargado && this.vista() === vistaConsulta) {
             this.registros.set([]); this.articulos.set([]); this.hayMas.set(false);
             this.error.set(obtenerMensajeError(error, 'historial'));
-          } else {
+          } else if (this.vista() === vistaConsulta) {
             this.avisoActualizacion.set('No pudimos actualizar. Mostramos los datos anteriores.');
           }
           this.cargando.set(false); this.actualizando.set(false);
+          if (this.vista() !== vistaConsulta) this.cargar();
         },
       });
   }
@@ -265,19 +295,21 @@ export class HistorialComponent implements OnInit {
 
   private guardarFiltros(): void {
     try {
-      localStorage.setItem(claveFiltrosHistorial, JSON.stringify({
+      guardarFiltrosSesion(claveFiltrosHistorial, {
         fechaDesde: this.filtros.fechaDesde,
         fechaHasta: this.filtros.fechaHasta,
         numeroPedido: this.filtros.numeroPedido.trim(),
         codigosAlmacen: this.filtros.codigosAlmacen,
         vista: this.vista(),
-      }));
+        pagina: this.pagina(),
+        cantidadPorPagina: this.filtros.cantidadPorPagina,
+      });
     } catch { /* Los filtros continúan disponibles durante la navegación actual. */ }
   }
 
   private leerFiltrosGuardados(): FiltrosHistorialGuardados {
     try {
-      const valor = JSON.parse(localStorage.getItem(claveFiltrosHistorial) ?? '{}') as Record<string, unknown>;
+      const valor = leerFiltrosSesion(claveFiltrosHistorial);
       const fechaValida = (fecha: unknown): fecha is string =>
         typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha);
       const codigos = Array.isArray(valor['codigosAlmacen'])
@@ -290,6 +322,9 @@ export class HistorialComponent implements OnInit {
           ? valor['numeroPedido'] : undefined,
         codigosAlmacen: codigos,
         vista: valor['vista'] === 'articulos' ? 'articulos' : 'pedido',
+        pagina: typeof valor['pagina'] === 'number' && valor['pagina'] > 0 ? valor['pagina'] : undefined,
+        cantidadPorPagina: typeof valor['cantidadPorPagina'] === 'number'
+          && [25, 50, 100].includes(valor['cantidadPorPagina']) ? valor['cantidadPorPagina'] : undefined,
       };
     } catch {
       return {};

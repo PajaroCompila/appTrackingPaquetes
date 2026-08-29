@@ -36,6 +36,7 @@ describe('ListaPedidosComponent', () => {
 
   beforeEach(async () => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 7, 3, 12, 0, 0));
     pedidosService = {
@@ -280,7 +281,7 @@ describe('ListaPedidosComponent', () => {
     expect(componente.filtrosFormulario.codigosAlmacen).toEqual(['BSPS01', 'BSPS02']);
   });
 
-  it('actualiza cada cinco segundos con filtros aplicados sin perder selección ni modal', async () => {
+  it('actualiza periódicamente con filtros aplicados sin perder selección ni modal', async () => {
     fixture.detectChanges();
     componente.alternarAlmacen('BSPS01', true);
     componente.filtrosFormulario.numeroPedido = '101468453';
@@ -290,7 +291,7 @@ describe('ListaPedidosComponent', () => {
     componente.abrirInformacionArticulo(respuestaLista.datos[0].articulos[0]);
     const llamadasIniciales = pedidosService.obtenerPedidos.mock.calls.length;
 
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(15000);
 
     expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(llamadasIniciales + 1);
     expect(pedidosService.obtenerPedidos).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -302,7 +303,7 @@ describe('ListaPedidosComponent', () => {
     expect(componente.dialogoInventarioAbierto()).toBe(true);
   });
 
-  it('no cancela ni superpone una consulta que tarda más de cinco segundos', async () => {
+  it('no cancela ni superpone una consulta que tarda más que el intervalo', async () => {
     let activas = 0;
     let maximoActivas = 0;
     pedidosService.obtenerPedidos.mockImplementation(() => new Observable((suscriptor) => {
@@ -311,11 +312,11 @@ describe('ListaPedidosComponent', () => {
       const temporizador = setTimeout(() => {
         suscriptor.next(respuestaLista);
         suscriptor.complete();
-      }, 7000);
+      }, 20000);
       return () => { clearTimeout(temporizador); activas -= 1; };
     }));
     fixture.detectChanges();
-    await vi.advanceTimersByTimeAsync(10000);
+    await vi.advanceTimersByTimeAsync(35000);
 
     expect(maximoActivas).toBe(1);
     expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(2);
@@ -328,9 +329,9 @@ describe('ListaPedidosComponent', () => {
       .mockReturnValueOnce(throwError(() => new Error('temporal')))
       .mockReturnValue(actualizaciones.asObservable());
     fixture.detectChanges();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(15000);
     expect(componente.pedidos()).toEqual(respuestaLista.datos);
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(15000);
     expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(3);
     expect(componente.pedidos()).toEqual(respuestaLista.datos);
   });
@@ -563,12 +564,12 @@ describe('ListaPedidosComponent', () => {
     pedidosService.obtenerPedidos.mockReturnValue(of({
       ...respuestaLista, datos: [{ ...pedido, articulos: [] }],
     }));
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(15000);
     expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
     expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
 
     pedidosService.obtenerPedidos.mockReturnValue(of(respuestaLista));
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(15000);
     componente.alternarSeleccionImpresion(pedido, pedido.articulos[0], 0, true);
     componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
     componente.paginaSiguiente();

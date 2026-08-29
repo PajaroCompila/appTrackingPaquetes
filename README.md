@@ -49,3 +49,37 @@ npm.cmd start
 
 - Frontend: `http://localhost:4400`
 - API: `http://localhost:3280`
+
+## Ejecución estable en red local
+
+Para usuarios finales, usar el build de Angular servido por la API en lugar de `ng serve`:
+
+```powershell
+.\scripts\preparar-produccion.ps1
+.\scripts\iniciar-produccion.ps1
+```
+
+Con esa forma, la aplicación queda disponible en `http://<servidor>:3280` y la API usa el mismo origen en `/api`.
+
+## Autoinicio en Windows
+
+Para registrar Pedidos Bodega al reiniciar el servidor:
+
+```powershell
+.\scripts\preparar-produccion.ps1
+.\scripts\registrar-autoinicio-windows.ps1 -Force
+```
+
+La tarea programada se llama `PedidosBodega-App`, corre al iniciar Windows y escribe logs en `logs\pedidos-bodega.log`.
+
+Para probar el arranque sin registrar nada:
+
+```powershell
+.\scripts\iniciar-produccion.ps1 -Validar
+```
+
+Para quitar el autoinicio:
+
+```powershell
+.\scripts\quitar-autoinicio-windows.ps1
+```

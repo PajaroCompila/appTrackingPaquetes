@@ -11,6 +11,7 @@ const fechaLocal = (fecha: Date): string => {
   const anio = fecha.getFullYear(); const mes = String(fecha.getMonth() + 1).padStart(2, '0');
   const dia = String(fecha.getDate()).padStart(2, '0'); return `${anio}-${mes}-${dia}`;
 };
+const intervaloActualizacionVendedoresMs = 15000;
 
 @Component({
   selector: 'app-ventas-vendedor',
@@ -40,7 +41,7 @@ export class VentasVendedorComponent implements OnInit {
       this.guardarFiltros();
       this.aplicados.next({ ...this.filtros });
     });
-    this.aplicados.pipe(switchMap((filtros) => timer(0, 5000).pipe(exhaustMap(() => {
+    this.aplicados.pipe(switchMap((filtros) => timer(0, intervaloActualizacionVendedoresMs).pipe(exhaustMap(() => {
       if (this.datos()) this.actualizando.set(true); else this.cargando.set(true);
       return this.servicio.obtenerVentasPorVendedor(
         this.codigoSucursal, filtros.fechaDesde, filtros.fechaHasta,

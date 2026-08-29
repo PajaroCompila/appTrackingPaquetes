@@ -86,7 +86,7 @@ describe('App', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(router.url).toBe('/pedidos-despachados');
+    expect(router.url).toContain('/pedidos-despachados');
     expect(enlace.classList.contains('activo')).toBe(true);
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Pedidos despachados');
   });

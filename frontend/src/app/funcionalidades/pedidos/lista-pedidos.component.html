@@ -1,4 +1,4 @@
-<section class="pagina" aria-labelledby="titulo-pedidos">
+<section class="pagina vista-pedidos" aria-labelledby="titulo-pedidos">
   <div class="encabezado-pagina">
     <div>
       <p class="sobrelinea">Pedidos</p>
@@ -94,7 +94,7 @@
   @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
   @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
   @if (!actualizando() && ultimaActualizacion()) {
-    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a' }}</p>
+    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a':'-0600' }}</p>
   }
 
   @if (cargando()) {
@@ -139,15 +139,15 @@
         <thead>
           <tr>
             <th class="columna-seleccion" scope="col"><span class="solo-lectores">Seleccionar</span></th>
-            <th scope="col">Pedido</th>
-            <th scope="col">Código</th>
-            <th scope="col">Descripción</th>
-            <th scope="col">Cantidad</th>
-            <th scope="col">Bodega</th>
-            <th scope="col">Fecha y hora</th>
-            <th scope="col">Vendedor</th>
-            <th scope="col">Ver detalle</th>
-            <th class="columna-seleccion" scope="col">Imprimir</th>
+            <th class="columna-pedido" scope="col">Pedido</th>
+            <th class="columna-codigo" scope="col">Código</th>
+            <th class="columna-descripcion" scope="col">Descripción</th>
+            <th class="columna-cantidad" scope="col">Cantidad</th>
+            <th class="columna-bodega" scope="col">Bodega</th>
+            <th class="columna-fecha" scope="col">Fecha y hora</th>
+            <th class="columna-vendedor" scope="col">Vendedor</th>
+            <th class="columna-detalle" scope="col">Ver detalle</th>
+            <th class="columna-seleccion columna-imprimir" scope="col">Imprimir</th>
           </tr>
         </thead>
         @for (pedido of pedidos(); track pedido.idOrigen) {
@@ -166,24 +166,24 @@
                     <span aria-hidden="true">✓</span>
                   </label>
                 </td>
-                <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+                <td class="columna-pedido" data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
                 <td
-                  class="codigo-consultable"
+                  class="codigo-consultable codigo-articulo-en-linea columna-codigo"
                   data-label="Código"
                   title="Doble clic para consultar inventario"
                   (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"
-                >{{ marcador(articulo.codigoArticulo) }}</td>
+                ><span class="columna-codigo-contenido">{{ marcador(articulo.codigoArticulo) }}</span></td>
                 <td
-                  class="descripcion-consultable"
+                  class="descripcion-consultable columna-descripcion"
                   data-label="Descripción"
                   title="Doble clic para consultar inventario"
                   (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"
-                >{{ marcador(articulo.descripcion) }}</td>
-                <td data-label="Cantidad">{{ marcador(articulo.cantidad) }}</td>
-                <td data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
-                <td data-label="Fecha y hora">{{ formatearFechaHora(pedido.fechaHoraPedido) }}</td>
-                <td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td>
-                <td class="accion-tabla">
+                ><span class="texto-maximo-dos-lineas">{{ marcador(articulo.descripcion) }}</span></td>
+                <td class="columna-cantidad" data-label="Cantidad">{{ marcador(articulo.cantidad) }}</td>
+                <td class="columna-bodega" data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
+                <td class="columna-fecha" data-label="Fecha y hora"><span class="texto-maximo-dos-lineas">{{ formatearFechaHora(pedido.fechaHoraPedido) }}</span></td>
+                <td class="columna-vendedor" data-label="Vendedor"><span class="texto-maximo-dos-lineas">{{ marcador(pedido.nombreVendedor) }}</span></td>
+                <td class="accion-tabla columna-detalle">
                   <a
                     class="enlace-detalle"
                     [routerLink]="['/pedidos', pedido.idOrigen]"
@@ -193,7 +193,7 @@
                     }"
                   >Ver detalle</a>
                 </td>
-                <td class="columna-seleccion" data-label="Imprimir">
+                <td class="columna-seleccion columna-imprimir" data-label="Imprimir">
                   <label class="selector-linea selector-impresion" title="Seleccionar para impresión">
                     <input
                       type="checkbox"

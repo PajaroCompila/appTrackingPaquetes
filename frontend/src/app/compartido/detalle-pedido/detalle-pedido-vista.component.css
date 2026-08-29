@@ -63,7 +63,7 @@
 .tabla-detalle-articulos th { background: #f3f6f9; }
 .tabla-detalle-articulos tbody tr { transition: background 180ms ease; }
 .tabla-detalle-articulos tbody tr:last-child td { border-bottom: 0; }
-.codigo-articulo { color: #173f6c; font-family: var(--fuente-interfaz); overflow-wrap: anywhere; }
+.codigo-articulo { color: #173f6c; font-family: var(--fuente-interfaz); }
 .descripcion-articulo { min-width: 15rem; max-width: 34rem; white-space: normal; overflow-wrap: anywhere; }
 .columna-cantidad { text-align: center; }
 .cantidad-articulo { display: inline-grid; min-width: 2.2rem; min-height: 2rem; place-items: center; border-radius: .45rem; background: #edf2f6; font-weight: 600; }

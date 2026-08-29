@@ -3,7 +3,13 @@ import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionB
 import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedidosBodega.js';
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import { validarConsultaSistemaOrigen } from '../../infraestructura/sql/consultaSistemaOrigen.js';
-import type { ArticuloHistorial, FiltrosHistorial, PaginaArticulosHistorial, PaginaHistorial, PedidoHistorial } from './historial.interface.js';
+import type {
+  ArticuloHistorial,
+  FiltrosHistorial,
+  PaginaArticulosHistorial,
+  PaginaHistorial,
+  PedidoHistorial,
+} from './historial.interface.js';
 
 interface CabeceraR1 {
   folioPedido: string; numeroPedido: string; codigoVenta: string | null;
@@ -52,25 +58,11 @@ export class HistorialR1Repositorio {
       hayMas: todas.length > inicio + filtros.cantidadPorPagina };
   }
 
-  public async obtener(idOrigen: string): Promise<PedidoHistorial | null> {
-    const partes = idOrigen.split(':');
-    const codigoFuente = partes.length >= 3 ? partes[1] : 'TSPS01';
-    const folio = partes.length >= 3 ? partes.slice(2).join(':') : partes.slice(1).join(':');
-    const sucursal = this.sucursales.find((item) => item.codigoTienda === codigoFuente);
-    if (!sucursal || !folio) return null;
-    const fila = await this.consultarCabeceraPorFolio(sucursal, folio);
-    if (!fila) return null;
-    const fuente = [{ sucursal, fila }];
-    const lineas = await this.obtenerLineasAgrupadas(fuente);
-    const metadatos = await this.obtenerMetadatosLocales([idOrigen]);
-    return this.mapearPedido(sucursal, fila,
-      lineas.get(`${sucursal.codigoTienda}\u0000${folio}`) ?? [], metadatos.get(idOrigen));
-  }
-
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
-    const limite = filtros.pagina * filtros.cantidadPorPagina + 1;
+    const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
+    const cantidadConsulta = cantidadAcumulada + 1;
     const resultados = await Promise.allSettled(this.sucursales.map(async (sucursal) => ({
-      sucursal, filas: await this.consultarArticulos(sucursal, filtros, limite),
+      sucursal, filas: await this.consultarArticulos(sucursal, filtros, cantidadConsulta),
     })));
     const disponibles = resultados.filter((resultado) => resultado.status === 'fulfilled');
     if (disponibles.length === 0) throw resultados[0]?.status === 'rejected'
@@ -87,6 +79,21 @@ export class HistorialR1Repositorio {
       hayMas: todos.length > inicio + filtros.cantidadPorPagina };
   }
 
+  public async obtener(idOrigen: string): Promise<PedidoHistorial | null> {
+    const partes = idOrigen.split(':');
+    const codigoFuente = partes.length >= 3 ? partes[1] : 'TSPS01';
+    const folio = partes.length >= 3 ? partes.slice(2).join(':') : partes.slice(1).join(':');
+    const sucursal = this.sucursales.find((item) => item.codigoTienda === codigoFuente);
+    if (!sucursal || !folio) return null;
+    const fila = await this.consultarCabeceraPorFolio(sucursal, folio);
+    if (!fila) return null;
+    const fuente = [{ sucursal, fila }];
+    const lineas = await this.obtenerLineasAgrupadas(fuente);
+    const metadatos = await this.obtenerMetadatosLocales([idOrigen]);
+    return this.mapearPedido(sucursal, fila,
+      lineas.get(`${sucursal.codigoTienda}\u0000${folio}`) ?? [], metadatos.get(idOrigen));
+  }
+
   private async consultarArticulos(
     sucursal: ConfiguracionSucursalR1, filtros: FiltrosHistorial, cantidad: number,
   ): Promise<ArticuloR1[]> {
@@ -95,8 +102,10 @@ export class HistorialR1Repositorio {
       CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido,
       CONVERT(nvarchar(30), detalle.[U_SO1_NUMPARTIDA]) identificadorDetalle,
       detalle.[U_SO1_NUMEROARTICULO] codigoArticulo,
-      detalle.[U_SO1_DESCRIPCION] descripcion, detalle.[U_SO1_CANTIDAD] cantidad,
-      detalle.[U_SO1_ALMACEN] codigoAlmacen, almacen.[U_SO1_NOMBREALMACEN] nombreAlmacen,
+      detalle.[U_SO1_DESCRIPCION] descripcion,
+      detalle.[U_SO1_CANTIDAD] cantidad,
+      detalle.[U_SO1_ALMACEN] codigoAlmacen,
+      almacen.[U_SO1_NOMBREALMACEN] nombreAlmacen,
       vendedor.[SlpName] nombreVendedor,
       CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN NULL ELSE
         CONVERT(char(19), DATEADD(minute, (venta.[U_SO1_HORA] / 100) * 60 +
@@ -109,10 +118,12 @@ export class HistorialR1Repositorio {
         FROM [dbo].[@SO1_01SUCURSALALMA] catalogo
         WHERE catalogo.[U_SO1_CODIGOALMACEN] = detalle.[U_SO1_ALMACEN]) almacen
       WHERE venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
-        AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL AND venta.[U_SO1_DOCUMENTOSBO] <> 0
+        AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
+        AND venta.[U_SO1_DOCUMENTOSBO] <> 0
         AND venta.[U_SO1_FECHA] >= @fechaDesde
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
-        AND (@numeroPedido IS NULL OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) = @numeroPedido)
+        AND (@numeroPedido IS NULL
+          OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) LIKE CONCAT('%', @numeroPedido))
         ${parametrosAlmacen.length > 0 ? `AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})` : ''}
       ORDER BY venta.[U_SO1_FECHA] DESC, venta.[U_SO1_HORA] DESC, venta.[Name], detalle.[U_SO1_NUMPARTIDA]
       OFFSET 0 ROWS FETCH NEXT @cantidad ROWS ONLY OPTION (RECOMPILE);`;
@@ -120,7 +131,8 @@ export class HistorialR1Repositorio {
     const solicitud = (await obtenerPoolSucursalR1(sucursal)).request()
       .input('fechaDesde', sql.Date, filtros.fechaDesde).input('fechaHasta', sql.Date, filtros.fechaHasta)
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null).input('cantidad', sql.Int, cantidad);
-    filtros.codigosAlmacen.forEach((codigo, indice) => solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
+    filtros.codigosAlmacen.forEach((codigo, indice) =>
+      solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
     return (await solicitud.query<ArticuloR1>(consulta)).recordset;
   }
 
@@ -145,7 +157,7 @@ export class HistorialR1Repositorio {
         AND venta.[U_SO1_FECHA] >= @fechaDesde
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL
-          OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) = @numeroPedido)
+          OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) LIKE CONCAT('%', @numeroPedido))
         ${parametrosAlmacen.length > 0 ? `AND EXISTS (SELECT 1 FROM [dbo].[@SO1_01VENTADETALLE] detalle
           WHERE detalle.[U_SO1_FOLIO] = venta.[Name]
             AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')}))` : ''}

@@ -1,18 +1,21 @@
-import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { CodigoRol, RolLocal, UsuarioLocal } from './usuario.interface';
 import { UsuarioService } from './usuario.service';
+import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 
 const claveFiltrosUsuarios = 'pedidosBodega.usuarios.filtros';
 
 @Component({
   selector: 'app-usuarios',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule],
   templateUrl: './usuarios.component.html',
   styleUrl: './usuarios.component.css',
 })
 export class UsuariosComponent implements OnInit {
+  public fecha(valor: string | null | undefined): string {
+    return formatearFechaHoraHonduras(valor);
+  }
   private readonly servicio = inject(UsuarioService);
   public readonly usuarios = signal<UsuarioLocal[]>([]);
   public readonly roles = signal<RolLocal[]>([]);

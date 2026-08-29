@@ -2,6 +2,7 @@ import sql from 'mssql';
 import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedidosBodega.js';
 import type { PedidoResumen } from '../pedidos/pedido.interface.js';
 import type { LineaDespachoValidada } from './lineaDespachoOrigenRepositorio.js';
+import { fechaSqlSinZona } from '../../compartido/fechaSql.js';
 
 export interface PedidoDespachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -13,10 +14,19 @@ export interface ResultadoPersistenciaDespacho {
   transferidas: { idOrigen: string; identificadorDetalle: string }[];
 }
 
+export interface FiltrosDespachados {
+  numeroPedido?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  codigosAlmacen: string[];
+  pagina: number;
+  cantidadPorPagina: number;
+}
+
 export interface IDespachoRepositorio {
   identidadesLineas(): Promise<Set<string>>;
   guardarLineas(lineas: LineaDespachoValidada[], usuarioId: string): Promise<ResultadoPersistenciaDespacho>;
-  listar(pagina: number, cantidad: number): Promise<{ pedidos: PedidoDespachado[]; total: number }>;
+  listar(filtros: FiltrosDespachados): Promise<{ pedidos: PedidoDespachado[]; total: number }>;
   obtener(id: string): Promise<PedidoDespachado | null>;
 }
 
@@ -110,18 +120,31 @@ export class DespachoRepositorio implements IDespachoRepositorio {
 
   private async consultar(
     idOrigen: string | null,
-    pagina = 1,
-    cantidad = 25,
+    filtros: FiltrosDespachados = { codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 },
   ): Promise<{ pedidos: PedidoDespachado[]; total: number }> {
-    const resultado = await obtenerPoolPedidosBodega().request()
+    const parametrosAlmacen = filtros.codigosAlmacen.map((_, indice) => `@codigoAlmacen${indice}`);
+    const solicitud = obtenerPoolPedidosBodega().request()
       .input('idOrigen', sql.NVarChar(150), idOrigen)
-      .input('inicio', sql.Int, (pagina - 1) * cantidad)
-      .input('cantidad', sql.Int, cantidad)
-      .query(`WITH Pedidos AS (
+      .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
+      .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null)
+      .input('fechaHasta', sql.Date, filtros.fechaHasta ?? null)
+      .input('inicio', sql.Int, (filtros.pagina - 1) * filtros.cantidadPorPagina)
+      .input('cantidad', sql.Int, filtros.cantidadPorPagina);
+    filtros.codigosAlmacen.forEach((codigo, indice) =>
+      solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
+    const filtroAlmacenes = parametrosAlmacen.length > 0 ? `AND EXISTS (
+      SELECT 1 FROM dbo.PedidoDespachadoDetalle filtro
+      WHERE filtro.idPedidoDespachado = pedido.idPedidoDespachado
+        AND filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')}))` : '';
+    const resultado = await solicitud.query(`WITH Pedidos AS (
         SELECT pedido.*, usuario.nombreVisible usuarioDespacho, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         WHERE pedido.estadoLocal = 'DESPACHADO' AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
+          AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
+          AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
+          AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
+          ${filtroAlmacenes}
         ORDER BY pedido.despachadoEn DESC
         OFFSET @inicio ROWS FETCH NEXT @cantidad ROWS ONLY
       )
@@ -145,7 +168,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           sapDocEntry: fila.sapDocEntry, folioPedido: fila.folioPedido ?? '',
           numeroPedido: fila.numeroPedido, codigoVenta: null, codigoVendedor: null,
           nombreVendedor: fila.nombreVendedor, codigosAlmacen: [], nombresBodega: fila.nombreAlmacen,
-          fechaHoraPedido: fila.fechaHoraPedido?.toISOString() ?? null,
+          fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
           estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
           usuarioDespacho: fila.usuarioDespacho,
@@ -163,7 +186,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     return { pedidos: [...mapa.values()], total: Number(resultado.recordset[0]?.total ?? 0) };
   }
 
-  public listar(pagina: number, cantidad: number) { return this.consultar(null, pagina, cantidad); }
+  public listar(filtros: FiltrosDespachados) { return this.consultar(null, filtros); }
 
   public async obtener(idOrigen: string): Promise<PedidoDespachado | null> {
     const pool = obtenerPoolPedidosBodega();
@@ -200,7 +223,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       codigosAlmacen: [...new Set(detalles.map((detalle) => detalle.codigoAlmacen)
         .filter((codigo): codigo is string => Boolean(codigo)))],
       nombresBodega: null,
-      fechaHoraPedido: cabecera.fechaHoraPedido?.toISOString() ?? null,
+      fechaHoraPedido: fechaSqlSinZona(cabecera.fechaHoraPedido),
       codigoEstadoVenta: 'DESPACHADO',
       codigoSincronizacion: null,
       estadoLocal: 'DESPACHADO',

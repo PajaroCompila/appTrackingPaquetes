@@ -5,7 +5,4 @@
 **/.env
 *.log
 .DS_Store
-appPedidosBodega.rar
-tablasR1.xlsx
-~$*
-**/test-results/
+

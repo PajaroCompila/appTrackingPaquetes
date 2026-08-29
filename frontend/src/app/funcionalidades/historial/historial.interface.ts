@@ -1,7 +1,7 @@
 import type { PedidoResumen } from '../pedidos/pedido.interface';
 
 export interface HistorialValidado extends PedidoResumen {
-  estadoLocal: 'VALIDADO';
+  estadoLocal: 'VALIDADO' | 'DESPACHADO';
   despachadoEn: string | null;
   validadoDetectadoEn: string | null;
   usuarioDespacho: string | null;

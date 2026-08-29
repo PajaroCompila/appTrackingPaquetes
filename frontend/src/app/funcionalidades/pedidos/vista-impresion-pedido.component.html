@@ -15,7 +15,7 @@
     @for (articulo of articulos; track $index) {
       <tbody class="articulo-impreso">
         <tr class="datos-principales">
-          <td>{{ articulo.codigo }}</td>
+          <td class="codigo-articulo-en-linea">{{ articulo.codigo }}</td>
           <td class="cantidad">{{ articulo.cantidad ?? '—' }}</td>
           <td class="bodega">{{ articulo.bodega }}</td>
         </tr>

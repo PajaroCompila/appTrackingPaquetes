@@ -14,6 +14,7 @@ function fechaLocal(fecha: Date): string {
   return `${anio}-${mes}-${dia}`;
 }
 const claveFiltrosDashboard = 'pedidosBodega.dashboard.filtros';
+const intervaloActualizacionDashboardMs = 15000;
 
 @Component({
   selector: 'app-dashboard',
@@ -40,7 +41,7 @@ export class DashboardComponent implements OnInit {
     this.hidratarFiltros();
     this.filtrosAplicados.next({ ...this.filtros });
     this.filtrosAplicados.pipe(
-      switchMap((filtros) => timer(0, 5000).pipe(
+      switchMap((filtros) => timer(0, intervaloActualizacionDashboardMs).pipe(
         exhaustMap(() => {
           this.actualizando.set(true);
           return this.servicio.obtener(filtros).pipe(
