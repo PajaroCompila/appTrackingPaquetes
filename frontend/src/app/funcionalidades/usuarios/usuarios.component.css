@@ -1,1 +1,42 @@
-.filtros{display:grid;grid-template-columns:2fr 1fr 1fr auto;align-items:end;gap:1rem;margin:1.5rem 0}.tabla-contenedor{overflow-x:auto}.acciones{display:flex;flex-wrap:wrap;gap:.35rem}.acciones button{border:0;background:transparent;color:var(--azul-700);cursor:pointer;font-weight:600}.paginacion{display:flex;justify-content:center;align-items:center;gap:1rem;margin-top:1rem}.fondo-modal{position:fixed;z-index:3000;inset:0;display:grid;place-items:center;padding:1rem;background:rgb(7 25 53/58%)}.modal{display:grid;width:min(32rem,100%);gap:1rem;max-height:90vh;overflow:auto}.modal h2{margin:0}.acciones-modal{display:flex;justify-content:flex-end;gap:.75rem}@media(max-width:700px){.filtros{grid-template-columns:1fr}.acciones{display:grid}.modal{width:100%}}
+.filtros { display: grid; grid-template-columns: 2fr 1fr 1fr auto; align-items: end; gap: 1rem; margin: 1.5rem 0; }
+.tabla-contenedor { overflow-x: auto; }
+.acciones { display: flex; flex-wrap: wrap; gap: .35rem; }
+.acciones button {
+  border: 0;
+  background: transparent;
+  color: var(--azul-700);
+  cursor: pointer;
+  font-weight: 600;
+  transition: color var(--transicion-rapida) var(--easing-corporativo), transform var(--transicion-rapida) var(--easing-corporativo);
+}
+.acciones button:hover, .acciones button:focus-visible { color: var(--azul-900); text-decoration: underline; text-underline-offset: .18rem; }
+.acciones button:active { transform: translateY(1px); }
+.paginacion { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1rem; }
+.fondo-modal {
+  position: fixed;
+  z-index: 3000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(7 25 53 / 58%);
+  animation: aparecer-fondo var(--transicion-normal) var(--easing-corporativo);
+}
+.modal {
+  display: grid;
+  width: min(32rem, 100%);
+  max-height: 90vh;
+  gap: 1rem;
+  overflow: auto;
+  animation: aparecer-modal var(--transicion-normal) var(--easing-corporativo);
+}
+.modal h2 { margin: 0; }
+.acciones-modal { display: flex; justify-content: flex-end; gap: .75rem; }
+@keyframes aparecer-fondo { from { opacity: 0; } }
+@keyframes aparecer-modal { from { opacity: 0; transform: translateY(5px); } }
+@media (max-width: 700px) { .filtros { grid-template-columns: 1fr; } .acciones { display: grid; } .modal { width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .acciones button { transition: none; }
+  .acciones button:active { transform: none; }
+  .fondo-modal, .modal { animation: none; }
+}

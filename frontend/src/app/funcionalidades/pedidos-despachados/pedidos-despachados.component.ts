@@ -14,8 +14,9 @@ import type {
 import type { PedidoResumen } from '../pedidos/pedido.interface';
 import type { Almacen } from '../pedidos/almacen.interface';
 import { AlmacenesService } from '../pedidos/almacenes.service';
-import { guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
+import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
+import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -59,6 +60,7 @@ export class PedidosDespachadosComponent implements OnInit {
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
   private readonly destruirRef = inject(DestroyRef);
+  private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly actualizarAhora = new Subject<boolean>();
   private haCargado = false;
   private consultaEnCurso = false;
@@ -204,7 +206,7 @@ export class PedidosDespachadosComponent implements OnInit {
     });
   }
 
-  public buscar(): void { this.actualizarListado(1); }
+  public buscar(): void { this.guardarFiltros(); this.actualizarListado(1); }
   public limpiarFiltros(): void { this.filtros = filtrosIniciales(); this.actualizarListado(1); }
   public cambiarCantidadPorPagina(): void { this.actualizarListado(1); }
   public estaSeleccionado(codigo: string): boolean { return this.filtros.codigosAlmacen.includes(codigo); }
@@ -214,7 +216,11 @@ export class PedidosDespachadosComponent implements OnInit {
       : this.filtros.codigosAlmacen.filter((actual) => actual !== codigo);
     this.guardarFiltros();
   }
+  public quitarAlmacen(codigo: string): void { this.alternarAlmacen(codigo, false); }
   public limpiarAlmacenes(): void { this.filtros.codigosAlmacen = []; this.guardarFiltros(); }
+  public nombreAlmacen(codigo: string): string {
+    return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigo)?.nombreAlmacen || codigo;
+  }
   public resumenAlmacenes(): string {
     const cantidad = this.filtros.codigosAlmacen.length;
     return cantidad === 0 ? 'Todos los almacenes'
@@ -241,16 +247,14 @@ export class PedidosDespachadosComponent implements OnInit {
   private hidratarFiltros(): void {
     const parametros = this.ruta.snapshot.queryParamMap;
     const guardados = leerFiltrosSesion(claveFiltrosDespachados);
-    const fechaValida = (valor: unknown): valor is string => typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor);
-    const codigosGuardados = Array.isArray(guardados['codigosAlmacen'])
-      ? guardados['codigosAlmacen'].filter((codigo): codigo is string => typeof codigo === 'string') : [];
+    const globales = this.filtrosGlobales.obtener();
     const codigosUrl = parametros.getAll('codigoAlmacen').map((codigo) => codigo.trim()).filter(Boolean);
     const cantidad = Number(parametros.get('cantidadPorPagina') ?? guardados['cantidadPorPagina']);
     this.filtros = {
       numeroPedido: parametros.get('numeroPedido') ?? (typeof guardados['numeroPedido'] === 'string' ? guardados['numeroPedido'] : ''),
-      fechaDesde: parametros.get('fechaDesde') ?? (fechaValida(guardados['fechaDesde']) ? guardados['fechaDesde'] : obtenerFechaLocalActual()),
-      fechaHasta: parametros.get('fechaHasta') ?? (fechaValida(guardados['fechaHasta']) ? guardados['fechaHasta'] : obtenerFechaLocalActual()),
-      codigosAlmacen: [...new Set(codigosUrl.length ? codigosUrl : codigosGuardados)],
+      fechaDesde: esFechaCalendarioValida(parametros.get('fechaDesde')) ? parametros.get('fechaDesde')! : globales.fechaDesde,
+      fechaHasta: esFechaCalendarioValida(parametros.get('fechaHasta')) ? parametros.get('fechaHasta')! : globales.fechaHasta,
+      codigosAlmacen: [...new Set(codigosUrl.length ? codigosUrl : globales.codigosAlmacen)],
       cantidadPorPagina: cantidad === 50 || cantidad === 100 ? cantidad : 25,
     };
     this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados['pagina']) || 1));
@@ -258,6 +262,8 @@ export class PedidosDespachadosComponent implements OnInit {
   }
 
   private guardarFiltros(): void {
+    this.filtrosGlobales.actualizar({ fechaDesde: this.filtros.fechaDesde,
+      fechaHasta: this.filtros.fechaHasta, codigosAlmacen: this.filtros.codigosAlmacen });
     guardarFiltrosSesion(claveFiltrosDespachados, { ...this.filtros, pagina: this.pagina() });
   }
 

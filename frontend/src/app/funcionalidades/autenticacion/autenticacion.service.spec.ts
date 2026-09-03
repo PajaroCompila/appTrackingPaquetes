@@ -15,6 +15,8 @@ describe('AutenticacionService', () => {
     solicitud.flush({ usuario: { usuarioId: '1', nombreUsuario: 'operador', nombreVisible: 'Operador', codigoRol: null, codigoAlmacen: null } });
     expect(servicio.usuario()?.nombreVisible).toBe('Operador');
     expect(localStorage.length).toBe(0);
-    expect(sessionStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(1);
+    expect(JSON.parse(sessionStorage.getItem('pedidosBodega.filtros.globales') ?? '{}'))
+      .toMatchObject({ codigosAlmacen: [] });
   });
 });

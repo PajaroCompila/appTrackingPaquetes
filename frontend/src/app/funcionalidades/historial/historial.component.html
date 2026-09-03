@@ -9,18 +9,20 @@
       (reintentar)="reintentarDetalle()"
     />
   } @else {
-    <div class="encabezado-pagina">
-      <div>
-        <h1 id="titulo-historial">Historial</h1>
-        <p>Pedidos entregados</p>
+    <div class="bloque-superior-operativo">
+      <div class="encabezado-pagina">
+        <div>
+          <p class="sobrelinea">Pedidos</p>
+          <h1 id="titulo-historial">Historial</h1>
+          <p>Pedidos entregados</p>
+        </div>
       </div>
-    </div>
 
-    <form class="panel filtros" (ngSubmit)="buscar()">
+      <form class="panel filtros" (ngSubmit)="buscar()">
       <div class="campo"><label for="numeroPedido">Número de pedido</label><input id="numeroPedido" name="numeroPedido" inputmode="numeric" maxlength="20" [(ngModel)]="filtros.numeroPedido" /></div>
-      <div class="campo"><label for="fechaDesde">Fecha del pedido desde</label><input id="fechaDesde" name="fechaDesde" type="date" required [(ngModel)]="filtros.fechaDesde" /></div>
-      <div class="campo"><label for="fechaHasta">Fecha del pedido hasta</label><input id="fechaHasta" name="fechaHasta" type="date" required [(ngModel)]="filtros.fechaHasta" /></div>
-      <div class="campo campo-almacenes">
+      <div class="campo"><label for="fechaDesde">Fecha desde</label><input id="fechaDesde" name="fechaDesde" type="date" required [(ngModel)]="filtros.fechaDesde" /></div>
+      <div class="campo"><label for="fechaHasta">Fecha hasta</label><input id="fechaHasta" name="fechaHasta" type="date" required [(ngModel)]="filtros.fechaHasta" /></div>
+      <div class="campo campo-amplio campo-almacenes">
         <span id="etiqueta-almacenes" class="etiqueta-campo">Almacenes</span>
         <details class="selector-multiple">
           <summary aria-labelledby="etiqueta-almacenes">{{ resumenAlmacenes() }}</summary>
@@ -31,7 +33,7 @@
                 <label class="opcion-almacen"><input type="checkbox"
                   [checked]="estaSeleccionado(almacen.codigoAlmacen)"
                   (change)="alternarAlmacen(almacen.codigoAlmacen, $any($event.target).checked)" />
-                  <span><strong>{{ almacen.codigoAlmacen }}</strong><small>{{ almacen.nombreAlmacen }}</small></span>
+                  <span class="datos-almacen"><strong>{{ almacen.codigoAlmacen }}</strong><small>{{ almacen.nombreAlmacen }}</small></span>
                 </label>
               }
             </div>
@@ -40,12 +42,36 @@
             }
           </fieldset>
         </details>
+        @if (filtros.codigosAlmacen.length > 0) {
+          <div class="etiquetas-almacenes" aria-label="Almacenes seleccionados">
+            @for (codigoAlmacen of filtros.codigosAlmacen; track codigoAlmacen) {
+              <span class="etiqueta-almacen">
+                {{ codigoAlmacen }}
+                <button
+                  type="button"
+                  (click)="quitarAlmacen(codigoAlmacen)"
+                  [attr.aria-label]="'Quitar ' + nombreAlmacen(codigoAlmacen)"
+                >×</button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+      <div class="campo">
+        <label for="cantidadHistorial">Registros por página</label>
+        <select id="cantidadHistorial" name="cantidadPorPagina"
+          [(ngModel)]="filtros.cantidadPorPagina" (change)="cambiarCantidadPorPagina()">
+          <option [ngValue]="25">25</option>
+          <option [ngValue]="50">50</option>
+          <option [ngValue]="100">100</option>
+        </select>
       </div>
       <div class="acciones-filtros">
         <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
         <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
       </div>
-    </form>
+      </form>
+    </div>
 
     @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
     @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }

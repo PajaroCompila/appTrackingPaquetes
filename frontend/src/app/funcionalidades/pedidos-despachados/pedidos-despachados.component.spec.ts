@@ -105,4 +105,31 @@ describe('PedidosDespachadosComponent', () => {
     filtrada.flush({ datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false } });
     fixture.destroy();
   });
+
+  it('muestra los almacenes seleccionados como chips y permite quitarlos', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'))
+      .flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
+    http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [
+      { codigoAlmacen: 'BSPS03', nombreAlmacen: 'Bodega 3', codigoSucursal: 'SPS', nombreSucursal: 'San Pedro Sula' },
+      { codigoAlmacen: 'BSPS04', nombreAlmacen: 'Bodega 4', codigoSucursal: 'SPS', nombreSucursal: 'San Pedro Sula' },
+    ] });
+
+    fixture.componentInstance.alternarAlmacen('BSPS03', true);
+    fixture.componentInstance.alternarAlmacen('BSPS04', true);
+    fixture.detectChanges();
+
+    const chips = [...fixture.nativeElement.querySelectorAll('.etiqueta-almacen')]
+      .map((elemento: HTMLElement) => elemento.textContent?.trim());
+    expect(chips).toEqual(expect.arrayContaining([expect.stringContaining('BSPS03'), expect.stringContaining('BSPS04')]));
+
+    (fixture.nativeElement.querySelector('[aria-label="Quitar Bodega 3"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.filtros.codigosAlmacen).toEqual(['BSPS04']);
+    expect(fixture.nativeElement.textContent).not.toContain('BSPS03 ×');
+    fixture.destroy();
+  });
 });

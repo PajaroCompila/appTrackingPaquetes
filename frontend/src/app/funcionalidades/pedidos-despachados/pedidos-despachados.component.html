@@ -9,15 +9,16 @@
       (reintentar)="reintentarDetalle()"
     />
   } @else {
-    <div class="encabezado-pagina">
-      <div>
-        <p class="sobrelinea">Pedidos</p>
-        <h1>Pedidos despachados</h1>
-        <p>Pedidos preparados por bodega que esperan confirmación de entrega.</p>
+    <div class="bloque-superior-operativo">
+      <div class="encabezado-pagina">
+        <div>
+          <p class="sobrelinea">Pedidos</p>
+          <h1>Pedidos despachados</h1>
+          <p>Pedidos preparados por bodega que esperan confirmación de entrega.</p>
+        </div>
       </div>
-    </div>
 
-    <form class="panel filtros" (ngSubmit)="buscar()">
+      <form class="panel filtros" (ngSubmit)="buscar()">
       <div class="campo">
         <label for="numeroPedidoDespachado">Número de pedido</label>
         <input id="numeroPedidoDespachado" name="numeroPedido" inputmode="numeric" maxlength="20" [(ngModel)]="filtros.numeroPedido" />
@@ -50,6 +51,20 @@
             }
           </fieldset>
         </details>
+        @if (filtros.codigosAlmacen.length > 0) {
+          <div class="etiquetas-almacenes" aria-label="Almacenes seleccionados">
+            @for (codigoAlmacen of filtros.codigosAlmacen; track codigoAlmacen) {
+              <span class="etiqueta-almacen">
+                {{ codigoAlmacen }}
+                <button
+                  type="button"
+                  (click)="quitarAlmacen(codigoAlmacen)"
+                  [attr.aria-label]="'Quitar ' + nombreAlmacen(codigoAlmacen)"
+                >×</button>
+              </span>
+            }
+          </div>
+        }
       </div>
       <div class="campo">
         <label for="cantidadDespachados">Pedidos por página</label>
@@ -61,7 +76,8 @@
         <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
         <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
       </div>
-    </form>
+      </form>
+    </div>
 
     @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
     @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }

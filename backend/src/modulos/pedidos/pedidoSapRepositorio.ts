@@ -41,7 +41,7 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
           AND (@fechaHasta IS NULL OR o.[DocDate] < DATEADD(day, 1, @fechaHasta))
           AND EXISTS (SELECT 1 FROM [dbo].[RDR1] linea WHERE linea.[DocEntry] = o.[DocEntry]
             AND linea.[LineStatus] = @estadoAbierto AND linea.[OpenQty] > 0 ${filtroBodega})
-        ORDER BY o.[DocDate] DESC, o.[DocTime] DESC, o.[DocEntry] DESC
+        ORDER BY o.[DocDate] ASC, o.[DocTime] ASC, o.[DocEntry] ASC
         OFFSET @desplazamiento ROWS FETCH NEXT @cantidadConsulta ROWS ONLY;
       `, (r) => {
       r.input('creadoRetailOne', sql.Char(1), 'N').input('grupoMayoristaA', sql.Int, 103)

@@ -43,7 +43,7 @@ export class PedidoServicio {
             && !lineasDespachadas.has(claveLineaDespachada(pedido.idOrigen, identidad));
         }) }))
         .filter((pedido) => pedido.articulos.length > 0).sort((a, b) =>
-        (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '') || a.idOrigen.localeCompare(b.idOrigen));
+        (a.fechaHoraPedido ?? '\uffff').localeCompare(b.fechaHoraPedido ?? '\uffff') || a.idOrigen.localeCompare(b.idOrigen));
       const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
       const pedidos = unificados.slice(inicio, inicio + filtros.cantidadPorPagina);
       const totalRegistros = unificados.length;

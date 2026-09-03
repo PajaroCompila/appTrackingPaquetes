@@ -4,7 +4,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BehaviorSubject, EMPTY, catchError, exhaustMap, switchMap, tap, timer } from 'rxjs';
-import type { VentasVendedorDashboard } from './dashboard.interface';
+import type {
+  DetalleVentasVendedorDashboard,
+  VentaPorVendedor,
+  VentasVendedorDashboard,
+} from './dashboard.interface';
 import { DashboardService } from './dashboard.service';
 
 const fechaLocal = (fecha: Date): string => {
@@ -32,6 +36,11 @@ export class VentasVendedorComponent implements OnInit {
   public readonly cargando = signal(true);
   public readonly actualizando = signal(false);
   public readonly advertencia = signal('');
+  public readonly vendedorSeleccionado = signal<VentaPorVendedor | null>(null);
+  public readonly detalleVendedor = signal<DetalleVentasVendedorDashboard | null>(null);
+  public readonly cargandoDetalle = signal(false);
+  public readonly errorDetalle = signal('');
+  private solicitudDetalle = 0;
 
   public ngOnInit(): void {
     this.ruta.queryParamMap.pipe(takeUntilDestroyed(this.destruirRef)).subscribe((parametros) => {
@@ -55,8 +64,13 @@ export class VentasVendedorComponent implements OnInit {
     }))), takeUntilDestroyed(this.destruirRef)).subscribe();
   }
 
-  public aplicarFiltros(): void { this.guardarFiltros(); void this.actualizarUrl(); }
+  public aplicarFiltros(): void {
+    this.cerrarDetalle();
+    this.guardarFiltros();
+    void this.actualizarUrl();
+  }
   public limpiarFiltros(): void {
+    this.cerrarDetalle();
     this.filtros = { fechaDesde: this.hoy, fechaHasta: this.hoy };
     this.guardarFiltros();
     void this.actualizarUrl();
@@ -71,6 +85,47 @@ export class VentasVendedorComponent implements OnInit {
     const seguro = prefijo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const limpio = nombre.replace(new RegExp(`^${seguro}(?:\\s*[-–—:]\\s*|\\s+)`, 'i'), '').trim();
     return limpio || nombre;
+  }
+  public seleccionarVendedor(vendedor: VentaPorVendedor, pagina = 1): void {
+    const numeroSolicitud = ++this.solicitudDetalle;
+    this.vendedorSeleccionado.set(vendedor);
+    this.cargandoDetalle.set(true);
+    this.errorDetalle.set('');
+    this.servicio.obtenerDetalleVentasVendedor(
+      this.codigoSucursal,
+      vendedor.codigoVendedor,
+      this.filtros.fechaDesde,
+      this.filtros.fechaHasta,
+      pagina,
+    ).pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
+      next: (detalle) => {
+        if (numeroSolicitud !== this.solicitudDetalle) return;
+        this.detalleVendedor.set(detalle);
+        this.cargandoDetalle.set(false);
+      },
+      error: () => {
+        if (numeroSolicitud !== this.solicitudDetalle) return;
+        this.detalleVendedor.set(null);
+        this.cargandoDetalle.set(false);
+        this.errorDetalle.set('No pudimos cargar las facturas de este vendedor.');
+      },
+    });
+  }
+  public cerrarDetalle(): void {
+    this.solicitudDetalle += 1;
+    this.vendedorSeleccionado.set(null);
+    this.detalleVendedor.set(null);
+    this.cargandoDetalle.set(false);
+    this.errorDetalle.set('');
+  }
+  public monto(monto: number | null, moneda: string | null): string {
+    if (monto === null) return '—';
+    const codigoMoneda = moneda === 'LPS' ? 'HNL' : (moneda || 'HNL');
+    try {
+      return new Intl.NumberFormat('es-HN', { style: 'currency', currency: codigoMoneda }).format(monto);
+    } catch {
+      return `${monto.toFixed(2)} ${moneda ?? ''}`.trim();
+    }
   }
   private async actualizarUrl(): Promise<void> {
     const navego = await this.enrutador.navigate([], { relativeTo: this.ruta, replaceUrl: true,

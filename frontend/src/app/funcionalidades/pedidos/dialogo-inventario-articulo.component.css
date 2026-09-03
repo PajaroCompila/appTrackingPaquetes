@@ -6,7 +6,7 @@
   place-items: center;
   padding: 1rem;
   background: rgb(7 25 53 / 58%);
-  animation: aparecer-fondo 200ms ease-out;
+  animation: aparecer-fondo var(--transicion-normal) var(--easing-corporativo);
 }
 
 .dialogo-inventario {
@@ -19,7 +19,7 @@
   border-radius: .95rem;
   background: #f5f8fb;
   box-shadow: 0 24px 70px rgb(4 21 47 / 35%);
-  animation: aparecer-dialogo 200ms ease-out;
+  animation: aparecer-dialogo var(--transicion-normal) var(--easing-corporativo);
 }
 
 header, footer { display: flex; align-items: center; padding: 1rem 1.25rem; background: white; }
@@ -27,8 +27,10 @@ header { justify-content: space-between; border-bottom: 1px solid #d8e1ea; }
 header h2 { margin: 0; color: var(--azul-900); font-size: 1.35rem; }
 footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .sobrelinea-dialogo { margin: 0 0 .2rem; color: var(--azul-700); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
-.cerrar-icono { width: 2.25rem; height: 2.25rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--azul-900); font-size: 1.7rem; cursor: pointer; }
+.cerrar-icono { width: 2.25rem; height: 2.25rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--azul-900); font-size: 1.7rem; cursor: pointer; transition: background-color var(--transicion-normal) var(--easing-corporativo), color var(--transicion-rapida) var(--easing-corporativo), transform var(--transicion-rapida) var(--easing-corporativo); }
 .cerrar-icono:hover, .cerrar-icono:focus-visible { background: var(--azul-100); }
+.cerrar-icono:hover { transform: translateY(-1px); }
+.cerrar-icono:active { transform: translateY(1px); }
 .contenido-dialogo { min-height: 0; overflow-y: auto; }
 .estado-dialogo { display: grid; min-height: 18rem; place-content: center; justify-items: center; gap: .75rem; padding: 1.5rem; text-align: center; }
 .estado-dialogo > i { color: #7892aa; font-size: 2.1rem; }
@@ -65,7 +67,7 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .sin-existencias p { margin: 0; }
 
 @keyframes aparecer-fondo { from { opacity: 0; } to { opacity: 1; } }
-@keyframes aparecer-dialogo { from { opacity: 0; transform: scale(.97) translateY(.4rem); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes aparecer-dialogo { from { opacity: 0; transform: translateY(5px); } }
 @media (max-width: 680px) {
   .dialogo-inventario { max-height: 94vh; }
   .datos-inventario, .bodegas-inventario { grid-template-columns: 1fr; }
@@ -82,5 +84,6 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fondo-dialogo, .dialogo-inventario { animation: none; }
-  .bodegas-inventario li { transition: none; }
+  .bodegas-inventario li, .cerrar-icono { transition: none; }
+  .cerrar-icono:hover, .cerrar-icono:active { transform: none; }
 }

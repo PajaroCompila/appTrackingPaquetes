@@ -27,9 +27,10 @@ export class HistorialServicio {
   }
 
   private async conciliar(): Promise<number> {
-    const [candidatos, candidatosSap] = await Promise.all([
+    const [candidatos, candidatosSap, nuevosCerradosSap] = await Promise.all([
       this.repositorio.obtenerDespachadosPendientes(),
       this.repositorio.obtenerDespachadosSapPendientes(),
+      this.repositorio.conservarCerradosSapSinDespacho(),
     ]);
     const estados = await this.repositorio.obtenerEstadosR1(candidatos);
     const cerradosSap = await this.repositorio.obtenerCerradosSap(candidatosSap);
@@ -47,7 +48,7 @@ export class HistorialServicio {
         ({ idOrigen, codigoSucursal: estados.get(idOrigen)?.codigoSucursal ?? null })),
       ...cerradosSap.map((idOrigen) => ({ idOrigen, codigoSucursal: null })),
     ]);
-    return cantidadCerrados + cantidadValidados;
+    return cantidadCerrados + cantidadValidados + nuevosCerradosSap;
   }
 
   public async buscar(filtros: FiltrosHistorial): Promise<PaginaHistorial> {
@@ -80,11 +81,25 @@ export class HistorialServicio {
   }
 
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
-    try {
-      return await (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscarArticulos(filtros);
-    } catch {
+    const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
+    const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
+    const [resultadoR1, resultadoSap] = await Promise.allSettled([
+      (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscarArticulos(filtrosAcumulados),
+      this.repositorio.buscarArticulosHistorial(filtrosAcumulados),
+    ]);
+    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected') {
       throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
         'El historial no está disponible temporalmente.');
     }
+    const r1 = resultadoR1.status === 'fulfilled' ? resultadoR1.value : null;
+    const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
+    const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? [])]
+      .sort((a, b) => (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '')
+        || b.idOrigen.localeCompare(a.idOrigen)
+        || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));
+    const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
+    const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
+    return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
+      hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
   }
 }

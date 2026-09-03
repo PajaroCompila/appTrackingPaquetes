@@ -50,5 +50,8 @@ export const routes: Routes = [
   },
   { path: 'configuracion/usuarios', canActivate: [autenticacionGuard, administradorGuard],
     loadComponent: () => import('./funcionalidades/usuarios/usuarios.component').then(({UsuariosComponent})=>UsuariosComponent) },
+  { path: 'prueba-microinteracciones', canActivate: [autenticacionGuard, administradorGuard],
+    loadComponent: () => import('./funcionalidades/pruebas/microinteracciones-prueba.component')
+      .then(({ MicrointeraccionesPruebaComponent }) => MicrointeraccionesPruebaComponent) },
   { path: '**', redirectTo: 'pedidos' },
 ];

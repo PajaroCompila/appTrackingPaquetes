@@ -52,14 +52,22 @@
   border-radius: .65rem;
   color: #dceafb;
   text-decoration: none;
-  border: 0;
+  border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
   overflow: visible;
-  transition: color 200ms ease, background-color 200ms ease;
+  transition:
+    background-color var(--transicion-normal) var(--easing-corporativo),
+    border-color var(--transicion-normal) var(--easing-corporativo),
+    color var(--transicion-normal) var(--easing-corporativo),
+    box-shadow var(--transicion-normal) var(--easing-corporativo),
+    transform var(--transicion-rapida) var(--easing-corporativo);
 }
 
-.navegacion-principal .pi { font-size: 1.4rem; }
+.navegacion-principal .pi {
+  font-size: 1.4rem;
+  transition: transform var(--transicion-rapida) var(--easing-corporativo);
+}
 .etiqueta-nav {
   position: absolute;
   top: 50%;
@@ -80,8 +88,11 @@
   pointer-events: none;
   visibility: hidden;
   opacity: 0;
-  transform: translate(-6px, -50%);
-  transition: opacity 160ms ease, transform 180ms ease, visibility 160ms ease;
+  transform: translate(-4px, -50%);
+  transition:
+    opacity var(--transicion-rapida) var(--easing-corporativo),
+    transform var(--transicion-normal) var(--easing-corporativo),
+    visibility var(--transicion-rapida) var(--easing-corporativo);
 }
 .navegacion-principal a:hover .etiqueta-nav,
 .navegacion-principal a:focus-visible .etiqueta-nav,
@@ -97,10 +108,22 @@
 .navegacion-principal a:hover,
 .navegacion-principal a:focus-visible,
 .navegacion-principal button:hover,
-.navegacion-principal button:focus-visible,
-.navegacion-principal a.activo {
-  background: rgb(255 255 255 / 16%);
+.navegacion-principal button:focus-visible {
+  border-color: rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 12%);
   color: white;
+  box-shadow: 0 3px 8px rgb(7 30 63 / 16%);
+  transform: translateY(-1px);
+}
+.navegacion-principal :is(a, button):hover .pi,
+.navegacion-principal :is(a, button):focus-visible .pi {
+  transform: translateY(-1px) scale(1.03);
+}
+.navegacion-principal a.activo {
+  border-color: rgb(255 255 255 / 14%);
+  background: rgb(255 255 255 / 18%);
+  color: white;
+  box-shadow: inset 3px 0 #8fc5ef;
 }
 
 .area-aplicacion { display: flex; grid-column: 2; min-width: 0; min-height: 100vh; flex-direction: column; }
@@ -136,7 +159,14 @@
 .sesion-actual span { color: #cfdef1; font-size: .7rem; }
 
 @media (prefers-reduced-motion: reduce) {
+  .navegacion-principal a,
+  .navegacion-principal button,
+  .navegacion-principal .pi,
   .etiqueta-nav { transition: none; }
+  .navegacion-principal :is(a, button):hover,
+  .navegacion-principal :is(a, button):focus-visible,
+  .navegacion-principal :is(a, button):hover .pi,
+  .navegacion-principal :is(a, button):focus-visible .pi { transform: none; }
 }
 
 @media (max-width: 680px) {

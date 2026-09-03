@@ -170,7 +170,11 @@ export class PedidoRepositorio implements IPedidoRepositorio {
             AND (@codigoEstadoVenta IS NULL OR venta.[U_SO1_STATUS] = @codigoEstadoVenta)
             AND (@codigoSincronizacion IS NULL OR venta.[U_SO1_SINCRONIZADO] = @codigoSincronizacion)
             ${condicionAlmacenes}
-          ORDER BY venta.[U_SO1_FECHA] DESC, venta.[Name] DESC
+          ORDER BY
+            CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN 1 ELSE 0 END,
+            venta.[U_SO1_FECHA] ASC,
+            venta.[U_SO1_HORA] ASC,
+            venta.[Name] ASC
           OFFSET @desplazamiento ROWS
           FETCH NEXT @cantidadConsulta ROWS ONLY
           OPTION (RECOMPILE);

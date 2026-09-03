@@ -39,3 +39,24 @@ export interface VentasVendedorDashboard {
   porVendedor: VentaPorVendedor[];
   consultadoEn: string;
 }
+
+export interface FacturaPedidoVendedor {
+  numeroPedido: string;
+  numeroFactura: string | null;
+  montoTotal: number | null;
+  moneda: string | null;
+}
+
+export interface DetalleVentasVendedorDashboard {
+  codigoSucursal: string;
+  codigoTienda: string;
+  nombreSucursal: string;
+  codigoVendedor: string | null;
+  fechaDesde: string;
+  fechaHasta: string;
+  pagina: number;
+  cantidadPorPagina: number;
+  totalPedidos: number;
+  hayMas: boolean;
+  ventas: FacturaPedidoVendedor[];
+}

@@ -1,13 +1,14 @@
 <section class="pagina vista-pedidos" aria-labelledby="titulo-pedidos">
-  <div class="encabezado-pagina">
-    <div>
-      <p class="sobrelinea">Pedidos</p>
-      <h1 id="titulo-pedidos">Pedidos de bodega</h1>
-      <p>Buscá y revisá los pedidos de bodega.</p>
+  <div class="bloque-superior-operativo">
+    <div class="encabezado-pagina">
+      <div>
+        <p class="sobrelinea">Pedidos</p>
+        <h1 id="titulo-pedidos">Pedidos de bodega</h1>
+        <p>Buscá y revisá los pedidos de bodega.</p>
+      </div>
     </div>
-  </div>
 
-  <form class="panel filtros" (ngSubmit)="buscar()">
+    <form class="panel filtros" (ngSubmit)="buscar()">
     <div class="campo">
       <label for="numeroPedido">Número de pedido</label>
       <input id="numeroPedido" name="numeroPedido" [(ngModel)]="filtrosFormulario.numeroPedido" />
@@ -85,7 +86,8 @@
         Limpiar filtros
       </button>
     </div>
-  </form>
+    </form>
+  </div>
 
   @if (informacionIncompleta()) {
     <p class="aviso-fuente" role="status">Una fuente no respondió. Los datos pueden estar incompletos.</p>

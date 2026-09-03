@@ -26,7 +26,7 @@ export class PedidoSucursalesRepositorio implements IPedidoRepositorio {
     if (disponibles.length === 0) throw resultados[0]?.status === 'rejected'
       ? resultados[0].reason : new Error('No hay sucursales configuradas.');
     const pedidos = disponibles.flatMap((resultado) => resultado.value.pedidos)
-      .sort((a, b) => (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '')
+      .sort((a, b) => (a.fechaHoraPedido ?? '\uffff').localeCompare(b.fechaHoraPedido ?? '\uffff')
         || a.idOrigen.localeCompare(b.idOrigen))
       .slice(0, cantidadAcumulada);
     const totalRegistros = disponibles.reduce((total, resultado) => total + resultado.value.totalRegistros, 0);

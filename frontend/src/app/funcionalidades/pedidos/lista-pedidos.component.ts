@@ -12,8 +12,9 @@ import type { ArticuloPedidoResumen, FiltrosPedidos, InventarioArticulo, PedidoR
 import { PedidosService } from './pedidos.service';
 import { DialogoInventarioArticuloComponent, type EstadoConsultaInventario } from './dialogo-inventario-articulo.component';
 import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from './vista-impresion-pedido.component';
-import { guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
+import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
+import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -47,6 +48,7 @@ export class ListaPedidosComponent implements OnInit {
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
   private readonly destruirRef = inject(DestroyRef);
+  private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly actualizarAhora = new Subject<boolean>();
   private primeraConsulta = true;
   private consultaEnCurso = false;
@@ -104,6 +106,7 @@ export class ListaPedidosComponent implements OnInit {
 
   public buscar(): void {
     this.limpiarSeleccionTransferencia();
+    this.guardarFiltros();
     void this.actualizarRuta(1);
   }
 
@@ -538,17 +541,20 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private restaurarEstadoDesdeUrl(parametros: ParamMap): void {
-    const fechaActual = obtenerFechaLocalActual();
+    const globales = this.filtrosGlobales.obtener();
     const guardados = this.leerFiltrosGuardados();
     const cantidadSolicitada = Number(parametros.get('cantidadPorPagina') ?? guardados.cantidadPorPagina);
     const paginaSolicitada = Number(parametros.get('pagina') ?? guardados.pagina);
-    const codigosUrl = parametros.getAll('codigoAlmacen').map((codigo) => codigo.trim()).filter(Boolean);
+    const codigosUrl = parametros.getAll('codigoAlmacen').map((codigo) => codigo.trim())
+      .filter((codigo) => /^[A-Za-z0-9_-]{1,16}$/.test(codigo));
+    const fechaDesdeUrl = parametros.get('fechaDesde');
+    const fechaHastaUrl = parametros.get('fechaHasta');
     this.filtrosFormulario = {
       numeroPedido: parametros.get('numeroPedido') ?? parametros.get('folioPedido')
         ?? guardados.numeroPedido ?? '',
-      fechaDesde: parametros.get('fechaDesde') ?? guardados.fechaDesde ?? fechaActual,
-      fechaHasta: parametros.get('fechaHasta') ?? guardados.fechaHasta ?? fechaActual,
-      codigosAlmacen: codigosUrl.length > 0 ? [...new Set(codigosUrl)] : guardados.codigosAlmacen ?? [],
+      fechaDesde: esFechaCalendarioValida(fechaDesdeUrl) ? fechaDesdeUrl : globales.fechaDesde,
+      fechaHasta: esFechaCalendarioValida(fechaHastaUrl) ? fechaHastaUrl : globales.fechaHasta,
+      codigosAlmacen: codigosUrl.length > 0 ? [...new Set(codigosUrl)] : globales.codigosAlmacen,
       codigoSincronizacion: parametros.get('codigoSincronizacion') ?? guardados.codigoSincronizacion ?? '',
       cantidadPorPagina: cantidadSolicitada === 50 || cantidadSolicitada === 100
         ? cantidadSolicitada
@@ -561,6 +567,11 @@ export class ListaPedidosComponent implements OnInit {
 
   private guardarFiltros(): void {
     try {
+      this.filtrosGlobales.actualizar({
+        fechaDesde: this.filtrosFormulario.fechaDesde,
+        fechaHasta: this.filtrosFormulario.fechaHasta,
+        codigosAlmacen: this.filtrosFormulario.codigosAlmacen,
+      });
       guardarFiltrosSesion(claveFiltrosPedidos, {
         ...this.filtrosFormulario, pagina: this.pagina(),
       });

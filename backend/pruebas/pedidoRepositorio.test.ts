@@ -68,7 +68,9 @@ describe('PedidoRepositorio', () => {
     expect(consultas[0]).toContain("NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), '') IS NOT NULL");
     expect(consultas[0].indexOf('NULLIF(LTRIM')).toBeLessThan(consultas[0].indexOf('OFFSET @desplazamiento'));
     expect(consultas[0]).toContain('OFFSET @desplazamiento');
-    expect(consultas[0]).toContain('venta.[Name] DESC');
+    expect(consultas[0]).toContain('venta.[U_SO1_FECHA] ASC');
+    expect(consultas[0]).toContain('venta.[U_SO1_HORA] ASC');
+    expect(consultas[0]).toContain('venta.[Name] ASC');
     expect(consultas[1]).toContain('[@SO1_01SUCURSALALMA]');
     expect(consultas[1]).toContain('detalle.[U_SO1_NUMEROARTICULO] AS codigoArticulo');
     expect(consultas[1]).toContain('detalle.[U_SO1_NUMPARTIDA] AS numeroPartida');

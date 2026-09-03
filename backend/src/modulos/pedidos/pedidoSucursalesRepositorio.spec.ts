@@ -27,6 +27,6 @@ describe('PedidoSucursalesRepositorio', () => {
       [configuracion('TLCB01'), configuracion('TCIR01'), configuracion('TPRO01')], crear,
     ).buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
     expect(resultado.totalRegistros).toBe(2);
-    expect(resultado.pedidos.map(({ idOrigen }) => idOrigen)).toEqual(['R1:TCIR01:F1', 'R1:TLCB01:F1']);
+    expect(resultado.pedidos.map(({ idOrigen }) => idOrigen)).toEqual(['R1:TLCB01:F1', 'R1:TCIR01:F1']);
   });
 });

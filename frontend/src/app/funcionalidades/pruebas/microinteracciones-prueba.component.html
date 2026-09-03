@@ -1,0 +1,156 @@
+<section class="pagina pagina-demostracion" aria-labelledby="titulo-prueba">
+  <div class="encabezado-pagina">
+    <div>
+      <p class="sobrelinea">Prueba aislada</p>
+      <h1 id="titulo-prueba">Microinteracciones</h1>
+      <p>Revise aquí los movimientos, estados e íconos antes de llevarlos a las pantallas de trabajo.</p>
+    </div>
+    <a class="boton boton-secundario enlace-regreso" routerLink="/pedidos">
+      <i class="pi pi-arrow-left" aria-hidden="true"></i>
+      Regresar a pedidos
+    </a>
+  </div>
+
+  <div class="panel aviso-prueba" role="note">
+    <i class="pi pi-shield" aria-hidden="true"></i>
+    <span>Esta pantalla no consulta ni modifica pedidos, inventario, usuarios, SAP o RetailOne.</span>
+  </div>
+
+  <div class="cuadricula-prueba">
+    <section class="panel bloque-prueba bloque-sidebar" aria-labelledby="titulo-sidebar-prueba">
+      <div class="titulo-bloque">
+        <div><h2 id="titulo-sidebar-prueba">Sidebar y tooltips</h2></div>
+        <small>Pruebe con el mouse y con la tecla Tab.</small>
+      </div>
+      <div class="escenario-sidebar">
+        <nav class="sidebar-prueba" aria-label="Muestra del sidebar">
+          <button type="button" aria-label="Pedidos pendientes"
+            [class.activo]="seccionActiva() === 'pendientes'"
+            [attr.aria-pressed]="seccionActiva() === 'pendientes'"
+            (click)="seleccionarSeccion('pendientes')">
+            <i class="pi pi-list-check" aria-hidden="true"></i>
+            <span class="tooltip-prueba" aria-hidden="true">Pedidos pendientes</span>
+          </button>
+          <button type="button" aria-label="Pedidos despachados"
+            [class.activo]="seccionActiva() === 'despachados'"
+            [attr.aria-pressed]="seccionActiva() === 'despachados'"
+            (click)="seleccionarSeccion('despachados')">
+            <i class="pi pi-check-circle" aria-hidden="true"></i>
+            <span class="tooltip-prueba" aria-hidden="true">Pedidos despachados</span>
+          </button>
+          <button type="button" aria-label="Historial"
+            [class.activo]="seccionActiva() === 'historial'"
+            [attr.aria-pressed]="seccionActiva() === 'historial'"
+            (click)="seleccionarSeccion('historial')">
+            <i class="pi pi-history" aria-hidden="true"></i>
+            <span class="tooltip-prueba" aria-hidden="true">Historial</span>
+          </button>
+        </nav>
+        <div class="explicacion-sidebar">
+          <strong>Opción activa: {{ seccionActiva() }}</strong>
+          <p>El ícono responde con un movimiento corto. La etiqueta aparece a la derecha sin mover el contenido.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel bloque-prueba" aria-labelledby="titulo-controles-prueba">
+      <div class="titulo-bloque">
+        <div><h2 id="titulo-controles-prueba">Botones y campos</h2></div>
+        <small>Incluye hover, pulsación y foco visible.</small>
+      </div>
+      <div class="campos-prueba">
+        <label class="campo">Número de pedido<input type="text" value="101473786" /></label>
+        <label class="campo">Almacén<select><option>Todos los almacenes</option><option>BSPS03</option></select></label>
+      </div>
+      <div class="botones-prueba">
+        <button class="boton boton-primario boton-interactivo" type="button">
+          <i class="pi pi-search" aria-hidden="true"></i>Buscar
+        </button>
+        <button class="boton boton-secundario boton-interactivo" type="button">
+          <i class="pi pi-filter-slash" aria-hidden="true"></i>Limpiar filtros
+        </button>
+        <button class="boton boton-secundario boton-icono" type="button" aria-label="Imprimir muestra">
+          <i class="pi pi-print" aria-hidden="true"></i>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <section class="bloque-prueba" aria-labelledby="titulo-tarjetas-prueba">
+    <div class="titulo-bloque titulo-fuera-panel">
+      <div><h2 id="titulo-tarjetas-prueba">Tarjetas</h2></div>
+      <small>Solo las tarjetas que realizan una acción muestran el cursor interactivo.</small>
+    </div>
+    <div class="tarjetas-prueba">
+      <button class="panel tarjeta-prueba tarjeta-clickeable" type="button"
+        (click)="sucursalSeleccionada.set('San Pedro Sula Principal')">
+        <span class="icono-tarjeta"><i class="pi pi-building" aria-hidden="true"></i></span>
+        <span><small>Sucursal</small><strong>San Pedro Sula Principal</strong></span>
+        <i class="pi pi-arrow-right flecha-tarjeta" aria-hidden="true"></i>
+      </button>
+      <button class="panel tarjeta-prueba tarjeta-clickeable" type="button"
+        (click)="sucursalSeleccionada.set('Tegucigalpa Palmira')">
+        <span class="icono-tarjeta"><i class="pi pi-building" aria-hidden="true"></i></span>
+        <span><small>Sucursal</small><strong>Tegucigalpa Palmira</strong></span>
+        <i class="pi pi-arrow-right flecha-tarjeta" aria-hidden="true"></i>
+      </button>
+      <div class="panel tarjeta-prueba tarjeta-informativa">
+        <span class="icono-tarjeta"><i class="pi pi-box" aria-hidden="true"></i></span>
+        <span><small>Dato informativo</small><strong>Sin acción al presionar</strong></span>
+      </div>
+    </div>
+    <p class="seleccion-prueba" aria-live="polite">Sucursal seleccionada: <strong>{{ sucursalSeleccionada() }}</strong></p>
+  </section>
+
+  <section class="panel bloque-prueba" aria-labelledby="titulo-tabla-prueba">
+    <div class="titulo-bloque">
+      <div><h2 id="titulo-tabla-prueba">Pestañas, tabla y actualización</h2></div>
+      <button class="boton boton-secundario boton-interactivo" type="button"
+        [attr.aria-pressed]="actualizando()" (click)="alternarActualizacion()">
+        <i class="pi pi-refresh" [class.girando]="actualizando()" aria-hidden="true"></i>
+        {{ actualizando() ? 'Detener muestra' : 'Simular actualización' }}
+      </button>
+    </div>
+    @if (actualizando()) {
+      <p class="actualizacion-prueba" role="status">Actualizando información…</p>
+    }
+    <div class="pestanas-prueba" role="tablist" aria-label="Muestra de pestañas">
+      <button type="button" role="tab" [attr.aria-selected]="pestanaActiva() === 'pedidos'"
+        [class.activa]="pestanaActiva() === 'pedidos'" (click)="seleccionarPestana('pedidos')">Pedido</button>
+      <button type="button" role="tab" [attr.aria-selected]="pestanaActiva() === 'articulos'"
+        [class.activa]="pestanaActiva() === 'articulos'" (click)="seleccionarPestana('articulos')">Artículos</button>
+    </div>
+    <div class="tabla-prueba">
+      <table>
+        <thead><tr><th>Pedido</th><th>{{ pestanaActiva() === 'pedidos' ? 'Estado' : 'Código' }}</th><th>Vendedor</th><th>Ver detalle</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Pedido"><strong>101473786</strong></td><td [attr.data-label]="pestanaActiva() === 'pedidos' ? 'Estado' : 'Código'">{{ pestanaActiva() === 'pedidos' ? 'Entregado' : 'MIRAGE-MBC-26-BL' }}</td><td data-label="Vendedor">María López</td><td class="accion-tabla"><a class="enlace-prueba" href="#titulo-tabla-prueba">Ver detalle</a></td></tr>
+          <tr><td data-label="Pedido"><strong>101473869</strong></td><td [attr.data-label]="pestanaActiva() === 'pedidos' ? 'Estado' : 'Código'">{{ pestanaActiva() === 'pedidos' ? 'Entregado' : 'FLETE CATEGORÍA 1' }}</td><td data-label="Vendedor">Carlos Mejía</td><td class="accion-tabla"><a class="enlace-prueba" href="#titulo-tabla-prueba">Ver detalle</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pie-prueba-modal">
+      <span>La fila cambia suavemente al pasar el mouse.</span>
+      <button class="boton boton-primario boton-interactivo" type="button" (click)="modalAbierto.set(true)">
+        <i class="pi pi-window-maximize" aria-hidden="true"></i>Probar modal
+      </button>
+    </div>
+  </section>
+
+  @if (modalAbierto()) {
+    <div class="fondo-modal-prueba" role="presentation" (click)="modalAbierto.set(false)">
+      <section class="modal-prueba panel" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-prueba"
+        (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+        <header>
+          <div><p class="sobrelinea">Vista de prueba</p><h2 id="titulo-modal-prueba">Información del artículo</h2></div>
+          <button class="boton-cerrar-prueba" type="button" aria-label="Cerrar modal" (click)="modalAbierto.set(false)">
+            <i class="pi pi-times" aria-hidden="true"></i>
+          </button>
+        </header>
+        <p>La ventana entra con un desplazamiento corto y el fondo aparece suavemente.</p>
+        <div class="dato-modal"><span>Código</span><strong>MIRAGE-MBC-26-BL</strong></div>
+        <footer><button class="boton boton-secundario boton-interactivo" type="button" (click)="modalAbierto.set(false)">Cerrar</button></footer>
+      </section>
+    </div>
+  }
+</section>

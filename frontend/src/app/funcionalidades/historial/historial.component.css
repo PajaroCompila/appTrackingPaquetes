@@ -1,35 +1,20 @@
-.filtros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-.acciones-filtros { display: flex; align-items: end; gap: .75rem; }
-.etiqueta-campo { color: #34495d; font-size: 13px; font-weight: 600; }
-.selector-multiple { position: relative; }
-.selector-multiple summary { display: flex; min-height: 2.65rem; align-items: center; justify-content: space-between; padding: .58rem .7rem; border: 1px solid #aebdca; border-radius: .48rem; background: #fff; cursor: pointer; list-style: none; }
-.selector-multiple summary::-webkit-details-marker { display: none; }
-.selector-multiple summary::after { content: '▾'; color: var(--azul-700); }
-.selector-multiple fieldset { position: absolute; z-index: 20; top: 100%; left: 0; width: 100%; max-height: 16rem; margin: .3rem 0 0; padding: .5rem; overflow-y: auto; border: 1px solid #aebdca; border-radius: .48rem; background: #fff; box-shadow: 0 8px 24px rgb(22 47 75 / 16%); }
-.opciones-almacenes { display: grid; gap: .2rem; }
-.opcion-almacen { display: flex; min-height: 2.2rem; gap: .5rem; align-items: center; padding: .25rem .35rem; border-radius: .35rem; cursor: pointer; }
-.opcion-almacen:hover { background: var(--gris-100); }
-.opcion-almacen input { width: 1.05rem; min-height: 1.05rem; padding: 0; margin: 0; flex: 0 0 1.05rem; }
-.opcion-almacen span { display: grid; }
-.opcion-almacen small { overflow: hidden; color: var(--gris-600); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
-.limpiar-seleccion { margin-top: .5rem; border: 0; background: transparent; color: var(--azul-700); font: inherit; font-weight: 600; cursor: pointer; }
 .tabla-contenedor { overflow-x: auto; }
 .pestanas-historial { display: flex; gap: .25rem; margin: .25rem 0 0; border-bottom: 1px solid #b8c8d8; }
-.pestanas-historial button { position: relative; min-width: 7rem; padding: .7rem 1rem; border: 0; background: transparent; color: var(--gris-600); font: inherit; font-weight: 600; cursor: pointer; }
+.pestanas-historial button { position: relative; min-width: 7rem; padding: .7rem 1rem; border: 0; background: transparent; color: var(--gris-600); font: inherit; font-weight: 600; cursor: pointer; transition: background-color var(--transicion-normal) var(--easing-corporativo), color var(--transicion-rapida) var(--easing-corporativo); }
 .pestanas-historial button::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; border-radius: 3px 3px 0 0; background: transparent; content: ''; }
 .pestanas-historial button:hover { color: var(--azul-700); background: rgb(20 73 129 / 5%); }
 .pestanas-historial button.activa { color: var(--azul-700); }
 .pestanas-historial button.activa::after { background: var(--azul-700); }
 .pestanas-historial button:focus-visible { outline: 2px solid var(--azul-500); outline-offset: 2px; }
 .codigo-articulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dato-consultable { cursor: pointer; }
-.dato-consultable:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
+.dato-consultable { cursor: pointer; transition: color var(--transicion-rapida) var(--easing-corporativo); }
+.dato-consultable:hover, .dato-consultable:focus-visible { color: var(--azul-700); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
 .texto-dos-lineas { display: -webkit-box; width: 100%; overflow: hidden; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .paginacion { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; font-weight: 600; }
 .etiqueta-estado { display: inline-flex; padding: .25rem .55rem; border-radius: 999px; background: #e7f6ed; color: #166534; font-weight: 600; }
-@media (max-width: 800px) { .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 540px) { .filtros { grid-template-columns: 1fr; } .paginacion { justify-content: space-between; } }
+@media (max-width: 540px) { .paginacion { justify-content: space-between; } }
 .estado-actualizacion { margin: 0; color: var(--gris-600); font-size: .78rem; text-align: right; }
 .aviso-actualizacion { margin: 0; padding: .55rem .7rem; border-radius: .45rem; background: #fff4d6; color: #6a4a00; font-size: .82rem; }
 .pagina-detalle { width: min(100% - 2rem, 1400px); }
 @media (max-width: 680px) { .pagina-detalle { width: min(100% - 1rem, 1400px); } }
+@media (prefers-reduced-motion: reduce) { .pestanas-historial button, .dato-consultable { transition: none; } }

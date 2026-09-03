@@ -23,6 +23,7 @@ describe('HistorialServicio', () => {
         { idOrigen: 'R1:F3', folioPedido: 'F3' },
       ]),
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
+      conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerCerradosSap: vi.fn().mockResolvedValue([]),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map([
         ['R1:F1', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: false }],
@@ -51,6 +52,7 @@ describe('HistorialServicio', () => {
     const repositorio = {
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([]),
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
+      conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerCerradosSap: vi.fn().mockResolvedValue([]),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map()),
       marcarCerrados: vi.fn().mockResolvedValue(0),
@@ -69,6 +71,7 @@ describe('HistorialServicio', () => {
         { idOrigen: 'SAP:10', sapDocEntry: '10' },
         { idOrigen: 'SAP:11', sapDocEntry: '11' },
       ]),
+      conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map()),
       obtenerCerradosSap: vi.fn().mockResolvedValue(['SAP:10']),
       marcarCerrados: vi.fn().mockResolvedValue(0),
@@ -114,7 +117,9 @@ describe('HistorialServicio', () => {
   });
 
   it('delega el listado por artículos sin consultar detalles uno por uno', async () => {
-    const repositorio = {} as HistorialRepositorio;
+    const repositorio = { buscarArticulosHistorial: vi.fn().mockResolvedValue({
+      registros: [], pagina: 1, cantidadPorPagina: 25, hayMas: false,
+    }) } as unknown as HistorialRepositorio;
     const repositorioConsulta = { buscarArticulos: vi.fn().mockResolvedValue({
       registros: [], pagina: 1, cantidadPorPagina: 25, hayMas: false,
     }) } as unknown as HistorialR1Repositorio;
@@ -125,5 +130,6 @@ describe('HistorialServicio', () => {
       .buscarArticulos(filtros)).resolves.toMatchObject({ pagina: 1, hayMas: false });
     expect(repositorioConsulta.buscarArticulos).toHaveBeenCalledOnce();
     expect(repositorioConsulta.buscarArticulos).toHaveBeenCalledWith(filtros);
+    expect(repositorio.buscarArticulosHistorial).toHaveBeenCalledWith(filtros);
   });
 });

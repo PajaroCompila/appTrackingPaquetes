@@ -1,3 +1,4 @@
+.bloque-superior-operativo { width: min(100%, 1200px); margin: 0 auto; }
 .filtros {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

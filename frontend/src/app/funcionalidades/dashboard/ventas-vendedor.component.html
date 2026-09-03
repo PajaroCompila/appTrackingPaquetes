@@ -18,11 +18,30 @@
     } @else {
       <section class="panel grafica-vendedores" aria-labelledby="tituloGrafica"><h2 id="tituloGrafica">Pedidos por vendedor</h2>
         @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) {
-          <div class="fila-vendedor"><strong>{{ nombreVendedor(vendedor.nombreVendedor) }}</strong><div class="pista"><span class="barra" [style.width.%]="ancho(vendedor.ventasValidadas)" tabindex="0"><span class="tooltip">{{ nombreVendedor(vendedor.nombreVendedor) }} · {{ vendedor.ventasValidadas }} pedidos</span></span></div><span class="cantidad">{{ vendedor.ventasValidadas }}</span></div>
+          <div class="fila-vendedor" [class.seleccionado]="vendedorSeleccionado() === vendedor"><button class="nombre-vendedor" type="button" (click)="seleccionarVendedor(vendedor)">{{ nombreVendedor(vendedor.nombreVendedor) }}</button><div class="pista"><button class="barra" type="button" [style.width.%]="ancho(vendedor.ventasValidadas)" (click)="seleccionarVendedor(vendedor)" [attr.aria-label]="'Ver facturas de ' + nombreVendedor(vendedor.nombreVendedor)"><span class="tooltip">{{ nombreVendedor(vendedor.nombreVendedor) }} · {{ vendedor.ventasValidadas }} pedidos</span></button></div><span class="cantidad">{{ vendedor.ventasValidadas }}</span></div>
         }
       </section>
+      @if (vendedorSeleccionado(); as vendedor) {
+        <section class="panel detalle-vendedor" aria-labelledby="tituloDetalleVendedor">
+          <header><div><p class="sobrelinea">Detalle del vendedor</p><h2 id="tituloDetalleVendedor">Pedidos y facturas de {{ nombreVendedor(vendedor.nombreVendedor) }}</h2></div><button class="boton boton-secundario" type="button" (click)="cerrarDetalle()">Cerrar</button></header>
+          @if (cargandoDetalle()) { <div class="estado-interfaz detalle-cargando"><span class="cargador"></span><p>Cargando facturas…</p></div> }
+          @if (errorDetalle()) { <p class="advertencia" role="alert">{{ errorDetalle() }}</p> }
+          @if (detalleVendedor(); as detalle) {
+            @if (detalle.ventas.length === 0) {
+              <div class="estado-interfaz"><p>No hay pedidos de este vendedor para esas fechas.</p></div>
+            } @else {
+              <div class="tabla-contenedor tabla-facturas"><table><caption>Facturas de {{ nombreVendedor(vendedor.nombreVendedor) }}</caption><thead><tr><th>Pedido</th><th>Factura</th><th>Monto total</th></tr></thead><tbody>
+                @for (venta of detalle.ventas; track venta.numeroPedido + ':' + (venta.numeroFactura ?? 'sin-factura')) {
+                  <tr><td><strong>{{ venta.numeroPedido }}</strong></td><td>{{ venta.numeroFactura ?? 'Sin factura registrada' }}</td><td class="monto">{{ monto(venta.montoTotal, venta.moneda) }}</td></tr>
+                }
+              </tbody></table></div>
+              <div class="paginacion-detalle"><button class="boton boton-secundario" type="button" [disabled]="detalle.pagina === 1" (click)="seleccionarVendedor(vendedor, detalle.pagina - 1)">Anterior</button><span>Página {{ detalle.pagina }} · {{ detalle.totalPedidos }} pedidos</span><button class="boton boton-secundario" type="button" [disabled]="!detalle.hayMas" (click)="seleccionarVendedor(vendedor, detalle.pagina + 1)">Siguiente</button></div>
+            }
+          }
+        </section>
+      }
       <div class="panel tabla-contenedor"><table><caption>Valores exactos por vendedor</caption><thead><tr><th>Código</th><th>Vendedor</th><th>Pedidos entregados</th></tr></thead><tbody>
-        @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) { <tr><td>{{ vendedor.codigoVendedor || '—' }}</td><td>{{ nombreVendedor(vendedor.nombreVendedor) }}</td><td>{{ vendedor.ventasValidadas }}</td></tr> }
+        @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) { <tr><td>{{ vendedor.codigoVendedor || '—' }}</td><td><button class="enlace-vendedor" type="button" (click)="seleccionarVendedor(vendedor)">{{ nombreVendedor(vendedor.nombreVendedor) }}</button></td><td>{{ vendedor.ventasValidadas }}</td></tr> }
       </tbody></table></div>
     }
     <p class="actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ resumen.consultadoEn | date:'hh:mm:ss a':'-0600' }}</p>

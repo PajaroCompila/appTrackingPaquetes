@@ -58,7 +58,6 @@
 .dashboard tbody tr:hover { background: rgb(255 255 255 / 5%); }
 .dashboard .estado-interfaz { border-color: rgb(255 255 255 / 18%); background: rgb(255 255 255 / 5%); }
 .ultima-actualizacion { margin: 0; color: #9cabc1; font-size: .82rem; text-align: right; }
-@media (prefers-reduced-motion: reduce) { .barra, .tooltip { transition: none; } }
 @media (max-width: 950px) { .tarjetas-sucursales { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 850px) { .filtros-dashboard { grid-template-columns: repeat(2, 1fr); }.acciones-filtros { align-items: stretch; }.grupo-barras { grid-template-columns: 1fr; }.grupo-barras > strong { grid-row: auto; } }
 @media (max-width: 620px) { .dashboard { padding: .85rem; border-radius: .85rem; }.filtros-dashboard, .tarjetas, .tarjetas-sucursales { grid-template-columns: 1fr; }.acciones-filtros { flex-direction: column; }.encabezado-panel { align-items: flex-start; flex-direction: column; }.fila-barra { grid-template-columns: 4.8rem minmax(0, 1fr) 2.5rem; }.panel-grafica { overflow: hidden; } }
@@ -85,3 +84,4 @@
 .dashboard tbody tr:hover { background: #f5f8fb; }
 .dashboard .estado-interfaz { border-color: #aab9c7; background: rgb(255 255 255 / 60%); }
 .ultima-actualizacion { color: var(--gris-600); }
+@media (prefers-reduced-motion: reduce) { .barra, .tooltip { transition: none; } }

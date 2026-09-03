@@ -45,6 +45,8 @@
 .tarjeta-resumen div { display: grid; min-width: 0; gap: .2rem; }
 .tarjeta-resumen span:not(.icono-resumen) { color: var(--gris-600); font-size: 12px; font-weight: 600; }
 .tarjeta-resumen strong { color: var(--gris-900); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.vendedor-destacado { border-color: #b7ddc6; background: #effaf3; }
+.vendedor-destacado strong { color: #174f32; }
 
 .panel-operativo, .panel-articulos { padding: 1.25rem 1.35rem; }
 .titulo-panel { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }

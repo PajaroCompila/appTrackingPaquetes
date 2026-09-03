@@ -11,6 +11,7 @@
     "db:migrate:flujo-estados": "tsx scripts/migrarFlujoEstados.ts",
     "db:migrate:usuarios": "tsx scripts/migrarUsuariosLocales.ts",
     "db:migrate:pedidos-cerrados": "tsx scripts/migrarPedidosCerrados.ts",
+    "db:migrate:historial-sap": "tsx scripts/migrarHistorialSap.ts",
     "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",
     "usuario:cambiar-contrasena": "tsx scripts/cambiarContrasenaUsuario.ts",
     "dev": "tsx watch src/servidor.ts",

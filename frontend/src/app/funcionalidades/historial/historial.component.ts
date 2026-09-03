@@ -10,8 +10,9 @@ import type {
 } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
 import type { MensajeError } from '../../compartido/error-api.interface';
 import { obtenerMensajeError } from '../../compartido/manejar-error-http';
-import { guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
+import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
+import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import type { ArticuloHistorial, HistorialValidado, RespuestaArticulosHistorial, RespuestaHistorial } from './historial.interface';
 import { HistorialService } from './historial.service';
 import type { Almacen } from '../pedidos/almacen.interface';
@@ -39,7 +40,7 @@ type VistaHistorial = 'pedido' | 'articulos';
   imports: [FormsModule, RouterLink, DetallePedidoVistaComponent,
     DialogoInventarioArticuloComponent],
   templateUrl: './historial.component.html',
-  styleUrl: './historial.component.css',
+  styleUrls: ['../pedidos/lista-pedidos.component.css', './historial.component.css'],
 })
 export class HistorialComponent implements OnInit {
   private readonly servicio = inject(HistorialService);
@@ -48,6 +49,7 @@ export class HistorialComponent implements OnInit {
   private readonly destruirRef = inject(DestroyRef);
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
+  private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private temporizador?: ReturnType<typeof setInterval>;
   private haCargado = false;
   private consultaInventarioPendiente: string | null = null;
@@ -126,6 +128,12 @@ export class HistorialComponent implements OnInit {
     this.actualizarUrl();
     this.cargar();
   }
+  public cambiarCantidadPorPagina(): void {
+    this.pagina.set(1);
+    this.guardarFiltros();
+    this.actualizarUrl();
+    this.cargar();
+  }
   public cambiarVista(vista: VistaHistorial): void {
     if (this.vista() === vista) return;
     this.vista.set(vista); this.pagina.set(1); this.haCargado = false; this.hayMas.set(false);
@@ -173,9 +181,16 @@ export class HistorialComponent implements OnInit {
       : this.filtros.codigosAlmacen.filter((codigo) => codigo !== codigoAlmacen);
     this.guardarFiltros();
   }
+  public quitarAlmacen(codigoAlmacen: string): void {
+    this.alternarAlmacen(codigoAlmacen, false);
+  }
   public limpiarAlmacenes(): void {
     this.filtros.codigosAlmacen = [];
     this.guardarFiltros();
+  }
+  public nombreAlmacen(codigoAlmacen: string): string {
+    return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigoAlmacen)?.nombreAlmacen
+      || codigoAlmacen;
   }
   public resumenAlmacenes(): string {
     const cantidad = this.filtros.codigosAlmacen.length;
@@ -206,13 +221,16 @@ export class HistorialComponent implements OnInit {
   private hidratarFiltros(): void {
     const parametros = this.ruta.snapshot.queryParamMap;
     const guardados = this.leerFiltrosGuardados();
-    this.filtros.fechaDesde = parametros.get('fechaDesde') || guardados.fechaDesde || this.filtros.fechaDesde;
-    this.filtros.fechaHasta = parametros.get('fechaHasta') || guardados.fechaHasta || this.filtros.fechaHasta;
+    const globales = this.filtrosGlobales.obtener();
+    const fechaDesdeUrl = parametros.get('fechaDesde');
+    const fechaHastaUrl = parametros.get('fechaHasta');
+    this.filtros.fechaDesde = esFechaCalendarioValida(fechaDesdeUrl) ? fechaDesdeUrl : globales.fechaDesde;
+    this.filtros.fechaHasta = esFechaCalendarioValida(fechaHastaUrl) ? fechaHastaUrl : globales.fechaHasta;
     this.filtros.numeroPedido = parametros.get('numeroPedido') || guardados.numeroPedido || '';
     const codigosUrl = parametros.getAll('codigoAlmacen')
       .map((codigo) => codigo.trim()).filter(Boolean);
     this.filtros.codigosAlmacen = codigosUrl.length > 0
-      ? [...new Set(codigosUrl)] : guardados.codigosAlmacen ?? [];
+      ? [...new Set(codigosUrl)] : globales.codigosAlmacen;
     const cantidad = Number(parametros.get('cantidadPorPagina') ?? guardados.cantidadPorPagina);
     if ([25, 50, 100].includes(cantidad)) this.filtros.cantidadPorPagina = cantidad;
     this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados.pagina) || 1));
@@ -295,6 +313,8 @@ export class HistorialComponent implements OnInit {
 
   private guardarFiltros(): void {
     try {
+      this.filtrosGlobales.actualizar({ fechaDesde: this.filtros.fechaDesde,
+        fechaHasta: this.filtros.fechaHasta, codigosAlmacen: this.filtros.codigosAlmacen });
       guardarFiltrosSesion(claveFiltrosHistorial, {
         fechaDesde: this.filtros.fechaDesde,
         fechaHasta: this.filtros.fechaHasta,

@@ -145,7 +145,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
           AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
           ${filtroAlmacenes}
-        ORDER BY pedido.despachadoEn DESC
+        ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
+          pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC
         OFFSET @inicio ROWS FETCH NEXT @cantidad ROWS ONLY
       )
       SELECT pedido.*, detalle.identificadorDetalle, detalle.numeroLinea,
@@ -157,7 +158,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
       JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
-      ORDER BY pedido.despachadoEn DESC,
+      ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
+        pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
         TRY_CONVERT(bigint, detalle.identificadorDetalle),
         detalle.identificadorDetalle, detalle.numeroLinea;`);
     const mapa = new Map<string, PedidoDespachado>();
