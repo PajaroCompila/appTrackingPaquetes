@@ -12,7 +12,7 @@ import type {
   PedidoHistorial,
 } from './historial.interface.js';
 import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionBaseDatos.js';
-import { fechaSqlSinZona } from '../../compartido/fechaSql.js';
+import { fechaSqlSinZona, fechaTextoSinZonaParaSql } from '../../compartido/fechaSql.js';
 
 export interface CandidatoValidacion { idOrigen: string; folioPedido: string }
 export interface CandidatoSap { idOrigen: string; sapDocEntry: string }
@@ -151,8 +151,7 @@ export class HistorialRepositorio {
         const insertado = await new sql.Request(transaccion)
           .input('sapDocEntry', sql.Int, cabecera.docEntry)
           .input('numeroPedido', sql.NVarChar(100), String(cabecera.docNum))
-          .input('fechaHoraPedido', sql.DateTime2(3), cabecera.fechaHoraPedido
-            ? new Date(`${cabecera.fechaHoraPedido}Z`) : null)
+          .input('fechaHoraPedido', sql.DateTime2(3), fechaTextoSinZonaParaSql(cabecera.fechaHoraPedido))
           .input('nombreVendedor', sql.NVarChar(200), cabecera.nombreVendedor?.trim() || null)
           .query<{ idPedidoSapHistorial: number }>(`
             IF NOT EXISTS (SELECT 1 FROM dbo.PedidoSapHistorial WITH (UPDLOCK, HOLDLOCK)

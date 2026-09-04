@@ -2,7 +2,7 @@ import sql from 'mssql';
 import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedidosBodega.js';
 import type { PedidoResumen } from '../pedidos/pedido.interface.js';
 import type { LineaDespachoValidada } from './lineaDespachoOrigenRepositorio.js';
-import { fechaSqlSinZona } from '../../compartido/fechaSql.js';
+import { fechaSqlSinZona, fechaTextoSinZonaParaSql } from '../../compartido/fechaSql.js';
 
 export interface PedidoDespachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -68,7 +68,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           .input('folioPedido', sql.NVarChar(100), pedido.folioPedido || null)
           .input('sapDocEntry', sql.NVarChar(50), pedido.sapDocEntry)
           .input('numeroPedido', sql.NVarChar(100), pedido.numeroPedido)
-          .input('fechaHoraPedido', sql.DateTime2(3), pedido.fechaHoraPedido ? new Date(pedido.fechaHoraPedido) : null)
+          .input('fechaHoraPedido', sql.DateTime2(3), fechaTextoSinZonaParaSql(pedido.fechaHoraPedido))
           .input('nombreVendedor', sql.NVarChar(200), pedido.nombreVendedor)
           .input('creadoEnR1', sql.Bit, pedido.creadoEnR1)
           .input('idUsuario', sql.UniqueIdentifier, usuarioId);
