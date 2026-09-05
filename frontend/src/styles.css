@@ -141,6 +141,14 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   transform: translateX(1px);
 }
 .codigo-articulo-en-linea { font-weight: 700; overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.codigo-inventario-consultable {
+  cursor: pointer;
+  border-radius: .2rem;
+}
+.codigo-inventario-consultable:hover,
+.codigo-inventario-consultable:focus-visible {
+  color: var(--azul-700);
+}
 
 /* Microinteracciones compartidas: feedback visual sin modificar la distribución. */
 .selector-multiple summary {

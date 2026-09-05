@@ -17,9 +17,7 @@ import type { ArticuloHistorial, HistorialValidado, RespuestaArticulosHistorial,
 import { HistorialService } from './historial.service';
 import type { Almacen } from '../pedidos/almacen.interface';
 import { AlmacenesService } from '../pedidos/almacenes.service';
-import { DialogoInventarioArticuloComponent, type EstadoConsultaInventario } from '../pedidos/dialogo-inventario-articulo.component';
-import type { InventarioArticulo } from '../pedidos/pedido.interface';
-import { PedidosService } from '../pedidos/pedidos.service';
+import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 
 const claveFiltrosHistorial = 'historial';
 const intervaloActualizacionHistorialMs = 15000;
@@ -38,14 +36,13 @@ type VistaHistorial = 'pedido' | 'articulos';
 @Component({
   selector: 'app-historial',
   imports: [FormsModule, RouterLink, DetallePedidoVistaComponent,
-    DialogoInventarioArticuloComponent],
+    CodigoArticuloInventarioDirective],
   templateUrl: './historial.component.html',
   styleUrls: ['../pedidos/lista-pedidos.component.css', './historial.component.css'],
 })
 export class HistorialComponent implements OnInit {
   private readonly servicio = inject(HistorialService);
   private readonly almacenesServicio = inject(AlmacenesService);
-  private readonly pedidosServicio = inject(PedidosService);
   private readonly destruirRef = inject(DestroyRef);
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
@@ -53,7 +50,6 @@ export class HistorialComponent implements OnInit {
   private temporizador?: ReturnType<typeof setInterval>;
   private haCargado = false;
   private recargaManualPendiente = false;
-  private consultaInventarioPendiente: string | null = null;
   public readonly idOrigen = signal<string | null>(null);
   public filtros = {
     fechaDesde: obtenerFechaLocalActual(),
@@ -62,9 +58,6 @@ export class HistorialComponent implements OnInit {
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly registros = signal<HistorialValidado[]>([]);
   public readonly articulos = signal<ArticuloHistorial[]>([]);
-  public readonly dialogoInventarioAbierto = signal(false);
-  public readonly estadoInventario = signal<EstadoConsultaInventario>('cargando');
-  public readonly inventarioArticulo = signal<InventarioArticulo | null>(null);
   public readonly vista = signal<VistaHistorial>('pedido');
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
@@ -146,32 +139,6 @@ export class HistorialComponent implements OnInit {
     this.filtros = { fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
       numeroPedido: '', codigosAlmacen: [], cantidadPorPagina: 25 };
     this.pagina.set(1); this.guardarFiltros(); this.actualizarUrl(); this.cargar();
-  }
-  public abrirInformacionArticulo(articulo: ArticuloHistorial): void {
-    const codigoArticulo = articulo.codigoArticulo?.trim();
-    const codigoAlmacen = articulo.codigoAlmacen?.trim();
-    if (!codigoArticulo || !codigoAlmacen) return;
-    const clave = `${codigoArticulo}\u0000${codigoAlmacen}`;
-    if (this.consultaInventarioPendiente === clave) return;
-    this.dialogoInventarioAbierto.set(true);
-    this.estadoInventario.set('cargando');
-    this.inventarioArticulo.set(null);
-    this.consultaInventarioPendiente = clave;
-    this.pedidosServicio.obtenerInventarioArticulo(codigoArticulo, codigoAlmacen)
-      .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
-        next: (inventario) => {
-          this.inventarioArticulo.set(inventario);
-          this.estadoInventario.set('datos');
-          this.consultaInventarioPendiente = null;
-        },
-        error: (error: { status?: number }) => {
-          this.estadoInventario.set(error.status === 404 ? 'no-encontrado' : 'error');
-          this.consultaInventarioPendiente = null;
-        },
-      });
-  }
-  public cerrarInformacionArticulo(): void {
-    this.dialogoInventarioAbierto.set(false);
   }
   public estaSeleccionado(codigoAlmacen: string): boolean {
     return this.filtros.codigosAlmacen.includes(codigoAlmacen);

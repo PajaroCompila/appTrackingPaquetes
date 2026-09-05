@@ -8,13 +8,13 @@ import type { MensajeError } from '../../compartido/error-api.interface';
 import { obtenerMensajeError } from '../../compartido/manejar-error-http';
 import type { Almacen } from './almacen.interface';
 import { AlmacenesService } from './almacenes.service';
-import type { ArticuloPedidoResumen, FiltrosPedidos, InventarioArticulo, PedidoResumen } from './pedido.interface';
+import type { ArticuloPedidoResumen, FiltrosPedidos, PedidoResumen } from './pedido.interface';
 import { PedidosService } from './pedidos.service';
-import { DialogoInventarioArticuloComponent, type EstadoConsultaInventario } from './dialogo-inventario-articulo.component';
 import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from './vista-impresion-pedido.component';
 import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
+import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -38,7 +38,8 @@ const intervaloActualizacionPedidosMs = 15000;
 
 @Component({
   selector: 'app-lista-pedidos',
-  imports: [CommonModule, FormsModule, RouterLink, DialogoInventarioArticuloComponent, VistaImpresionPedidoComponent],
+  imports: [CommonModule, FormsModule, RouterLink, VistaImpresionPedidoComponent,
+    CodigoArticuloInventarioDirective],
   templateUrl: './lista-pedidos.component.html',
   styleUrl: './lista-pedidos.component.css',
 })
@@ -70,16 +71,12 @@ export class ListaPedidosComponent implements OnInit {
   public readonly informacionIncompleta = signal(false);
   public readonly transfiriendo = signal(false);
   public readonly mensajeTransferencia = signal('');
-  public readonly dialogoInventarioAbierto = signal(false);
-  public readonly estadoInventario = signal<EstadoConsultaInventario>('cargando');
-  public readonly inventarioArticulo = signal<InventarioArticulo | null>(null);
   public readonly articulosImpresion = signal<readonly ArticuloImpresionPedido[]>([]);
   public readonly fechaHoraImpresion = signal('');
   public readonly preparandoImpresion = signal(false);
   public readonly lineasSeleccionadasImpresion = signal<ReadonlySet<string>>(new Set());
   public readonly lineasSeleccionadasTransferencia = signal<ReadonlySet<string>>(new Set());
   public readonly mensajeImpresion = signal('');
-  private consultaInventarioPendiente: string | null = null;
 
   public ngOnInit(): void {
     this.cargarAlmacenes();
@@ -178,36 +175,6 @@ export class ListaPedidosComponent implements OnInit {
 
   public reintentar(): void {
     this.actualizarAhora.next(false);
-  }
-
-  public abrirInformacionArticulo(articulo: ArticuloPedidoResumen): void {
-    const codigoArticulo = articulo.codigoArticulo?.trim();
-    const codigoAlmacen = articulo.codigoAlmacen?.trim();
-    if (!codigoArticulo || !codigoAlmacen) return;
-    const clave = `${codigoArticulo}\u0000${codigoAlmacen}`;
-    if (this.consultaInventarioPendiente === clave) return;
-
-    this.dialogoInventarioAbierto.set(true);
-    this.estadoInventario.set('cargando');
-    this.inventarioArticulo.set(null);
-    this.consultaInventarioPendiente = clave;
-    this.pedidosService.obtenerInventarioArticulo(codigoArticulo, codigoAlmacen)
-      .pipe(takeUntilDestroyed(this.destruirRef))
-      .subscribe({
-        next: (inventario) => {
-          this.inventarioArticulo.set(inventario);
-          this.estadoInventario.set('datos');
-          this.consultaInventarioPendiente = null;
-        },
-        error: (error: { status?: number }) => {
-          this.estadoInventario.set(error.status === 404 ? 'no-encontrado' : 'error');
-          this.consultaInventarioPendiente = null;
-        },
-      });
-  }
-
-  public cerrarInformacionArticulo(): void {
-    this.dialogoInventarioAbierto.set(false);
   }
 
   public claveLineaImpresion(

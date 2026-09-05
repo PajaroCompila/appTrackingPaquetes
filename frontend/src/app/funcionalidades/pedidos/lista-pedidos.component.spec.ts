@@ -5,6 +5,7 @@ import { Observable, Subject, of, throwError } from 'rxjs';
 import { AlmacenesService } from './almacenes.service';
 import { ListaPedidosComponent } from './lista-pedidos.component';
 import { PedidosService } from './pedidos.service';
+import { ConsultaInventarioArticuloService } from '../../compartido/inventario/consulta-inventario-articulo.service';
 
 const respuestaLista = {
   datos: [{
@@ -288,7 +289,8 @@ describe('ListaPedidosComponent', () => {
     componente.alternarSeleccionTransferencia(
       respuestaLista.datos[0], respuestaLista.datos[0].articulos[0], 0, true,
     );
-    componente.abrirInformacionArticulo(respuestaLista.datos[0].articulos[0]);
+    const consultaInventario = TestBed.inject(ConsultaInventarioArticuloService);
+    consultaInventario.abrir('001234', 'COD-COLA');
     const llamadasIniciales = pedidosService.obtenerPedidos.mock.calls.length;
 
     await vi.advanceTimersByTimeAsync(15000);
@@ -300,7 +302,7 @@ describe('ListaPedidosComponent', () => {
     expect(pedidosService.obtenerPedidos.mock.calls.at(-1)?.[0]).not.toHaveProperty('numeroPedido');
     expect(pedidosService.obtenerPedidos.mock.calls.at(-1)?.[0].codigosAlmacen).toBeUndefined();
     expect(componente.lineasSeleccionadasTransferencia().size).toBe(1);
-    expect(componente.dialogoInventarioAbierto()).toBe(true);
+    expect(consultaInventario.abierto()).toBe(true);
   });
 
   it('no cancela ni superpone una consulta que tarda más que el intervalo', async () => {
@@ -468,9 +470,9 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
 
     expect(pedidosService.obtenerInventarioArticulo).toHaveBeenCalledWith('001234', 'COD-COLA');
-    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeTruthy();
-    expect(fixture.nativeElement.textContent).toContain('Existencia física en SAP');
-    expect(fixture.nativeElement.textContent).toContain('10 unidades');
+    const consultaInventario = TestBed.inject(ConsultaInventarioArticuloService);
+    expect(consultaInventario.estado()).toBe('datos');
+    expect(consultaInventario.inventario()?.existenciaFisica).toBe(10);
   });
 
   it('abre el mismo modal al hacer doble clic en el código del artículo', () => {
@@ -480,23 +482,23 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
 
     expect(pedidosService.obtenerInventarioArticulo).toHaveBeenCalledWith('001234', 'COD-COLA');
-    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeTruthy();
-    expect(fixture.nativeElement.textContent).toContain('Artículo visible');
-    expect(fixture.nativeElement.textContent).toContain('10 unidades');
+    const consultaInventario = TestBed.inject(ConsultaInventarioArticuloService);
+    expect(consultaInventario.abierto()).toBe(true);
+    expect(consultaInventario.inventario()?.descripcion).toContain('Artículo visible');
   });
 
   it('mantiene el modal abierto y diferencia inventario inexistente de falla SAP', () => {
+    const consultaInventario = TestBed.inject(ConsultaInventarioArticuloService);
     pedidosService.obtenerInventarioArticulo.mockReturnValue(throwError(() => ({ status: 404 })));
     fixture.detectChanges();
-    componente.abrirInformacionArticulo(respuestaLista.datos[0].articulos[0]);
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No hay inventario');
+    consultaInventario.abrir('001234', 'COD-COLA');
+    expect(consultaInventario.abierto()).toBe(true);
+    expect(consultaInventario.estado()).toBe('no-encontrado');
 
-    componente.cerrarInformacionArticulo();
+    consultaInventario.cerrar();
     pedidosService.obtenerInventarioArticulo.mockReturnValue(throwError(() => ({ status: 500 })));
-    componente.abrirInformacionArticulo(respuestaLista.datos[0].articulos[0]);
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No pudimos consultar');
+    consultaInventario.abrir('001234', 'COD-COLA');
+    expect(consultaInventario.estado()).toBe('error');
   });
 
   it('selecciona líneas independientes e imprime una sola vez en el orden visual', async () => {

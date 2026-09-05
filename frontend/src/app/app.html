@@ -25,6 +25,9 @@
     }
     <main><router-outlet /></main>
     @if (!esLogin()) {
+      <app-consulta-inventario-articulo-host />
+    }
+    @if (!esLogin()) {
       <footer class="pie-aplicacion">Todos los derechos reservados. 2026© Almacén Pájaro Azul.</footer>
     }
   </div>

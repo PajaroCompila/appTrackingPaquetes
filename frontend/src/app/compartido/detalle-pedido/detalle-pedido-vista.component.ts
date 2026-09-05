@@ -6,9 +6,11 @@ import type {
   PedidoDetalleVisual,
 } from './detalle-pedido-vista.interface';
 import { formatearFechaHoraHonduras } from '../fechas/fecha-honduras';
+import { CodigoArticuloInventarioDirective } from '../inventario/codigo-articulo-inventario.directive';
 
 @Component({
   selector: 'app-detalle-pedido-vista',
+  imports: [CodigoArticuloInventarioDirective],
   templateUrl: './detalle-pedido-vista.component.html',
   styleUrl: './detalle-pedido-vista.component.css',
 })

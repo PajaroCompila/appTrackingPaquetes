@@ -112,7 +112,10 @@
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
                 <tr>
-                  <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td class="codigo-articulo-en-linea" data-label="Código" [title]="articulo.codigoArticulo || '—'">{{ articulo.codigoArticulo || '—' }}</td>
+                  <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td class="codigo-articulo-en-linea" data-label="Código"
+                    [title]="(articulo.codigoArticulo || '—') + ' — Doble clic para consultar inventario'"
+                    [appCodigoArticuloInventario]="articulo.codigoArticulo"
+                    [codigoAlmacenInventario]="articulo.codigoAlmacen">{{ articulo.codigoArticulo || '—' }}</td>
                   <td data-label="Descripción" [title]="articulo.descripcion || '—'"><span class="texto-dos-lineas descripcion-despachado">{{ articulo.descripcion || '—' }}</span></td><td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
                   <td data-label="Bodega">{{ articulo.codigoAlmacen || '—' }}</td><td data-label="Fecha y hora" [title]="fecha(pedido.fechaHoraPedido)"><span class="texto-dos-lineas">{{ fecha(pedido.fechaHoraPedido) }}</span></td>
                   <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td><td data-label="Vendedor" [title]="pedido.nombreVendedor || '—'"><span class="texto-dos-lineas">{{ pedido.nombreVendedor || '—' }}</span></td>

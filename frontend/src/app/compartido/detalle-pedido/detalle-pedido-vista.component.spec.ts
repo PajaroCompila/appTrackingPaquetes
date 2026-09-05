@@ -4,9 +4,11 @@ import type {
   PedidoDetalleVisual,
 } from './detalle-pedido-vista.interface';
 import { DetallePedidoVistaComponent } from './detalle-pedido-vista.component';
+import { ConsultaInventarioArticuloService } from '../inventario/consulta-inventario-articulo.service';
 
 describe('DetallePedidoVistaComponent', () => {
   let fixture: ComponentFixture<DetallePedidoVistaComponent>;
+  const abrirInventario = vi.fn();
   const configuracion: ConfiguracionDetallePedido = {
     contexto: 'Consulta', titulo: 'Detalle del pedido', descripcion: 'Descripción contextual',
     etiquetaEstado: 'Pendiente', severidadEstado: 'advertencia',
@@ -26,7 +28,11 @@ describe('DetallePedidoVistaComponent', () => {
   };
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [DetallePedidoVistaComponent] }).compileComponents();
+    abrirInventario.mockClear();
+    await TestBed.configureTestingModule({
+      imports: [DetallePedidoVistaComponent],
+      providers: [{ provide: ConsultaInventarioArticuloService, useValue: { abrir: abrirInventario } }],
+    }).compileComponents();
     fixture = TestBed.createComponent(DetallePedidoVistaComponent);
     fixture.componentRef.setInput('configuracion', configuracion);
   });
@@ -43,6 +49,16 @@ describe('DetallePedidoVistaComponent', () => {
     expect(texto).toContain('Descripción extensa');
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(2);
     expect(texto).toContain('3');
+  });
+
+  it('consulta inventario desde el código con el valor completo y la bodega de la partida', () => {
+    fixture.componentRef.setInput('pedido', pedido);
+    fixture.detectChanges();
+    const codigo = fixture.nativeElement.querySelector('.codigo-articulo') as HTMLElement;
+
+    codigo.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    expect(abrirInventario).toHaveBeenCalledWith('ARTICULO-CODIGO-EXTENSO-001', 'BSPS01');
   });
 
   it('muestra un esqueleto durante la carga sin presentar datos anteriores', () => {

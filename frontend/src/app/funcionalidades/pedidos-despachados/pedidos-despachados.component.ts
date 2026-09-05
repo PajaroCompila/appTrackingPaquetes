@@ -17,6 +17,7 @@ import { AlmacenesService } from '../pedidos/almacenes.service';
 import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
+import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -50,7 +51,7 @@ const filtrosIniciales = (): FiltrosDespachados => ({
 
 @Component({
   selector: 'app-pedidos-despachados',
-  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent],
+  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent, CodigoArticuloInventarioDirective],
   templateUrl: './pedidos-despachados.component.html',
   styleUrl: '../pedidos/lista-pedidos.component.css',
 })

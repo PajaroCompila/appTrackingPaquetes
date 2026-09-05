@@ -105,10 +105,12 @@
             <tr><td data-label="Pedido"><strong>{{ articulo.numeroPedido }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
                 title="Doble clic para consultar inventario"
-                (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"><strong>{{ marcador(articulo.codigoArticulo) }}</strong></td>
+                [appCodigoArticuloInventario]="articulo.codigoArticulo"
+                [codigoAlmacenInventario]="articulo.codigoAlmacen"><strong>{{ marcador(articulo.codigoArticulo) }}</strong></td>
               <td class="dato-consultable" data-label="Descripción"
                 title="Doble clic para consultar inventario"
-                (dblclick)="$event.stopPropagation(); abrirInformacionArticulo(articulo)"><span class="texto-dos-lineas">{{ marcador(articulo.descripcion) }}</span></td>
+                [appCodigoArticuloInventario]="articulo.codigoArticulo"
+                [codigoAlmacenInventario]="articulo.codigoAlmacen"><span class="texto-dos-lineas">{{ marcador(articulo.descripcion) }}</span></td>
               <td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
               <td data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
               <td data-label="Fecha y hora"><span class="texto-dos-lineas">{{ fechaHora(articulo.fechaHoraPedido, true) }}</span></td>
@@ -122,9 +124,5 @@
     }
 
     <nav class="paginacion" aria-label="Paginación del historial"><button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button><span>Página {{ pagina() }}</span><button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button></nav>
-    @if (dialogoInventarioAbierto()) {
-      <app-dialogo-inventario-articulo [estado]="estadoInventario()"
-        [inventario]="inventarioArticulo()" (cerrar)="cerrarInformacionArticulo()" />
-    }
   }
 </section>
