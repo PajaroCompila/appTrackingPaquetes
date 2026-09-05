@@ -34,8 +34,10 @@ export const claveLineaDespachada = (idOrigen: string, identificadorDetalle: str
   `${idOrigen}\u0000${identificadorDetalle}`;
 
 export class DespachoRepositorio implements IDespachoRepositorio {
+  public constructor(private readonly proveedorPool: () => sql.ConnectionPool = obtenerPoolPedidosBodega) {}
+
   public async identidadesLineas(): Promise<Set<string>> {
-    const resultado = await obtenerPoolPedidosBodega().request().query<{
+    const resultado = await this.proveedorPool().request().query<{
       idOrigen: string;
       identificadorDetalle: string;
     }>('SELECT idOrigen, identificadorDetalle FROM dbo.PedidoDespachadoDetalle;');
@@ -53,7 +55,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     lineas: LineaDespachoValidada[],
     usuarioId: string,
   ): Promise<ResultadoPersistenciaDespacho> {
-    const transaccion = new sql.Transaction(obtenerPoolPedidosBodega());
+    const transaccion = new sql.Transaction(this.proveedorPool());
     await transaccion.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     try {
       const agrupadas = new Map<string, LineaDespachoValidada[]>();
@@ -123,7 +125,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     filtros: FiltrosDespachados = { codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 },
   ): Promise<{ pedidos: PedidoDespachado[]; total: number }> {
     const parametrosAlmacen = filtros.codigosAlmacen.map((_, indice) => `@codigoAlmacen${indice}`);
-    const solicitud = obtenerPoolPedidosBodega().request()
+    const solicitud = this.proveedorPool().request()
       .input('idOrigen', sql.NVarChar(150), idOrigen)
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
       .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null)
@@ -157,6 +159,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       FROM Pedidos pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
+        ${parametrosAlmacen.length > 0
+          ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
       JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
       ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
         pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
@@ -169,7 +173,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           idOrigen: fila.idOrigen, origenPedido: fila.origenPedido, creadoEnR1: fila.creadoEnR1,
           sapDocEntry: fila.sapDocEntry, folioPedido: fila.folioPedido ?? '',
           numeroPedido: fila.numeroPedido, codigoVenta: null, codigoVendedor: null,
-          nombreVendedor: fila.nombreVendedor, codigosAlmacen: [], nombresBodega: fila.nombreAlmacen,
+          nombreVendedor: fila.nombreVendedor, codigosAlmacen: [], nombresBodega: null,
           fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
           estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
@@ -185,13 +189,20 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         nombreAlmacen: fila.detalleNombreAlmacen,
       });
     }
-    return { pedidos: [...mapa.values()], total: Number(resultado.recordset[0]?.total ?? 0) };
+    const pedidos = [...mapa.values()];
+    for (const pedido of pedidos) {
+      pedido.codigosAlmacen = [...new Set(pedido.articulos.map(({ codigoAlmacen }) => codigoAlmacen)
+        .filter((codigo): codigo is string => Boolean(codigo)))];
+      pedido.nombresBodega = [...new Set(pedido.articulos.map(({ nombreAlmacen }) => nombreAlmacen)
+        .filter((nombre): nombre is string => Boolean(nombre)))].join(', ') || null;
+    }
+    return { pedidos, total: Number(resultado.recordset[0]?.total ?? 0) };
   }
 
   public listar(filtros: FiltrosDespachados) { return this.consultar(null, filtros); }
 
   public async obtener(idOrigen: string): Promise<PedidoDespachado | null> {
-    const pool = obtenerPoolPedidosBodega();
+    const pool = this.proveedorPool();
     const cabecera = (await pool.request()
       .input('idOrigen', sql.NVarChar(150), idOrigen)
       .query(`SELECT TOP (1) pedido.*, usuario.nombreVisible usuarioDespacho

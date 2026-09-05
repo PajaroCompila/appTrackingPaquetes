@@ -94,8 +94,7 @@ describe('PedidosDespachadosComponent', () => {
     componente.filtros.numeroPedido = '101469987';
     componente.filtros.fechaDesde = '2026-08-15';
     componente.filtros.fechaHasta = '2026-08-19';
-    componente.alternarAlmacen('BSPS01', true);
-    componente.alternarAlmacen('BSPS02', true);
+    componente.filtros.codigosAlmacen = ['BSPS01', 'BSPS02'];
     componente.buscar();
     const filtrada = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
     expect(filtrada.request.params.get('numeroPedido')).toBe('101469987');
@@ -119,7 +118,13 @@ describe('PedidosDespachadosComponent', () => {
     ] });
 
     fixture.componentInstance.alternarAlmacen('BSPS03', true);
+    const bsps03 = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(bsps03.request.params.getAll('codigoAlmacen')).toEqual(['BSPS03']);
+    bsps03.flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.componentInstance.alternarAlmacen('BSPS04', true);
+    const ambos = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(ambos.request.params.getAll('codigoAlmacen')).toEqual(['BSPS03', 'BSPS04']);
+    ambos.flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.detectChanges();
 
     const chips = [...fixture.nativeElement.querySelectorAll('.etiqueta-almacen')]
@@ -127,6 +132,9 @@ describe('PedidosDespachadosComponent', () => {
     expect(chips).toEqual(expect.arrayContaining([expect.stringContaining('BSPS03'), expect.stringContaining('BSPS04')]));
 
     (fixture.nativeElement.querySelector('[aria-label="Quitar Bodega 3"]') as HTMLButtonElement).click();
+    const restante = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(restante.request.params.getAll('codigoAlmacen')).toEqual(['BSPS04']);
+    restante.flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.detectChanges();
     expect(fixture.componentInstance.filtros.codigosAlmacen).toEqual(['BSPS04']);
     expect(fixture.nativeElement.textContent).not.toContain('BSPS03 ×');

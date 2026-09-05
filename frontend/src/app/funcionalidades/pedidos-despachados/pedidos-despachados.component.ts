@@ -169,12 +169,17 @@ export class PedidosDespachadosComponent implements OnInit {
       filter(() => !this.consultaEnCurso),
       exhaustMap((esAutomatica) => {
         this.consultaEnCurso = true;
+        const firmaConsulta = this.firmaConsultaActual();
         if (!this.haCargado || !esAutomatica) this.cargando.set(true);
         else this.actualizando.set(true);
         if (!esAutomatica) this.error.set(false);
         return this.consultarListado().pipe(
-          map((respuesta) => ({ respuesta, esAutomatica })),
+          map((respuesta) => ({ respuesta, esAutomatica, firmaConsulta })),
           catchError(() => {
+            if (this.firmaConsultaActual() !== firmaConsulta) {
+              this.actualizacionManualPendiente = true;
+              return EMPTY;
+            }
             if (!this.haCargado || !esAutomatica) {
               this.marcarError();
             } else {
@@ -194,7 +199,11 @@ export class PedidosDespachadosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta }) => {
+    ).subscribe(({ respuesta, firmaConsulta }) => {
+      if (this.firmaConsultaActual() !== firmaConsulta) {
+        this.actualizacionManualPendiente = true;
+        return;
+      }
       const paginacion = respuesta.paginacion;
       this.hayMas.set(Boolean(paginacion?.hayMas));
       this.totalRegistros.set(paginacion?.totalRegistros ?? respuesta.datos.length);
@@ -211,13 +220,19 @@ export class PedidosDespachadosComponent implements OnInit {
   public cambiarCantidadPorPagina(): void { this.actualizarListado(1); }
   public estaSeleccionado(codigo: string): boolean { return this.filtros.codigosAlmacen.includes(codigo); }
   public alternarAlmacen(codigo: string, seleccionado: boolean): void {
-    this.filtros.codigosAlmacen = seleccionado
+    const codigosAlmacen = seleccionado
       ? [...new Set([...this.filtros.codigosAlmacen, codigo])]
       : this.filtros.codigosAlmacen.filter((actual) => actual !== codigo);
-    this.guardarFiltros();
+    if (codigosAlmacen.join('\u0000') === this.filtros.codigosAlmacen.join('\u0000')) return;
+    this.filtros.codigosAlmacen = codigosAlmacen;
+    this.actualizarListado(1);
   }
   public quitarAlmacen(codigo: string): void { this.alternarAlmacen(codigo, false); }
-  public limpiarAlmacenes(): void { this.filtros.codigosAlmacen = []; this.guardarFiltros(); }
+  public limpiarAlmacenes(): void {
+    if (this.filtros.codigosAlmacen.length === 0) return;
+    this.filtros.codigosAlmacen = [];
+    this.actualizarListado(1);
+  }
   public nombreAlmacen(codigo: string): string {
     return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigo)?.nombreAlmacen || codigo;
   }
@@ -265,6 +280,17 @@ export class PedidosDespachadosComponent implements OnInit {
     this.filtrosGlobales.actualizar({ fechaDesde: this.filtros.fechaDesde,
       fechaHasta: this.filtros.fechaHasta, codigosAlmacen: this.filtros.codigosAlmacen });
     guardarFiltrosSesion(claveFiltrosDespachados, { ...this.filtros, pagina: this.pagina() });
+  }
+
+  private firmaConsultaActual(): string {
+    return JSON.stringify({
+      numeroPedido: this.filtros.numeroPedido.trim(),
+      fechaDesde: this.filtros.fechaDesde,
+      fechaHasta: this.filtros.fechaHasta,
+      codigosAlmacen: this.filtros.codigosAlmacen,
+      cantidadPorPagina: this.filtros.cantidadPorPagina,
+      pagina: this.pagina(),
+    });
   }
 
   private cargarAlmacenes(): void {

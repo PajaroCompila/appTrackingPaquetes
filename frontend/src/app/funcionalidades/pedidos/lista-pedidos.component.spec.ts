@@ -179,14 +179,30 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
 
     expect(componente.resumenAlmacenes()).toBe('Todos los almacenes');
+    enrutador.navigate.mockClear();
     componente.alternarAlmacen('BSPS01', true);
     expect(componente.resumenAlmacenes()).toBe('BSPS01');
+    expect(enrutador.navigate).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: expect.objectContaining({ pagina: 1, codigoAlmacen: ['BSPS01'] }),
+    }));
     componente.alternarAlmacen('BSPS02', true);
     expect(componente.resumenAlmacenes()).toBe('2 almacenes seleccionados');
+    expect(enrutador.navigate).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: expect.objectContaining({ pagina: 1, codigoAlmacen: ['BSPS01', 'BSPS02'] }),
+    }));
     componente.quitarAlmacen('BSPS01');
     expect(componente.filtrosFormulario.codigosAlmacen).toEqual(['BSPS02']);
+    expect(enrutador.navigate).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: expect.objectContaining({ pagina: 1, codigoAlmacen: ['BSPS02'] }),
+    }));
     componente.limpiarAlmacenes();
     expect(componente.resumenAlmacenes()).toBe('Todos los almacenes');
+    expect(enrutador.navigate).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: {
+        pagina: 1, cantidadPorPagina: 25,
+        fechaDesde: '2026-08-03', fechaHasta: '2026-08-03',
+      },
+    }));
   });
 
   it('conserva almacenes al avanzar de página', () => {

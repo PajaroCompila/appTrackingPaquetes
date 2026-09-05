@@ -127,10 +127,13 @@ export class ListaPedidosComponent implements OnInit {
 
   public alternarAlmacen(codigoAlmacen: string, seleccionado: boolean): void {
     const actuales = this.filtrosFormulario.codigosAlmacen;
-    this.filtrosFormulario.codigosAlmacen = seleccionado
+    const codigosAlmacen = seleccionado
       ? [...new Set([...actuales, codigoAlmacen])]
       : actuales.filter((codigo) => codigo !== codigoAlmacen);
+    if (codigosAlmacen.join('\u0000') === actuales.join('\u0000')) return;
+    this.filtrosFormulario.codigosAlmacen = codigosAlmacen;
     this.guardarFiltros();
+    void this.actualizarRuta(1);
   }
 
   public quitarAlmacen(codigoAlmacen: string): void {
@@ -138,8 +141,10 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public limpiarAlmacenes(): void {
+    if (this.filtrosFormulario.codigosAlmacen.length === 0) return;
     this.filtrosFormulario.codigosAlmacen = [];
     this.guardarFiltros();
+    void this.actualizarRuta(1);
   }
 
   public resumenAlmacenes(): string {
@@ -445,13 +450,19 @@ export class ListaPedidosComponent implements OnInit {
       filter(() => !this.consultaEnCurso),
       exhaustMap((esAutomatica) => {
         this.consultaEnCurso = true;
+        const filtrosConsulta = this.copiarFiltros(this.filtrosAplicados);
+        const firmaConsulta = this.firmaFiltros(filtrosConsulta);
         const mostrarCargaInicial = this.primeraConsulta;
         if (mostrarCargaInicial) this.cargando.set(true);
         else this.actualizando.set(true);
         if (!esAutomatica) this.error.set(null);
-        return this.pedidosService.obtenerPedidos(this.copiarFiltros(this.filtrosAplicados)).pipe(
-          map((respuesta) => ({ respuesta, esAutomatica })),
+        return this.pedidosService.obtenerPedidos(filtrosConsulta).pipe(
+          map((respuesta) => ({ respuesta, esAutomatica, firmaConsulta })),
           catchError((error: unknown) => {
+            if (this.firmaFiltros(this.filtrosAplicados) !== firmaConsulta) {
+              this.actualizacionManualPendiente = true;
+              return EMPTY;
+            }
             if (this.primeraConsulta) {
               this.pedidos.set([]);
               this.hayMas.set(false);
@@ -467,6 +478,8 @@ export class ListaPedidosComponent implements OnInit {
           }),
           finalize(() => {
             this.consultaEnCurso = false;
+            this.cargando.set(false);
+            this.actualizando.set(false);
             if (this.actualizacionManualPendiente) {
               this.actualizacionManualPendiente = false;
               queueMicrotask(() => this.actualizarAhora.next(false));
@@ -475,7 +488,11 @@ export class ListaPedidosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta: { datos, paginacion, fuentes }, esAutomatica }) => {
+    ).subscribe(({ respuesta: { datos, paginacion, fuentes }, esAutomatica, firmaConsulta }) => {
+      if (this.firmaFiltros(this.filtrosAplicados) !== firmaConsulta) {
+        this.actualizacionManualPendiente = true;
+        return;
+      }
       if (!esAutomatica && datos.length === 0 && this.pagina() > 1) {
         void this.actualizarRuta(this.pagina() - 1);
         return;
@@ -524,6 +541,18 @@ export class ListaPedidosComponent implements OnInit {
   private copiarFiltros(filtros: FiltrosPedidos): FiltrosPedidos {
     return { ...filtros,
       codigosAlmacen: filtros.codigosAlmacen ? [...filtros.codigosAlmacen] : undefined };
+  }
+
+  private firmaFiltros(filtros: FiltrosPedidos): string {
+    return JSON.stringify({
+      pagina: filtros.pagina,
+      cantidadPorPagina: filtros.cantidadPorPagina,
+      numeroPedido: filtros.numeroPedido?.trim() ?? '',
+      fechaDesde: filtros.fechaDesde ?? '',
+      fechaHasta: filtros.fechaHasta ?? '',
+      codigoSincronizacion: filtros.codigoSincronizacion?.trim() ?? '',
+      codigosAlmacen: filtros.codigosAlmacen ?? [],
+    });
   }
 
   private construirParametros(pagina: number): Record<string, string | number | string[]> {

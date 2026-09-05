@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import type { Observable } from 'rxjs';
+import { finalize, type Observable } from 'rxjs';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 import type {
   ConfiguracionDetallePedido,
@@ -14,7 +14,7 @@ import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obten
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import type { ArticuloHistorial, HistorialValidado, RespuestaArticulosHistorial, RespuestaHistorial } from './historial.interface';
-import { HistorialService } from './historial.service';
+import { HistorialService, type FiltrosHistorial as FiltrosHistorialConsulta } from './historial.service';
 import type { Almacen } from '../pedidos/almacen.interface';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { DialogoInventarioArticuloComponent, type EstadoConsultaInventario } from '../pedidos/dialogo-inventario-articulo.component';
@@ -52,6 +52,7 @@ export class HistorialComponent implements OnInit {
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private temporizador?: ReturnType<typeof setInterval>;
   private haCargado = false;
+  private consultaPendiente = false;
   private consultaInventarioPendiente: string | null = null;
   public readonly idOrigen = signal<string | null>(null);
   public filtros = {
@@ -176,17 +177,20 @@ export class HistorialComponent implements OnInit {
     return this.filtros.codigosAlmacen.includes(codigoAlmacen);
   }
   public alternarAlmacen(codigoAlmacen: string, seleccionado: boolean): void {
-    this.filtros.codigosAlmacen = seleccionado
+    const codigosAlmacen = seleccionado
       ? [...new Set([...this.filtros.codigosAlmacen, codigoAlmacen])]
       : this.filtros.codigosAlmacen.filter((codigo) => codigo !== codigoAlmacen);
-    this.guardarFiltros();
+    if (codigosAlmacen.join('\u0000') === this.filtros.codigosAlmacen.join('\u0000')) return;
+    this.filtros.codigosAlmacen = codigosAlmacen;
+    this.aplicarCambioAlmacenes();
   }
   public quitarAlmacen(codigoAlmacen: string): void {
     this.alternarAlmacen(codigoAlmacen, false);
   }
   public limpiarAlmacenes(): void {
+    if (this.filtros.codigosAlmacen.length === 0) return;
     this.filtros.codigosAlmacen = [];
-    this.guardarFiltros();
+    this.aplicarCambioAlmacenes();
   }
   public nombreAlmacen(codigoAlmacen: string): string {
     return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigoAlmacen)?.nombreAlmacen
@@ -262,34 +266,49 @@ export class HistorialComponent implements OnInit {
   }
 
   private cargar(esAutomatica = false): void {
-    if (this.cargando() || this.actualizando()) return;
+    if (this.cargando() || this.actualizando()) {
+      if (!esAutomatica) this.consultaPendiente = true;
+      return;
+    }
     if (this.haCargado) this.actualizando.set(true); else this.cargando.set(true);
     if (!esAutomatica) this.error.set(null);
     const vistaConsulta = this.vista();
-    const consulta: Observable<RespuestaHistorial | RespuestaArticulosHistorial> = vistaConsulta === 'articulos' ? this.servicio.buscarArticulos({ ...this.filtros, pagina: this.pagina() })
-      : this.servicio.buscar({ ...this.filtros, pagina: this.pagina() });
+    const filtrosConsulta = this.crearFiltrosConsulta();
+    const firmaConsulta = this.firmaConsulta(vistaConsulta, filtrosConsulta);
+    const consulta: Observable<RespuestaHistorial | RespuestaArticulosHistorial> = vistaConsulta === 'articulos'
+      ? this.servicio.buscarArticulos(filtrosConsulta)
+      : this.servicio.buscar(filtrosConsulta);
     consulta
-      .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
+      .pipe(
+        finalize(() => {
+          this.cargando.set(false); this.actualizando.set(false);
+          if (this.consultaPendiente) {
+            this.consultaPendiente = false;
+            queueMicrotask(() => this.cargar());
+          }
+        }),
+        takeUntilDestroyed(this.destruirRef),
+      ).subscribe({
         next: ({ datos, paginacion }) => {
+          if (this.firmaConsulta(this.vista(), this.crearFiltrosConsulta()) !== firmaConsulta) {
+            this.consultaPendiente = true;
+            return;
+          }
           if (vistaConsulta === 'articulos') this.articulos.set(datos as ArticuloHistorial[]);
           else this.registros.set(datos as HistorialValidado[]);
-          if (this.vista() === vistaConsulta) {
-            this.hayMas.set(paginacion.hayMas); this.haCargado = true; this.avisoActualizacion.set('');
-          } else {
-            this.hayMas.set(false); this.haCargado = false;
-          }
-          this.cargando.set(false); this.actualizando.set(false);
-          if (this.vista() !== vistaConsulta) this.cargar();
+          this.hayMas.set(paginacion.hayMas); this.haCargado = true; this.avisoActualizacion.set('');
         },
         error: (error: unknown) => {
-          if (!this.haCargado && this.vista() === vistaConsulta) {
+          if (this.firmaConsulta(this.vista(), this.crearFiltrosConsulta()) !== firmaConsulta) {
+            this.consultaPendiente = true;
+            return;
+          }
+          if (!this.haCargado) {
             this.registros.set([]); this.articulos.set([]); this.hayMas.set(false);
             this.error.set(obtenerMensajeError(error, 'historial'));
-          } else if (this.vista() === vistaConsulta) {
+          } else {
             this.avisoActualizacion.set('No pudimos actualizar. Mostramos los datos anteriores.');
           }
-          this.cargando.set(false); this.actualizando.set(false);
-          if (this.vista() !== vistaConsulta) this.cargar();
         },
       });
   }
@@ -325,6 +344,29 @@ export class HistorialComponent implements OnInit {
         cantidadPorPagina: this.filtros.cantidadPorPagina,
       });
     } catch { /* Los filtros continúan disponibles durante la navegación actual. */ }
+  }
+
+  private aplicarCambioAlmacenes(): void {
+    this.pagina.set(1);
+    this.guardarFiltros();
+    this.actualizarUrl();
+    this.cargar();
+  }
+
+  private crearFiltrosConsulta(): FiltrosHistorialConsulta {
+    return { ...this.filtros, codigosAlmacen: [...this.filtros.codigosAlmacen], pagina: this.pagina() };
+  }
+
+  private firmaConsulta(vista: VistaHistorial, filtros: FiltrosHistorialConsulta): string {
+    return JSON.stringify({
+      vista,
+      fechaDesde: filtros.fechaDesde,
+      fechaHasta: filtros.fechaHasta,
+      numeroPedido: filtros.numeroPedido.trim(),
+      codigosAlmacen: filtros.codigosAlmacen,
+      pagina: filtros.pagina,
+      cantidadPorPagina: filtros.cantidadPorPagina,
+    });
   }
 
   private leerFiltrosGuardados(): FiltrosHistorialGuardados {
