@@ -52,6 +52,7 @@ export class HistorialComponent implements OnInit {
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private temporizador?: ReturnType<typeof setInterval>;
   private haCargado = false;
+  private recargaManualPendiente = false;
   private consultaInventarioPendiente: string | null = null;
   public readonly idOrigen = signal<string | null>(null);
   public filtros = {
@@ -179,14 +180,14 @@ export class HistorialComponent implements OnInit {
     this.filtros.codigosAlmacen = seleccionado
       ? [...new Set([...this.filtros.codigosAlmacen, codigoAlmacen])]
       : this.filtros.codigosAlmacen.filter((codigo) => codigo !== codigoAlmacen);
-    this.guardarFiltros();
+    this.buscar();
   }
   public quitarAlmacen(codigoAlmacen: string): void {
     this.alternarAlmacen(codigoAlmacen, false);
   }
   public limpiarAlmacenes(): void {
     this.filtros.codigosAlmacen = [];
-    this.guardarFiltros();
+    this.buscar();
   }
   public nombreAlmacen(codigoAlmacen: string): string {
     return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigoAlmacen)?.nombreAlmacen
@@ -262,7 +263,10 @@ export class HistorialComponent implements OnInit {
   }
 
   private cargar(esAutomatica = false): void {
-    if (this.cargando() || this.actualizando()) return;
+    if (this.cargando() || this.actualizando()) {
+      if (!esAutomatica) this.recargaManualPendiente = true;
+      return;
+    }
     if (this.haCargado) this.actualizando.set(true); else this.cargando.set(true);
     if (!esAutomatica) this.error.set(null);
     const vistaConsulta = this.vista();
@@ -278,8 +282,7 @@ export class HistorialComponent implements OnInit {
           } else {
             this.hayMas.set(false); this.haCargado = false;
           }
-          this.cargando.set(false); this.actualizando.set(false);
-          if (this.vista() !== vistaConsulta) this.cargar();
+          this.finalizarConsulta(vistaConsulta);
         },
         error: (error: unknown) => {
           if (!this.haCargado && this.vista() === vistaConsulta) {
@@ -288,10 +291,18 @@ export class HistorialComponent implements OnInit {
           } else if (this.vista() === vistaConsulta) {
             this.avisoActualizacion.set('No pudimos actualizar. Mostramos los datos anteriores.');
           }
-          this.cargando.set(false); this.actualizando.set(false);
-          if (this.vista() !== vistaConsulta) this.cargar();
+          this.finalizarConsulta(vistaConsulta);
         },
       });
+  }
+
+  private finalizarConsulta(vistaConsulta: VistaHistorial): void {
+    this.cargando.set(false);
+    this.actualizando.set(false);
+    if (this.vista() !== vistaConsulta || this.recargaManualPendiente) {
+      this.recargaManualPendiente = false;
+      queueMicrotask(() => this.cargar());
+    }
   }
 
   private cargarDetalle(idOrigen: string): void {

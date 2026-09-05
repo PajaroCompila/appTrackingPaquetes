@@ -35,8 +35,12 @@ describe('HistorialComponent', () => {
     await fixture.whenStable();
     const componente = fixture.componentInstance;
     componente.alternarAlmacen('BSPS03', true);
+    expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({ codigosAlmacen: ['BSPS03'] }));
     componente.alternarAlmacen('BSPS04', true);
     expect(componente.filtros.codigosAlmacen).toEqual(['BSPS03', 'BSPS04']);
+    expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen: ['BSPS03', 'BSPS04'],
+    }));
     fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
 
@@ -49,8 +53,6 @@ describe('HistorialComponent', () => {
     fixture.detectChanges();
     expect(componente.filtros.codigosAlmacen).toEqual(['BSPS03']);
     expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(['BSPS03']);
-
-    componente.buscar();
     expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({ codigosAlmacen: ['BSPS03'] }));
     fixture.destroy();
     vi.useRealTimers();

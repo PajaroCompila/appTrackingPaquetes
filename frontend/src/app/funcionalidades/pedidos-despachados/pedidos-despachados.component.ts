@@ -215,9 +215,14 @@ export class PedidosDespachadosComponent implements OnInit {
       ? [...new Set([...this.filtros.codigosAlmacen, codigo])]
       : this.filtros.codigosAlmacen.filter((actual) => actual !== codigo);
     this.guardarFiltros();
+    this.actualizarListado(1);
   }
   public quitarAlmacen(codigo: string): void { this.alternarAlmacen(codigo, false); }
-  public limpiarAlmacenes(): void { this.filtros.codigosAlmacen = []; this.guardarFiltros(); }
+  public limpiarAlmacenes(): void {
+    this.filtros.codigosAlmacen = [];
+    this.guardarFiltros();
+    this.actualizarListado(1);
+  }
   public nombreAlmacen(codigo: string): string {
     return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigo)?.nombreAlmacen || codigo;
   }

@@ -95,8 +95,12 @@ describe('PedidosDespachadosComponent', () => {
     componente.filtros.fechaDesde = '2026-08-15';
     componente.filtros.fechaHasta = '2026-08-19';
     componente.alternarAlmacen('BSPS01', true);
+    const primerAlmacen = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(primerAlmacen.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01']);
+    primerAlmacen.flush({ datos: [], paginacion: {
+      pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false,
+    } });
     componente.alternarAlmacen('BSPS02', true);
-    componente.buscar();
     const filtrada = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
     expect(filtrada.request.params.get('numeroPedido')).toBe('101469987');
     expect(filtrada.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01', 'BSPS02']);
@@ -119,7 +123,11 @@ describe('PedidosDespachadosComponent', () => {
     ] });
 
     fixture.componentInstance.alternarAlmacen('BSPS03', true);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'))
+      .flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.componentInstance.alternarAlmacen('BSPS04', true);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'))
+      .flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.detectChanges();
 
     const chips = [...fixture.nativeElement.querySelectorAll('.etiqueta-almacen')]
@@ -127,6 +135,9 @@ describe('PedidosDespachadosComponent', () => {
     expect(chips).toEqual(expect.arrayContaining([expect.stringContaining('BSPS03'), expect.stringContaining('BSPS04')]));
 
     (fixture.nativeElement.querySelector('[aria-label="Quitar Bodega 3"]') as HTMLButtonElement).click();
+    const sinBodegaTres = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(sinBodegaTres.request.params.getAll('codigoAlmacen')).toEqual(['BSPS04']);
+    sinBodegaTres.flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.detectChanges();
     expect(fixture.componentInstance.filtros.codigosAlmacen).toEqual(['BSPS04']);
     expect(fixture.nativeElement.textContent).not.toContain('BSPS03 ×');

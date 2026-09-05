@@ -131,6 +131,7 @@ export class ListaPedidosComponent implements OnInit {
       ? [...new Set([...actuales, codigoAlmacen])]
       : actuales.filter((codigo) => codigo !== codigoAlmacen);
     this.guardarFiltros();
+    void this.actualizarRuta(1);
   }
 
   public quitarAlmacen(codigoAlmacen: string): void {
@@ -140,6 +141,7 @@ export class ListaPedidosComponent implements OnInit {
   public limpiarAlmacenes(): void {
     this.filtrosFormulario.codigosAlmacen = [];
     this.guardarFiltros();
+    void this.actualizarRuta(1);
   }
 
   public resumenAlmacenes(): string {

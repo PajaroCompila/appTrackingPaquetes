@@ -136,6 +136,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       SELECT 1 FROM dbo.PedidoDespachadoDetalle filtro
       WHERE filtro.idPedidoDespachado = pedido.idPedidoDespachado
         AND filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')}))` : '';
+    const filtroDetalleAlmacenes = parametrosAlmacen.length > 0
+      ? `WHERE detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
     const resultado = await solicitud.query(`WITH Pedidos AS (
         SELECT pedido.*, usuario.nombreVisible usuarioDespacho, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
@@ -158,6 +160,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
       JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
+      ${filtroDetalleAlmacenes}
       ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
         pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
         TRY_CONVERT(bigint, detalle.identificadorDetalle),
