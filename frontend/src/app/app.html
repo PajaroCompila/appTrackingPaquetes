@@ -236,7 +236,7 @@
         <app-sucursales [puedeEditar]="sesion.usuario()?.rol === 'administrador'" />
       }
       @if (seguimientoVisible()) {
-        <app-seguimiento-envios [rolUsuario]="sesion.usuario()!.rol" />
+        <app-seguimiento-envios [rolUsuario]="sesion.usuario()!.rol" (abrirDetalle)="consultarDesdeSeguimiento($event)" />
       }
       @if (enviosVisible()) {
         <app-envios [puedeCrear]="true" [rolUsuario]="sesion.usuario()!.rol" [sucursalIdUsuario]="sesion.usuario()!.sucursalId" />
@@ -266,6 +266,7 @@
         <span class="seccion-etiqueta">SEGUIMIENTO</span>
         <h2 id="titulo-resultado-guia">{{ envio.numeroGuia }}</h2>
         <span class="consulta-estado">{{ nombreEstado(envio.estadoActual) }}</span>
+        <div class="consulta-codigo-barras"><app-codigo-barras [valor]="envio.numeroGuia" /></div>
         <dl>
           <div><dt>Origen</dt><dd>{{ envio.puntoOrigen }}</dd></div>
           <div><dt>Destino</dt><dd>{{ envio.puntoDestino }}</dd></div>

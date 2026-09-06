@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import type { Envio } from '../modelos/envio';
 export interface UsuarioReceptor {
   usuarioId: number;
   nombreUsuario: string;
@@ -24,10 +25,13 @@ export class ServicioRecepciones {
   usuarios() {
     return this.http.get<UsuarioReceptor[]>(`${this.url}/usuarios`, this.opciones);
   }
-  crear(datos: { envioId: number; usuarioRecibeId: number }) {
+  enviosDisponibles() {
+    return this.http.get<Envio[]>(`${this.url}/envios`, this.opciones);
+  }
+  crear(datos: { envioId: number }) {
     return this.http.post<Recepcion>(this.url, datos, this.opciones);
   }
-  crearLote(datos: { envioIds: number[]; usuarioRecibeId: number }) {
+  crearLote(datos: { envioIds: number[] }) {
     return this.http.post<Recepcion[]>(`${this.url}/lote`, datos, this.opciones);
   }
 }

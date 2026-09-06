@@ -14,6 +14,8 @@ th,td { padding:15px 18px; border-bottom:1px solid #dce5ee; color:#53627a; font-
 th { color:#60748a; font-size:.69rem; }
 tbody tr:last-child td { border-bottom:0; }
 .guia { color:#1c61e7; font-weight:700; }
+.guia button { padding:2px 0; border:0; color:inherit; background:transparent; font:inherit; font-weight:700; text-decoration:underline; text-decoration-color:rgba(28,97,231,.35); text-underline-offset:3px; cursor:pointer; }
+.guia button:hover,.guia button:focus-visible { color:#124dac; text-decoration-color:currentColor; }
 .estado { display:inline-block; padding:5px 9px; border-radius:20px; color:#245d9c; background:#e2eefb; font-weight:650; }
 .estado[data-estado='recibido'] { color:#28725a; background:#e2f3ec; }
 .estado[data-estado='cancelado'] { color:#98404b; background:#f8e8eb; }

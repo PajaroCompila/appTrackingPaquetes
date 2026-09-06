@@ -5,6 +5,7 @@ export interface IdentidadAutenticada {
   nombreUsuario: string;
   rol: Rol;
   sucursalId: number;
+  nombreCompleto?: string;
 }
 export interface UsuarioGuardado extends IdentidadAutenticada {
   sucursalId: number;

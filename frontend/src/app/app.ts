@@ -9,6 +9,7 @@ import { Envios } from './componentes/envios/envios';
 import { Recepciones } from './componentes/recepciones/recepciones';
 import { Sucursales } from './componentes/sucursales/sucursales';
 import { SeguimientoEnvios } from './componentes/seguimiento-envios/seguimiento-envios';
+import { CodigoBarras } from './componentes/codigo-barras/codigo-barras';
 import { ServicioSesion } from './servicios/sesion.service';
 import { ServicioEnvios } from './servicios/envios.service';
 import type { SeguimientoEnvio } from './modelos/envio';
@@ -25,6 +26,7 @@ import type { SeguimientoEnvio } from './modelos/envio';
     Envios,
     Recepciones,
     SeguimientoEnvios,
+    CodigoBarras,
     DatePipe,
   ],
   templateUrl: './app.html',
@@ -138,6 +140,11 @@ export class Aplicacion {
     this.panelVisible.set(false);
     if (!this.consultaPendiente()) return;
     this.consultaPendiente.set(false);
+    this.ejecutarConsulta();
+  }
+
+  protected consultarDesdeSeguimiento(numeroGuia: string): void {
+    this.numeroGuia = numeroGuia;
     this.ejecutarConsulta();
   }
 

@@ -27,7 +27,7 @@
       <table>
         <thead><tr><th>Guía</th>@if (esAdministrador()) { <th>Usuario</th> }<th>Origen</th><th>Destino</th><th>Fecha</th><th>Estado</th></tr></thead>
         <tbody>@for (envio of enviosFiltrados(); track envio.envioId) {
-          <tr><td class="guia">{{ envio.numeroGuia }}</td>@if (esAdministrador()) { <td>{{ envio.nombreUsuario }}</td> }<td>{{ envio.puntoOrigen }}</td><td>{{ envio.puntoDestino }}</td><td>{{ envio.fechaCreacion | date:'dd/MM/yyyy' }}</td><td><span class="estado" [attr.data-estado]="envio.estadoActual">{{ nombreEstado(envio.estadoActual) }}</span></td></tr>
+          <tr><td class="guia"><button type="button" title="Doble clic para ver el detalle" (dblclick)="mostrarDetalle(envio.numeroGuia)" (keydown.enter)="mostrarDetalle(envio.numeroGuia)">{{ envio.numeroGuia }}</button></td>@if (esAdministrador()) { <td>{{ envio.nombreUsuario }}</td> }<td>{{ envio.puntoOrigen }}</td><td>{{ envio.puntoDestino }}</td><td>{{ envio.fechaCreacion | date:'dd/MM/yyyy' }}</td><td><span class="estado" [attr.data-estado]="envio.estadoActual">{{ nombreEstado(envio.estadoActual) }}</span></td></tr>
         }</tbody>
       </table>
     }

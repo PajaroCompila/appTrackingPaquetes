@@ -29,6 +29,7 @@ export class ServicioSesion {
         nombreUsuario: contenido.nombreUsuario,
         rol: contenido.rol as IdentidadAutenticada["rol"],
         sucursalId: contenido.sucursalId,
+        nombreCompleto: typeof contenido.nombreCompleto === "string" ? contenido.nombreCompleto : contenido.nombreUsuario,
       };
     } catch {
       throw new ErrorAplicacion(

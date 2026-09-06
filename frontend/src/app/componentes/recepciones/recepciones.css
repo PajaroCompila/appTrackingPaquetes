@@ -64,6 +64,11 @@ label {
   border-color: #2f7df6;
   box-shadow: 0 0 0 3px rgba(47, 125, 246, 0.12);
 }
+.campo-busqueda input[readonly] {
+  color: #29435f;
+  background: rgba(232, 240, 249, 0.72);
+  cursor: not-allowed;
+}
 .sugerencias {
   position: absolute;
   z-index: 30;

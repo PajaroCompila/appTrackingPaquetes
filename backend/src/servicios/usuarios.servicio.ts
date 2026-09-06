@@ -33,6 +33,19 @@ const hacerPublico = (usuario: UsuarioGuardado): UsuarioPublico => ({
 export class ServicioUsuarios {
   constructor(private readonly repositorio: RepositorioUsuarios) {}
 
+  async obtenerIdentidadActual(identidad: IdentidadAutenticada): Promise<IdentidadAutenticada> {
+    const usuario = await this.repositorio.buscarPorNombreUsuario(identidad.nombreUsuario);
+    if (!usuario || !usuario.activo)
+      throw new ErrorAplicacion(401, "SESION_INVALIDA", "La sesión no es válida");
+    return {
+      usuarioId: usuario.usuarioId,
+      nombreUsuario: usuario.nombreUsuario,
+      nombreCompleto: `${usuario.nombres} ${usuario.apellidos}`.trim(),
+      rol: usuario.rol,
+      sucursalId: usuario.sucursalId,
+    };
+  }
+
   async listar(identidad: IdentidadAutenticada): Promise<UsuarioPublico[]> {
     if (identidad.rol === "usuario")
       throw new ErrorAplicacion(
@@ -110,6 +123,7 @@ export class ServicioUsuarios {
       nombreUsuario: usuario.nombreUsuario,
       rol: usuario.rol,
       sucursalId: usuario.sucursalId,
+      nombreCompleto: `${usuario.nombres} ${usuario.apellidos}`.trim(),
     };
   }
 

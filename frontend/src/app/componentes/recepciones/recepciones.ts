@@ -1,12 +1,11 @@
-import { Component, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Envio } from '../../modelos/envio';
-import { ServicioEnvios } from '../../servicios/envios.service';
 import {
   Recepcion,
   ServicioRecepciones,
-  UsuarioReceptor,
 } from '../../servicios/recepciones.service';
+import { ServicioSesion } from '../../servicios/sesion.service';
 
 @Component({
   selector: 'app-recepciones',
@@ -16,15 +15,13 @@ import {
 })
 export class Recepciones {
   readonly envios = signal<Envio[]>([]);
-  readonly usuarios = signal<UsuarioReceptor[]>([]);
   readonly recepciones = signal<Recepcion[]>([]);
   readonly mensaje = signal('');
   readonly guiaActiva = signal(false);
-  readonly usuarioActivo = signal(false);
   readonly enviosPorRecibir = signal<Envio[]>([]);
   readonly enviando = signal(false);
   guiaEscrita = '';
-  usuarioEscrito = '';
+  readonly nombreUsuarioActual = computed(() => this.sesion.usuario()?.nombreCompleto ?? this.sesion.usuario()?.nombreUsuario ?? '');
 
   enviosFiltrados(): Envio[] {
     const texto = this.guiaEscrita.trim().toLowerCase();
@@ -32,22 +29,16 @@ export class Recepciones {
       .filter((e) => !texto || e.numeroGuia.toLowerCase().includes(texto))
       .slice(0, 8);
   }
-  usuariosFiltrados(): UsuarioReceptor[] {
-    const texto = this.usuarioEscrito.trim().toLowerCase();
-    return this.usuarios()
-      .filter((u) => !texto || u.nombreUsuario.toLowerCase().includes(texto))
-      .slice(0, 8);
-  }
-
   constructor(
     private readonly servicio: ServicioRecepciones,
-    envios: ServicioEnvios,
+    private readonly sesion: ServicioSesion,
   ) {
-    envios
-      .listar()
-      .subscribe((lista) => this.envios.set(lista.filter((e) => e.estadoActual !== 'recibido')));
-    servicio.usuarios().subscribe((lista) => this.usuarios.set(lista));
+    this.cargarEnvios();
     this.cargar();
+  }
+
+  cargarEnvios(): void {
+    this.servicio.enviosDisponibles().subscribe((lista) => this.envios.set(lista));
   }
 
   cargar(): void {
@@ -56,17 +47,10 @@ export class Recepciones {
   escribirGuia(): void {
     this.guiaActiva.set(true);
   }
-  escribirUsuario(): void {
-    this.usuarioActivo.set(true);
-  }
   seleccionarEnvio(envio: Envio): void {
     this.guiaEscrita = envio.numeroGuia;
     this.guiaActiva.set(false);
     this.agregarGuia();
-  }
-  seleccionarUsuario(usuario: UsuarioReceptor): void {
-    this.usuarioEscrito = usuario.nombreUsuario;
-    this.usuarioActivo.set(false);
   }
 
   agregarGuia(): void {
@@ -90,30 +74,21 @@ export class Recepciones {
   }
 
   guardar(): void {
-    const nombreUsuario = this.usuarioEscrito.trim().toLowerCase();
-    const usuario = this.usuarios().find((u) => u.nombreUsuario.toLowerCase() === nombreUsuario);
     if (!this.enviosPorRecibir().length) {
       this.mensaje.set('Agrega al menos una guía.');
-      return;
-    }
-    if (!usuario) {
-      this.mensaje.set('Escribe un usuario registrado.');
       return;
     }
     this.enviando.set(true);
     this.servicio
       .crearLote({
         envioIds: this.enviosPorRecibir().map((e) => e.envioId),
-        usuarioRecibeId: usuario.usuarioId,
       })
       .subscribe({
         next: (resultados) => {
-          const ids = new Set(resultados.map((r) => r.envioId));
           this.recepciones.update((lista) => [...resultados, ...lista]);
-          this.envios.update((lista) => lista.filter((e) => !ids.has(e.envioId)));
           this.enviosPorRecibir.set([]);
-          this.usuarioEscrito = '';
           this.enviando.set(false);
+          this.cargarEnvios();
           this.mensaje.set(
             `${resultados.length} ${resultados.length === 1 ? 'recepción registrada' : 'recepciones registradas'}.`,
           );

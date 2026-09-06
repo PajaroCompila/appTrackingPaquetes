@@ -38,29 +38,10 @@
       >Usuario que recibe
       <input
         name="usuario"
-        autocomplete="off"
-        placeholder="Escribe el nombre de usuario"
-        [(ngModel)]="usuarioEscrito"
-        (input)="escribirUsuario()"
-        (focus)="usuarioActivo.set(true)"
-        (blur)="usuarioActivo.set(false)"
+        [value]="nombreUsuarioActual()"
+        readonly
+        aria-readonly="true"
       />
-      @if (usuarioActivo()) {
-        <div class="sugerencias">
-          @for (usuario of usuariosFiltrados(); track usuario.usuarioId) {
-            <button
-              type="button"
-              (mousedown)="$event.preventDefault()"
-              (click)="seleccionarUsuario(usuario)"
-            >
-              <strong>{{ usuario.nombreUsuario }}</strong
-              ><span>Usuario registrado</span>
-            </button>
-          } @empty {
-            <p>No hay usuarios disponibles.</p>
-          }
-        </div>
-      }
     </label>
     @if (enviosPorRecibir().length) {
       <section class="lote">
@@ -80,7 +61,7 @@
       {{ enviando() ? 'Guardando...' : 'Registrar recepciones' }}
     </button>
   </form>
-  <p class="aclaracion">La guía y el usuario deben coincidir con un registro existente.</p>
+  <p class="aclaracion">La recepción se registrará con el usuario que inició sesión.</p>
   @if (mensaje()) {
     <p class="mensaje">{{ mensaje() }}</p>
   }

@@ -16,5 +16,5 @@ export const datosEnvioEsquema = z.object({
 export const actualizacionEnvioEsquema = datosEnvioEsquema.extend({
   estadoActual: z.enum(["registrado", "en_transito", "recibido", "cancelado"]),
 });
-export const recepcionEnvioEsquema = z.object({ envioId: z.number().int().positive(), usuarioRecibeId: z.number().int().positive() });
-export const recepcionLoteEsquema = z.object({ envioIds: z.array(z.number().int().positive()).min(1).max(100), usuarioRecibeId: z.number().int().positive() });
+export const recepcionEnvioEsquema = z.object({ envioId: z.number().int().positive() });
+export const recepcionLoteEsquema = z.object({ envioIds: z.array(z.number().int().positive()).min(1).max(100) });

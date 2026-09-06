@@ -160,6 +160,7 @@ describe("ServicioUsuarios: inicio de sesión", () => {
       nombreUsuario: "ana.lopez",
       rol: "usuario",
       sucursalId: 1,
+      nombreCompleto: "Ana María López Ruiz",
     });
   });
 

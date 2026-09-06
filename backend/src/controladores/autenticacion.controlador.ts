@@ -25,8 +25,8 @@ export class ControladorAutenticacion {
     });
     respuesta.json({ usuario: identidad });
   };
-  actual = (solicitud: Request, respuesta: Response): void => {
-    respuesta.json({ usuario: solicitud.identidad });
+  actual = async (solicitud: Request, respuesta: Response): Promise<void> => {
+    respuesta.json({ usuario: await this.usuarios.obtenerIdentidadActual(solicitud.identidad!) });
   };
   cerrar = (_solicitud: Request, respuesta: Response): void => {
     respuesta.clearCookie(NOMBRE_COOKIE, {

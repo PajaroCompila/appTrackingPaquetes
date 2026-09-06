@@ -43,6 +43,7 @@ export class ServicioEnvios {
     if (!(await this.repositorio.eliminar(envioId, identidad))) throw new ErrorAplicacion(404, "ENVIO_NO_ENCONTRADO", "El envío no existe");
   }
   listarRecepciones() { return this.repositorio.listarRecepciones(); }
+  listarDisponiblesParaRecepcion() { return this.repositorio.listarDisponiblesParaRecepcion(); }
   usuariosActivos() { return this.repositorio.usuariosActivos(); }
   async registrarRecepcion(datos: DatosRecepcion) { const resultado=await this.repositorio.registrarRecepcion(datos); if(!resultado) throw new ErrorAplicacion(400,"RECEPCION_INVALIDA","Verifica el envío y el usuario receptor"); return resultado; }
   async registrarRecepciones(envioIds:number[],usuarioRecibeId:number) { const unicos=[...new Set(envioIds)]; const resultados=[]; for(const envioId of unicos) resultados.push(await this.registrarRecepcion({envioId,usuarioRecibeId})); return resultados; }

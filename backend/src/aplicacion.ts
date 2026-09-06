@@ -97,6 +97,7 @@ export function crearAplicacion(
     aplicacion.patch("/api/envios/:envioId", requiereSesion, controladorEnvios.actualizar);
     aplicacion.delete("/api/envios/:envioId", requiereSesion, controladorEnvios.eliminar);
     aplicacion.get("/api/recepciones", requiereSesion, controladorEnvios.listarRecepciones);
+    aplicacion.get("/api/recepciones/envios", requiereSesion, controladorEnvios.listarDisponiblesParaRecepcion);
     aplicacion.get("/api/recepciones/usuarios", requiereSesion, controladorEnvios.usuariosActivos);
     aplicacion.post("/api/recepciones", requiereSesion, controladorEnvios.registrarRecepcion);
     aplicacion.post("/api/recepciones/lote", requiereSesion, controladorEnvios.registrarRecepciones);

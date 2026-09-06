@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Envio, EstadoEnvio } from '../../modelos/envio';
 import type { Rol } from '../../modelos/sesion';
@@ -13,6 +13,7 @@ import { ServicioEnvios } from '../../servicios/envios.service';
 })
 export class SeguimientoEnvios {
   readonly rolUsuario = input.required<Rol>();
+  readonly abrirDetalle = output<string>();
   readonly envios = signal<Envio[]>([]);
   readonly cargando = signal(true);
   readonly mensaje = signal('');
@@ -49,5 +50,9 @@ export class SeguimientoEnvios {
 
   protected nombreEstado(estado: EstadoEnvio): string {
     return ({ registrado: 'Registrado', en_transito: 'En tránsito', recibido: 'Recibido', cancelado: 'Cancelado' })[estado];
+  }
+
+  protected mostrarDetalle(numeroGuia: string): void {
+    this.abrirDetalle.emit(numeroGuia);
   }
 }

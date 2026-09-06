@@ -4,4 +4,5 @@ export interface IdentidadAutenticada {
   nombreUsuario: string;
   rol: Rol;
   sucursalId: number;
+  nombreCompleto?: string;
 }
