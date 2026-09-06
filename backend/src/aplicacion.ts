@@ -6,11 +6,13 @@ import { ControladorAutenticacion } from "./controladores/autenticacion.controla
 import { ControladorUsuarios } from "./controladores/usuarios.controlador.js";
 import { ControladorSucursales } from "./controladores/sucursales.controlador.js";
 import { ControladorEnvios } from "./controladores/envios.controlador.js";
+import { ControladorDespachos } from "./controladores/despachos.controlador.js";
 import { autenticar, exigirOrigen } from "./middlewares/autenticacion.js";
 import { manejarErrores } from "./middlewares/errores.js";
 import type { RepositorioUsuarios } from "./repositorios/usuarios.repositorio.js";
 import type { RepositorioSucursales } from "./repositorios/sucursales.repositorio.js";
 import type { RepositorioEnvios } from "./repositorios/envios.repositorio.js";
+import type { RepositorioDespachosSql } from "./repositorios/despachos.repositorio.js";
 import { ServicioSesion } from "./servicios/sesion.servicio.js";
 import { ServicioUsuarios } from "./servicios/usuarios.servicio.js";
 import { ServicioSucursales } from "./servicios/sucursales.servicio.js";
@@ -21,6 +23,7 @@ export function crearAplicacion(
   repositorio: RepositorioUsuarios,
   repositorioSucursales?: RepositorioSucursales,
   repositorioEnvios?: RepositorioEnvios,
+  repositorioDespachos?: RepositorioDespachosSql,
 ): Express {
   const aplicacion = express();
   const usuarios = new ServicioUsuarios(repositorio);
@@ -44,6 +47,9 @@ export function crearAplicacion(
     ? new ServicioEnvios(repositorioEnvios)
     : null;
   const controladorEnvios = envios ? new ControladorEnvios(envios) : null;
+  const controladorDespachos = repositorioDespachos
+    ? new ControladorDespachos(repositorioDespachos)
+    : null;
   const requiereSesion = autenticar(sesion);
 
   aplicacion.disable("x-powered-by");
@@ -98,9 +104,15 @@ export function crearAplicacion(
     aplicacion.delete("/api/envios/:envioId", requiereSesion, controladorEnvios.eliminar);
     aplicacion.get("/api/recepciones", requiereSesion, controladorEnvios.listarRecepciones);
     aplicacion.get("/api/recepciones/envios", requiereSesion, controladorEnvios.listarDisponiblesParaRecepcion);
+    aplicacion.get("/api/seguimiento/recibidos", requiereSesion, controladorEnvios.listarRecibidos);
     aplicacion.get("/api/recepciones/usuarios", requiereSesion, controladorEnvios.usuariosActivos);
     aplicacion.post("/api/recepciones", requiereSesion, controladorEnvios.registrarRecepcion);
     aplicacion.post("/api/recepciones/lote", requiereSesion, controladorEnvios.registrarRecepciones);
+  }
+  if (controladorDespachos) {
+    aplicacion.get("/api/despachos", requiereSesion, controladorDespachos.listar);
+    aplicacion.get("/api/despachos/paquetes", requiereSesion, controladorDespachos.listarPaquetesDisponibles);
+    aplicacion.post("/api/despachos", requiereSesion, controladorDespachos.crear);
   }
   aplicacion.use(manejarErrores);
   return aplicacion;

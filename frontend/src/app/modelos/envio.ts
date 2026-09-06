@@ -19,6 +19,7 @@ export interface Envio {
   estadoActual: EstadoEnvio;
   fechaCreacion: string;
 }
+export interface EnvioRecibido extends Envio { fechaRecepcion: string; entregaFinal: boolean; }
 export type DatosEnvio = Omit<
   Envio,
   'envioId' | 'numeroGuia' | 'usuarioQueRegistraId' | 'nombreUsuario' | 'puntoOrigen' | 'puntoDestino' | 'estadoActual' | 'fechaCreacion'

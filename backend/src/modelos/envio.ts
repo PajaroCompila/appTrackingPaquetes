@@ -3,6 +3,7 @@ import type { IdentidadAutenticada } from "./usuario.js";
 export type EstadoEnvio = "registrado" | "en_transito" | "recibido" | "cancelado";
 
 export interface RecepcionEnvio { recepcionId: number; envioId: number; numeroGuia: string; usuarioRecibeId: number; nombreUsuario: string; entregaFinal: boolean; fechaRecepcion: Date; }
+export interface EnvioRecibido extends Envio { fechaRecepcion: Date; entregaFinal: boolean; }
 export interface DatosRecepcion { envioId: number; usuarioRecibeId: number; }
 
 export interface Envio {

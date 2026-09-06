@@ -147,9 +147,6 @@ label {
 .mensaje {
   color: #245d9c;
 }
-.aclaracion {
-  font-size: 0.76rem !important;
-}
 .lista {
   display: grid;
   gap: 10px;

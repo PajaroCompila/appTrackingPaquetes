@@ -1,7 +1,7 @@
 import sql from "mssql";
 import type { Configuracion } from "../configuracion/entorno.js";
 import { obtenerConexion } from "../baseDatos/conexion.js";
-import type { ActualizacionEnvio, DatosEnvio, Envio, SeguimientoEnvio, DatosRecepcion, RecepcionEnvio } from "../modelos/envio.js";
+import type { ActualizacionEnvio, DatosEnvio, Envio, EnvioRecibido, SeguimientoEnvio, DatosRecepcion, RecepcionEnvio } from "../modelos/envio.js";
 import type { IdentidadAutenticada } from "../modelos/usuario.js";
 
 const columnas = `e.envioId, e.numeroGuia, e.puntoOrigenId, origen.nombre AS puntoOrigen,
@@ -12,6 +12,7 @@ const columnas = `e.envioId, e.numeroGuia, e.puntoOrigenId, origen.nombre AS pun
 export interface RepositorioEnvios {
   listar(identidad: IdentidadAutenticada): Promise<Envio[]>;
   listarDisponiblesParaRecepcion(): Promise<Envio[]>;
+  listarRecibidos(usuarioId: number): Promise<EnvioRecibido[]>;
   crear(numeroGuia: string, usuarioId: number, datos: DatosEnvio): Promise<Envio>;
   actualizar(envioId: number, identidad: IdentidadAutenticada, datos: ActualizacionEnvio): Promise<Envio | null>;
   eliminar(envioId: number, identidad: IdentidadAutenticada): Promise<boolean>;
@@ -62,6 +63,18 @@ export class RepositorioEnviosSql implements RepositorioEnvios {
     return resultado.recordset;
   }
 
+  async listarRecibidos(usuarioId: number): Promise<EnvioRecibido[]> {
+    const conexion = await obtenerConexion(this.configuracion);
+    const resultado = await conexion.request().input("usuarioId", sql.Int, usuarioId).query<EnvioRecibido>(`
+      SELECT ${columnas}, r.fechaRecepcion, r.entregaFinal FROM dbo.RecepcionesEnvio r
+      INNER JOIN dbo.Envios e ON e.envioId = r.envioId
+      INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId
+      INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId
+      INNER JOIN dbo.Usuarios u ON u.usuarioId = e.usuarioQueRegistraId
+      WHERE r.usuarioRecibeId = @usuarioId ORDER BY r.fechaRecepcion DESC`);
+    return resultado.recordset;
+  }
+
   async buscarPorGuia(numeroGuia: string, buscarPorTerminacion: boolean): Promise<SeguimientoEnvio | null> {
     const conexion = await obtenerConexion(this.configuracion);
     const resultado = await conexion.request()
@@ -101,9 +114,47 @@ export class RepositorioEnviosSql implements RepositorioEnvios {
   async listarRecepciones() { const c=await obtenerConexion(this.configuracion); return (await c.request().query<RecepcionEnvio>(`SELECT r.recepcionId,r.envioId,e.numeroGuia,r.usuarioRecibeId,u.nombreUsuario,r.entregaFinal,r.fechaRecepcion FROM dbo.RecepcionesEnvio r JOIN dbo.Envios e ON e.envioId=r.envioId JOIN dbo.Usuarios u ON u.usuarioId=r.usuarioRecibeId ORDER BY r.fechaRecepcion DESC`)).recordset; }
   async usuariosActivos() { const c=await obtenerConexion(this.configuracion); return (await c.request().query<{usuarioId:number;nombreUsuario:string}>(`SELECT usuarioId,nombreUsuario FROM dbo.Usuarios WHERE activo=1 ORDER BY nombreUsuario`)).recordset; }
   async registrarRecepcion(datos: DatosRecepcion) {
-    const c=await obtenerConexion(this.configuracion); const t=new sql.Transaction(c); await t.begin();
-    try { const q=new sql.Request(t).input('envioId',sql.Int,datos.envioId).input('usuarioRecibeId',sql.Int,datos.usuarioRecibeId);
-      const r=await q.query<RecepcionEnvio>(`IF EXISTS(SELECT 1 FROM dbo.Usuarios WHERE usuarioId=@usuarioRecibeId AND activo=1) AND EXISTS(SELECT 1 FROM dbo.Envios WHERE envioId=@envioId AND estadoActual NOT IN ('recibido','cancelado')) AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionesEnvio WHERE envioId=@envioId AND usuarioRecibeId=@usuarioRecibeId) BEGIN DECLARE @entregaFinal BIT=CASE WHEN EXISTS(SELECT 1 FROM dbo.Envios e JOIN dbo.Usuarios u ON u.usuarioId=@usuarioRecibeId WHERE e.envioId=@envioId AND e.puntoDestinoId=u.sucursalId) THEN 1 ELSE 0 END; INSERT dbo.RecepcionesEnvio(envioId,usuarioRecibeId,entregaFinal) VALUES(@envioId,@usuarioRecibeId,@entregaFinal); UPDATE dbo.Envios SET estadoActual=CASE WHEN @entregaFinal=1 THEN 'recibido' ELSE 'en_transito' END WHERE envioId=@envioId; SELECT r.recepcionId,r.envioId,e.numeroGuia,r.usuarioRecibeId,u.nombreUsuario,r.entregaFinal,r.fechaRecepcion FROM dbo.RecepcionesEnvio r JOIN dbo.Envios e ON e.envioId=r.envioId JOIN dbo.Usuarios u ON u.usuarioId=r.usuarioRecibeId WHERE r.recepcionId=SCOPE_IDENTITY(); END`); await t.commit(); return r.recordset[0]??null;
-    } catch(e){await t.rollback();throw e;}
+    const conexion = await obtenerConexion(this.configuracion);
+    const transaccion = new sql.Transaction(conexion);
+    await transaccion.begin();
+    try {
+      const solicitud = new sql.Request(transaccion)
+        .input('envioId', sql.Int, datos.envioId)
+        .input('usuarioRecibeId', sql.Int, datos.usuarioRecibeId);
+      const resultado = await solicitud.query<RecepcionEnvio>(`
+        IF EXISTS(SELECT 1 FROM dbo.Usuarios WHERE usuarioId=@usuarioRecibeId AND activo=1)
+          AND EXISTS(SELECT 1 FROM dbo.Envios WHERE envioId=@envioId AND estadoActual NOT IN ('recibido','cancelado'))
+          AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionesEnvio WHERE envioId=@envioId AND usuarioRecibeId=@usuarioRecibeId)
+        BEGIN
+          DECLARE @entregaFinal BIT=CASE WHEN EXISTS(
+            SELECT 1 FROM dbo.Envios e JOIN dbo.Usuarios u ON u.usuarioId=@usuarioRecibeId
+            WHERE e.envioId=@envioId AND e.puntoDestinoId=u.sucursalId
+          ) THEN 1 ELSE 0 END;
+          INSERT dbo.RecepcionesEnvio(envioId,usuarioRecibeId,entregaFinal)
+          VALUES(@envioId,@usuarioRecibeId,@entregaFinal);
+          UPDATE dbo.Envios
+          SET estadoActual=CASE WHEN @entregaFinal=1 THEN 'recibido' ELSE 'en_transito' END
+          WHERE envioId=@envioId;
+          UPDATE d
+          SET d.estado='recibido',d.fechaRecepcion=SYSUTCDATETIME()
+          FROM dbo.Despachos d
+          WHERE d.estado='despachado'
+            AND EXISTS(SELECT 1 FROM dbo.DespachoPaquetes dp WHERE dp.despachoId=d.despachoId AND dp.envioId=@envioId)
+            AND NOT EXISTS(
+              SELECT 1 FROM dbo.DespachoPaquetes dp
+              JOIN dbo.Envios paquete ON paquete.envioId=dp.envioId
+              WHERE dp.despachoId=d.despachoId AND paquete.estadoActual<>'recibido'
+            );
+          SELECT r.recepcionId,r.envioId,e.numeroGuia,r.usuarioRecibeId,u.nombreUsuario,r.entregaFinal,r.fechaRecepcion
+          FROM dbo.RecepcionesEnvio r JOIN dbo.Envios e ON e.envioId=r.envioId
+          JOIN dbo.Usuarios u ON u.usuarioId=r.usuarioRecibeId
+          WHERE r.recepcionId=SCOPE_IDENTITY();
+        END`);
+      await transaccion.commit();
+      return resultado.recordset[0] ?? null;
+    } catch (error) {
+      await transaccion.rollback();
+      throw error;
+    }
   }
 }

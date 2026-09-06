@@ -34,7 +34,6 @@ input:focus-visible {
   outline: 3px solid rgba(55, 132, 255, 0.42);
   outline-offset: 2px;
 }
-/* Superficie común para tarjetas y formularios del sistema. */
 :root {
   --superficie-blur: rgba(255, 255, 255, 0.76);
   --borde-superficie-blur: rgba(188, 204, 221, 0.82);

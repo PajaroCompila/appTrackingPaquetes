@@ -3,10 +3,14 @@
 .listado-cabecera h2 { margin:6px 0; font-size:1.65rem; }
 .listado-cabecera p { margin:0; color:#61708a; }
 .listado-cabecera > strong { color:#245d9c; font-size:.78rem; }
+.pestanas-seguimiento { display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid #c7d4e1; }
+.pestanas-seguimiento button { min-height:42px; padding:0 18px; border:0; border-bottom:3px solid transparent; color:#63758b; background:transparent; font:inherit; font-size:.78rem; font-weight:650; cursor:pointer; }
+.pestanas-seguimiento button.activa { border-bottom-color:#1c61e7; color:#174f9f; }
 .filtros { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)) auto; gap:12px; align-items:end; padding:20px; margin-bottom:16px; border:1px solid #c9d5e1; border-radius:12px; background:rgba(255,255,255,.76); backdrop-filter:blur(14px); box-shadow:0 12px 32px rgba(41,67,95,.1); }
 .filtros label { display:grid; gap:7px; color:#53627a; font-size:.72rem; font-weight:650; }
 .filtros input,.filtros select { width:100%; min-height:42px; padding:0 11px; border:1px solid #c3d1e0; border-radius:8px; color:#172033; background:rgba(255,255,255,.7); font:inherit; }
 .filtros button { min-height:42px; padding:0 16px; border:1px solid #aec2d7; border-radius:8px; color:#29435f; background:rgba(239,245,251,.82); font-weight:650; cursor:pointer; }
+.filtros-recibidos { grid-template-columns:minmax(180px,260px) minmax(180px,260px) auto; justify-content:start; }
 .matriz-envios { overflow:hidden; border:1px solid #c9d5e1; border-radius:12px; background:rgba(255,255,255,.76); backdrop-filter:blur(14px); box-shadow:0 12px 32px rgba(41,67,95,.1); }
 .matriz-envios > p { margin:0; padding:24px; color:#61708a; }
 table { width:100%; border-collapse:collapse; text-align:left; }

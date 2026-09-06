@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import type { ActualizacionEnvio, DatosEnvio, Envio, SeguimientoEnvio } from '../modelos/envio';
+import type { ActualizacionEnvio, DatosEnvio, Envio, EnvioRecibido, SeguimientoEnvio } from '../modelos/envio';
 
 @Injectable({ providedIn: 'root' })
 export class ServicioEnvios {
@@ -11,6 +11,9 @@ export class ServicioEnvios {
   constructor(private readonly http: HttpClient) {}
   listar() {
     return this.http.get<Envio[]>(this.url, this.opciones);
+  }
+  listarRecibidos() {
+    return this.http.get<EnvioRecibido[]>('http://localhost:3000/api/seguimiento/recibidos', this.opciones);
   }
   consultar(numeroGuia: string) {
     return this.http.get<SeguimientoEnvio>(`${this.url}/guia/${encodeURIComponent(numeroGuia)}`, this.opciones);

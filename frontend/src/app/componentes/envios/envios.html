@@ -2,15 +2,15 @@
   <div class="envios-cabecera">
     <div>
       <span class="seccion-etiqueta">OPERACIÓN</span>
-      <h2 id="titulo-envios">Envíos</h2>
-      <p>Registro y consulta de encomiendas entre sucursales.</p>
+      <h2 id="titulo-envios">Paquetes</h2>
+      <p>Registro y consulta de paquetes.</p>
     </div>
   </div>
   @if (puedeCrear()) {
     <form class="envio-formulario" [formGroup]="formulario" (ngSubmit)="guardar()">
       <header class="formulario-cabecera">
         <div>
-          <h3>{{ envioEnEdicion() ? 'Editar envío' : 'Registrar envío' }}</h3>
+          <h3>{{ envioEnEdicion() ? 'Editar paquete' : 'Registrar paquete' }}</h3>
           <small>{{ envioEnEdicion()?.numeroGuia || 'Datos de la encomienda' }}</small>
         </div>
       </header>
@@ -87,20 +87,21 @@
           <button class="boton-secundario" type="button" (click)="cancelarEdicion()">Cancelar</button>
         }
         <button class="boton-registrar" type="submit">
-          <span>{{ envioEnEdicion() ? 'Guardar cambios' : 'Registrar envío' }}</span>
+          <span>{{ envioEnEdicion() ? 'Guardar cambios' : 'Registrar paquete' }}</span>
         </button>
       </div>
     </form>
   }
-  @if (cargando()) {
-    <p>Cargando envíos...</p>
-  } @else if (envios().length === 0) {
-    <p>No hay envíos registrados.</p>
-  }
   @if (mensaje()) {
-    <p role="alert">{{ mensaje() }}</p>
+    <p class="mensaje-envios" role="alert">{{ mensaje() }}</p>
   }
   <div class="envios-lista">
+    <h3>Paquetes registrados</h3>
+    @if (cargando()) {
+      <p class="lista-vacia">Cargando paquetes...</p>
+    } @else if (envios().length === 0) {
+      <p class="lista-vacia">No hay paquetes registrados.</p>
+    }
     @for (envio of envios(); track envio.envioId) {
       <article class="envio-item">
         <div>

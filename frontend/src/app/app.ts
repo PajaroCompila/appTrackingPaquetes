@@ -6,6 +6,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { CrearUsuario } from './componentes/crear-usuario/crear-usuario';
 import { InicioSesion } from './componentes/inicio-sesion/inicio-sesion';
 import { Envios } from './componentes/envios/envios';
+import { Despachos } from './componentes/despachos/despachos';
 import { Recepciones } from './componentes/recepciones/recepciones';
 import { Sucursales } from './componentes/sucursales/sucursales';
 import { SeguimientoEnvios } from './componentes/seguimiento-envios/seguimiento-envios';
@@ -24,6 +25,7 @@ import type { SeguimientoEnvio } from './modelos/envio';
     CrearUsuario,
     Sucursales,
     Envios,
+    Despachos,
     Recepciones,
     SeguimientoEnvios,
     CodigoBarras,
@@ -52,6 +54,7 @@ export class Aplicacion {
   });
   protected readonly sucursalesVisible = signal(false);
   protected readonly enviosVisible = signal(false);
+  protected readonly despachosVisible = signal(false);
   protected readonly recepcionesVisible = signal(false);
   protected readonly seguimientoVisible = signal(false);
   protected numeroGuia = '';
@@ -87,7 +90,7 @@ export class Aplicacion {
       this.volverAlInicio();
       return;
     }
-    if (this.seguimientoVisible() || this.enviosVisible() || this.recepcionesVisible() || this.sucursalesVisible() || this.crearUsuarioVisible()) {
+    if (this.seguimientoVisible() || this.enviosVisible() || this.despachosVisible() || this.recepcionesVisible() || this.sucursalesVisible() || this.crearUsuarioVisible()) {
       this.abrirInicio();
     }
   }
@@ -103,6 +106,7 @@ export class Aplicacion {
   protected abrirInicio(): void {
     this.crearUsuarioVisible.set(false);
     this.enviosVisible.set(false);
+    this.despachosVisible.set(false);
     this.sucursalesVisible.set(false);
     this.recepcionesVisible.set(false);
     this.seguimientoVisible.set(false);
@@ -183,6 +187,7 @@ export class Aplicacion {
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(false);
     this.enviosVisible.set(false);
+    this.despachosVisible.set(false);
     this.recepcionesVisible.set(false);
     this.seguimientoVisible.set(true);
     this.cerrarMenu();
@@ -194,6 +199,7 @@ export class Aplicacion {
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(false);
     this.enviosVisible.set(false);
+    this.despachosVisible.set(false);
     this.seguimientoVisible.set(false);
     this.panelVisible.set(false);
   }
@@ -203,6 +209,7 @@ export class Aplicacion {
       this.crearUsuarioVisible.set(true);
       this.sucursalesVisible.set(false);
       this.enviosVisible.set(false);
+      this.despachosVisible.set(false);
       this.seguimientoVisible.set(false);
       this.cerrarMenu();
     }
@@ -214,6 +221,7 @@ export class Aplicacion {
       this.crearUsuarioVisible.set(false);
       this.sucursalesVisible.set(false);
       this.enviosVisible.set(false);
+      this.despachosVisible.set(false);
       this.panelVisible.set(false);
       return;
     }
@@ -222,6 +230,7 @@ export class Aplicacion {
         this.crearUsuarioVisible.set(false);
         this.sucursalesVisible.set(false);
         this.enviosVisible.set(false);
+        this.despachosVisible.set(false);
         this.seguimientoVisible.set(false);
         this.panelVisible.set(false);
       },
@@ -232,17 +241,30 @@ export class Aplicacion {
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(true);
     this.enviosVisible.set(false);
+    this.despachosVisible.set(false);
     this.seguimientoVisible.set(false);
     this.cerrarMenu();
   }
 
-  protected abrirEnvios(): void {
+  protected abrirPaquetes(): void {
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(false);
     this.enviosVisible.set(true);
+    this.despachosVisible.set(false);
     this.recepcionesVisible.set(false);
     this.seguimientoVisible.set(false);
     this.cerrarMenu();
   }
-  protected abrirRecepciones(): void { this.crearUsuarioVisible.set(false);this.sucursalesVisible.set(false);this.enviosVisible.set(false);this.seguimientoVisible.set(false);this.recepcionesVisible.set(true);this.cerrarMenu(); }
+
+  protected abrirDespachos(): void {
+    this.crearUsuarioVisible.set(false);
+    this.sucursalesVisible.set(false);
+    this.enviosVisible.set(false);
+    this.despachosVisible.set(true);
+    this.recepcionesVisible.set(false);
+    this.seguimientoVisible.set(false);
+    this.cerrarMenu();
+  }
+
+  protected abrirRecepciones(): void { this.crearUsuarioVisible.set(false);this.sucursalesVisible.set(false);this.enviosVisible.set(false);this.despachosVisible.set(false);this.seguimientoVisible.set(false);this.recepcionesVisible.set(true);this.cerrarMenu(); }
 }

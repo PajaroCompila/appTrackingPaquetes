@@ -1,0 +1,51 @@
+<section class="despachos-vista" aria-labelledby="titulo-despachos">
+  <header class="despachos-cabecera">
+    <span class="seccion-etiqueta">OPERACIÓN</span>
+    <h2 id="titulo-despachos">Envíos</h2>
+    <p>Despacho de paquetes entre sucursales.</p>
+  </header>
+
+  <form class="despacho-formulario" [formGroup]="formulario" (ngSubmit)="guardar()">
+    <header class="formulario-cabecera">
+      <h3>Nuevo envío</h3>
+      <small>Datos del vehículo y la carga</small>
+    </header>
+    <label class="campo-despacho"><span>Origen</span><input [value]="origen()?.nombre || 'Sucursal asignada'" readonly /></label>
+    <label class="campo-despacho"><span>Destino</span>
+      <p-select formControlName="puntoDestinoId" [options]="sucursales()" optionValue="sucursalId" optionLabel="nombre" placeholder="Selecciona un destino" styleClass="selector-destino" panelStyleClass="selector-blur-panel" appendTo="body">
+        <ng-template #selectedItem let-sucursal>{{ sucursal.codigo }} · {{ sucursal.nombre }}</ng-template>
+        <ng-template #item let-sucursal>{{ sucursal.codigo }} · {{ sucursal.nombre }}</ng-template>
+      </p-select>
+    </label>
+    <label class="campo-despacho"><span>Placa del vehículo</span><input formControlName="placa" maxlength="15" placeholder="Ej. HAA 1234" /></label>
+    <label class="campo-despacho"><span>Conductor</span><input formControlName="conductor" placeholder="Nombre del conductor" /></label>
+    <div class="campo-guia">
+      <label class="campo-despacho"><span>Número de guía</span><input formControlName="numeroGuia" list="guias-disponibles" placeholder="Escanea o escribe la guía" (keydown.enter)="$event.preventDefault(); agregarGuia()" /></label>
+      <datalist id="guias-disponibles">
+        @for (paquete of paquetesDisponibles(); track paquete.envioId) { <option [value]="paquete.numeroGuia">{{ paquete.puntoDestino }}</option> }
+      </datalist>
+      <button type="button" (click)="agregarGuia()">Agregar</button>
+    </div>
+    <div class="carga">
+      <strong>Paquetes cargados</strong>
+      @if (paquetesSeleccionados().length === 0) { <span class="carga-vacia">No hay guías agregadas.</span> }
+      @for (paquete of paquetesSeleccionados(); track paquete.envioId) {
+        <div><span><b>{{ paquete.numeroGuia }}</b><small>{{ paquete.nombreDestinatario }}</small></span><button type="button" (click)="quitarPaquete(paquete.envioId)">Quitar</button></div>
+      }
+    </div>
+    <div class="acciones"><button type="submit" [disabled]="guardando()">{{ guardando() ? 'Guardando...' : 'Registrar envío' }}</button></div>
+  </form>
+
+  @if (mensaje()) { <p class="mensaje" role="status">{{ mensaje() }}</p> }
+
+  <section class="lista-despachos">
+    <h3>Envíos registrados</h3>
+    @if (despachos().length === 0) { <p>No hay envíos registrados.</p> }
+    @for (despacho of despachos(); track despacho.despachoId) {
+      <article>
+        <div class="despacho-ruta"><strong>{{ despacho.placa }}</strong><span>{{ despacho.puntoOrigen }} → {{ despacho.puntoDestino }}</span><small>{{ despacho.guias }}</small></div>
+        <div class="despacho-datos"><span>{{ despacho.conductor }}</span><small>{{ despacho.fechaSalida | date: 'dd/MM/yyyy, h:mm a' }}</small><b>{{ despacho.estado === 'recibido' ? 'Recibido' : 'Despachado' }}</b></div>
+      </article>
+    }
+  </section>
+</section>

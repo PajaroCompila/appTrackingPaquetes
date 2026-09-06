@@ -488,7 +488,6 @@ td strong {
   display: none;
 }
 
-/* Portal público de seguimiento */
 .portada {
   min-height: 100vh;
   color: #f4f7fc;
@@ -942,7 +941,6 @@ td strong {
   }
 }
 
-/* Identidad corporativa clara */
 .aplicacion,
 .portada {
   color: #17283d;
@@ -1055,7 +1053,6 @@ td,
   border-color: #c8d4df;
   background: #ffffff;
 }
-/* Resultado de la consulta disponible desde la portada y el panel. */
 .consulta-superpuesta {
   position: fixed;
   z-index: 1200;

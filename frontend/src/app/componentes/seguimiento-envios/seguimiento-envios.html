@@ -2,13 +2,18 @@
   <header class="listado-cabecera">
     <div>
       <span class="seccion-etiqueta">SEGUIMIENTO</span>
-      <h2 id="titulo-listado-envios">{{ esAdministrador() ? 'Todos los envíos' : 'Mis envíos' }}</h2>
-      <p>{{ esAdministrador() ? 'Consulta los envíos registrados en el sistema.' : 'Consulta los envíos que has registrado.' }}</p>
+      <h2 id="titulo-listado-envios">Seguimiento de envíos</h2>
+      <p>Consulta tus registros y recepciones.</p>
     </div>
-    <strong>{{ enviosFiltrados().length }} envíos</strong>
+    <strong>{{ pestanaActiva() === 'envios' ? enviosFiltrados().length : recibidosFiltrados().length }} envíos</strong>
   </header>
 
-  @if (esAdministrador()) {
+  <nav class="pestanas-seguimiento" aria-label="Listas de seguimiento">
+    <button type="button" [class.activa]="pestanaActiva() === 'envios'" (click)="pestanaActiva.set('envios')">{{ esAdministrador() ? 'Todos los envíos' : 'Mis envíos' }}</button>
+    <button type="button" [class.activa]="pestanaActiva() === 'recibidos'" (click)="pestanaActiva.set('recibidos')">Recibidos</button>
+  </nav>
+
+  @if (pestanaActiva() === 'envios' && esAdministrador()) {
     <div class="filtros" aria-label="Filtros de envíos">
       <label>Usuario<input type="search" [(ngModel)]="usuario" placeholder="Nombre de usuario" /></label>
       <label>Sucursal<input type="search" [(ngModel)]="sucursal" placeholder="Origen o destino" /></label>
@@ -19,6 +24,7 @@
     </div>
   }
 
+  @if (pestanaActiva() === 'envios') {
   <div class="matriz-envios">
     @if (cargando()) { <p>Cargando envíos...</p> }
     @else if (mensaje()) { <p role="alert">{{ mensaje() }}</p> }
@@ -32,4 +38,20 @@
       </table>
     }
   </div>
+  } @else {
+    <div class="filtros filtros-recibidos" aria-label="Filtros de envíos recibidos">
+      <label>Fecha de recepción<input type="date" [(ngModel)]="fechaRecibido" /></label>
+      <label>Estado<select [(ngModel)]="estadoRecibido"><option value="">Todos</option><option value="registrado">Registrado</option><option value="en_transito">En tránsito</option><option value="recibido">Recibido</option><option value="cancelado">Cancelado</option></select></label>
+      <button type="button" (click)="limpiarFiltrosRecibidos()">Limpiar</button>
+    </div>
+    <div class="matriz-envios">
+      @if (recibidosFiltrados().length === 0) { <p>No hay envíos recibidos para mostrar.</p> }
+      @else {
+        <table><thead><tr><th>Guía</th><th>Origen</th><th>Destino</th><th>Fecha de recepción</th><th>Estado</th></tr></thead>
+        <tbody>@for (envio of recibidosFiltrados(); track envio.envioId) {
+          <tr><td class="guia"><button type="button" title="Doble clic para ver el detalle" (dblclick)="mostrarDetalle(envio.numeroGuia)" (keydown.enter)="mostrarDetalle(envio.numeroGuia)">{{ envio.numeroGuia }}</button></td><td>{{ envio.puntoOrigen }}</td><td>{{ envio.puntoDestino }}</td><td>{{ envio.fechaRecepcion | date:'dd/MM/yyyy, h:mm a' }}</td><td><span class="estado" [attr.data-estado]="envio.estadoActual">{{ nombreEstado(envio.estadoActual) }}</span></td></tr>
+        }</tbody></table>
+      }
+    </div>
+  }
 </section>

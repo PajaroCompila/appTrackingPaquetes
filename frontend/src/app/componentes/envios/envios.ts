@@ -54,7 +54,7 @@ export class Envios {
   cargar(): void {
     this.servicio.listar().subscribe({
       next: (resultado) => { this.envios.set(resultado); this.cargando.set(false); },
-      error: () => { this.mensaje.set('No fue posible cargar los envíos'); this.cargando.set(false); },
+      error: () => { this.mensaje.set('No fue posible cargar los paquetes'); this.cargando.set(false); },
     });
   }
 
@@ -75,9 +75,9 @@ export class Envios {
           ? envios.map((registro) => registro.envioId === envio.envioId ? envio : registro)
           : [envio, ...envios]);
         this.cancelarEdicion();
-        this.mensaje.set(envioActual ? 'Envío actualizado' : 'Envío registrado');
+        this.mensaje.set(envioActual ? 'Paquete actualizado' : 'Paquete registrado');
       },
-      error: () => this.mensaje.set('No fue posible guardar el envío'),
+      error: () => this.mensaje.set('No fue posible guardar el paquete'),
     });
   }
 
@@ -105,14 +105,14 @@ export class Envios {
   }
 
   eliminar(envio: Envio): void {
-    if (!window.confirm(`¿Eliminar el envío ${envio.numeroGuia}?`)) return;
+    if (!window.confirm(`¿Eliminar el paquete ${envio.numeroGuia}?`)) return;
     this.servicio.eliminar(envio.envioId).subscribe({
       next: () => {
         this.envios.update((envios) => envios.filter((registro) => registro.envioId !== envio.envioId));
         if (this.envioEnEdicion()?.envioId === envio.envioId) this.cancelarEdicion();
-        this.mensaje.set('Envío eliminado');
+        this.mensaje.set('Paquete eliminado');
       },
-      error: () => this.mensaje.set('No fue posible eliminar el envío'),
+      error: () => this.mensaje.set('No fue posible eliminar el paquete'),
     });
   }
 }

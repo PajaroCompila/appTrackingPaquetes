@@ -33,6 +33,7 @@ export class ControladorEnvios {
   };
   listarRecepciones = async (_s:Request,r:Response) => { r.json(await this.envios.listarRecepciones()); };
   listarDisponiblesParaRecepcion = async (_s:Request,r:Response) => { r.json(await this.envios.listarDisponiblesParaRecepcion()); };
+  listarRecibidos = async (s:Request,r:Response) => { r.json(await this.envios.listarRecibidos(s.identidad!.usuarioId)); };
   usuariosActivos = async (_s:Request,r:Response) => { r.json(await this.envios.usuariosActivos()); };
   registrarRecepcion = async (s:Request,r:Response) => { const datos=recepcionEnvioEsquema.parse(s.body); r.status(201).json(await this.envios.registrarRecepcion({ ...datos, usuarioRecibeId: s.identidad!.usuarioId })); };
   registrarRecepciones = async (s:Request,r:Response) => { const datos=recepcionLoteEsquema.parse(s.body);r.status(201).json(await this.envios.registrarRecepciones(datos.envioIds,s.identidad!.usuarioId)); };

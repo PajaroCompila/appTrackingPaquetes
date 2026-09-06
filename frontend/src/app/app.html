@@ -89,12 +89,16 @@
         <path d="m15.4 15.4 5.1 5.1" />
       </symbol>
       <symbol id="icono-envios" viewBox="0 0 24 24">
-        <path d="m3 11 18-8-7.5 18-2.4-7.6L3 11Z" />
-        <path d="m11.1 13.4 4.4-4.4" />
+        <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z" />
+        <path d="m4.3 7.5 7.7 4.4 7.7-4.4M12 12v9M8 5.3l8 4.5" />
       </symbol>
       <symbol id="icono-recepciones" viewBox="0 0 24 24">
         <path d="M4.5 8.5h15l2 5.5v6h-19v-6l2-5.5Z" />
         <path d="M2.5 14h5l1.5 2h6l1.5-2h5M8 8.5V5h8v3.5" />
+      </symbol>
+      <symbol id="icono-despachos" viewBox="0 0 24 24">
+        <path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z" />
+        <circle cx="7" cy="19" r="2" /><circle cx="18" cy="19" r="2" />
       </symbol>
       <symbol id="icono-destinos" viewBox="0 0 24 24">
         <path d="M20 10c0 5.7-8 11-8 11s-8-5.3-8-11a8 8 0 1 1 16 0Z" />
@@ -126,7 +130,7 @@
         <span class="menu-titulo">OPERACIÓN</span>
         <a
           class="menu-enlace"
-          [class.activo]="!seguimientoVisible() && !enviosVisible() && !recepcionesVisible() && !sucursalesVisible() && !crearUsuarioVisible()"
+          [class.activo]="!seguimientoVisible() && !enviosVisible() && !despachosVisible() && !recepcionesVisible() && !sucursalesVisible() && !crearUsuarioVisible()"
           href="#inicio"
           (click)="abrirInicio()"
           ><svg class="menu-icono" aria-hidden="true"><use href="#icono-inicio" /></svg
@@ -140,10 +144,13 @@
           class="menu-enlace"
           [class.activo]="enviosVisible()"
           type="button"
-          (click)="abrirEnvios()"
+          (click)="abrirPaquetes()"
         >
           <svg class="menu-icono" aria-hidden="true"><use href="#icono-envios" /></svg
-          ><span>Envíos</span>
+          ><span>Paquetes</span>
+        </button>
+        <button class="menu-enlace" [class.activo]="despachosVisible()" type="button" (click)="abrirDespachos()">
+          <svg class="menu-icono" aria-hidden="true"><use href="#icono-despachos" /></svg><span>Envíos</span>
         </button>
         <button class="menu-enlace" [class.activo]="recepcionesVisible()" type="button" (click)="abrirRecepciones()"
           ><svg class="menu-icono" aria-hidden="true"><use href="#icono-recepciones" /></svg
@@ -240,6 +247,9 @@
       }
       @if (enviosVisible()) {
         <app-envios [puedeCrear]="true" [rolUsuario]="sesion.usuario()!.rol" [sucursalIdUsuario]="sesion.usuario()!.sucursalId" />
+      }
+      @if (despachosVisible()) {
+        <app-despachos [sucursalIdUsuario]="sesion.usuario()!.sucursalId" />
       }
       @if (recepcionesVisible()) { <app-recepciones /> }
       @if (crearUsuarioVisible() && sesion.usuario(); as usuarioActual) {

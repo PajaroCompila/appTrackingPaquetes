@@ -44,6 +44,7 @@ export class ServicioEnvios {
   }
   listarRecepciones() { return this.repositorio.listarRecepciones(); }
   listarDisponiblesParaRecepcion() { return this.repositorio.listarDisponiblesParaRecepcion(); }
+  listarRecibidos(usuarioId: number) { return this.repositorio.listarRecibidos(usuarioId); }
   usuariosActivos() { return this.repositorio.usuariosActivos(); }
   async registrarRecepcion(datos: DatosRecepcion) { const resultado=await this.repositorio.registrarRecepcion(datos); if(!resultado) throw new ErrorAplicacion(400,"RECEPCION_INVALIDA","Verifica el envío y el usuario receptor"); return resultado; }
   async registrarRecepciones(envioIds:number[],usuarioRecibeId:number) { const unicos=[...new Set(envioIds)]; const resultados=[]; for(const envioId of unicos) resultados.push(await this.registrarRecepcion({envioId,usuarioRecibeId})); return resultados; }
