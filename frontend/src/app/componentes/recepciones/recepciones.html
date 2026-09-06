@@ -1,0 +1,96 @@
+<section class="recepciones">
+  <span class="seccion-etiqueta">OPERACIÓN</span>
+  <h2>Recepciones</h2>
+  <p>Registra cada entrega del paquete.</p>
+  <form (ngSubmit)="guardar()">
+    <label class="campo-busqueda"
+      >Número de guía
+      <div class="entrada-guia">
+        <input
+          name="guia"
+          autocomplete="off"
+          placeholder="Escanea o escribe la guía"
+          [(ngModel)]="guiaEscrita"
+          (input)="escribirGuia()"
+          (focus)="guiaActiva.set(true)"
+          (blur)="guiaActiva.set(false)"
+          (keydown.enter)="$event.preventDefault(); agregarGuia()"
+        /><button type="button" (click)="agregarGuia()">Agregar</button>
+      </div>
+      @if (guiaActiva()) {
+        <div class="sugerencias">
+          @for (envio of enviosFiltrados(); track envio.envioId) {
+            <button
+              type="button"
+              (mousedown)="$event.preventDefault()"
+              (click)="seleccionarEnvio(envio)"
+            >
+              <strong>{{ envio.numeroGuia }}</strong
+              ><span>{{ envio.puntoOrigen }} — {{ envio.puntoDestino }}</span>
+            </button>
+          } @empty {
+            <p>No hay guías disponibles.</p>
+          }
+        </div>
+      }
+    </label>
+    <label class="campo-busqueda"
+      >Usuario que recibe
+      <input
+        name="usuario"
+        autocomplete="off"
+        placeholder="Escribe el nombre de usuario"
+        [(ngModel)]="usuarioEscrito"
+        (input)="escribirUsuario()"
+        (focus)="usuarioActivo.set(true)"
+        (blur)="usuarioActivo.set(false)"
+      />
+      @if (usuarioActivo()) {
+        <div class="sugerencias">
+          @for (usuario of usuariosFiltrados(); track usuario.usuarioId) {
+            <button
+              type="button"
+              (mousedown)="$event.preventDefault()"
+              (click)="seleccionarUsuario(usuario)"
+            >
+              <strong>{{ usuario.nombreUsuario }}</strong
+              ><span>Usuario registrado</span>
+            </button>
+          } @empty {
+            <p>No hay usuarios disponibles.</p>
+          }
+        </div>
+      }
+    </label>
+    @if (enviosPorRecibir().length) {
+      <section class="lote">
+        <header>
+          <strong>Guías por recibir</strong><span>{{ enviosPorRecibir().length }}</span>
+        </header>
+        @for (envio of enviosPorRecibir(); track envio.envioId) {
+          <div>
+            <span>{{ envio.numeroGuia }}</span
+            ><small>{{ envio.puntoDestino }}</small
+            ><button type="button" (click)="quitarEnvio(envio.envioId)">Quitar</button>
+          </div>
+        }
+      </section>
+    }
+    <button class="registrar" type="submit" [disabled]="enviando()">
+      {{ enviando() ? 'Guardando...' : 'Registrar recepciones' }}
+    </button>
+  </form>
+  <p class="aclaracion">La guía y el usuario deben coincidir con un registro existente.</p>
+  @if (mensaje()) {
+    <p class="mensaje">{{ mensaje() }}</p>
+  }
+  <div class="lista">
+    @for (recepcion of recepciones(); track recepcion.recepcionId) {
+      <article>
+        <strong>{{ recepcion.numeroGuia }}</strong
+        ><span>{{ recepcion.nombreUsuario }}</span
+        ><b>{{ recepcion.entregaFinal ? 'Recibido' : 'En tránsito' }}</b>
+      </article>
+    }
+  </div>
+</section>

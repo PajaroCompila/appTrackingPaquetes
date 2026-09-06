@@ -1,0 +1,48 @@
+<main class="acceso" [class.cerrando]="cerrando">
+  <button
+    class="fondo-acceso"
+    type="button"
+    aria-label="Cerrar inicio de sesión"
+    (click)="cerrar()"
+  ></button>
+  <section role="dialog" aria-modal="true" aria-labelledby="titulo-inicio-sesion">
+    <button class="cerrar" type="button" aria-label="Cerrar" (click)="cerrar()">Cerrar</button>
+    <span class="icono" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <rect x="5" y="10" width="14" height="11" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" />
+      </svg>
+    </span>
+    <p>ACCESO DEL PERSONAL</p>
+    <h1 id="titulo-inicio-sesion">Inicia sesión</h1>
+    <p class="descripcion">Ingresa el usuario y la contraseña asignados por Sistemas.</p>
+    <form (ngSubmit)="ingresar()">
+      <label for="nombreUsuario">Nombre de usuario</label>
+      <input
+        pInputText
+        id="nombreUsuario"
+        type="text"
+        autocomplete="username"
+        [formControl]="formulario.controls.nombreUsuario"
+      />
+      @if (formulario.controls.nombreUsuario.touched && formulario.controls.nombreUsuario.invalid) {
+        <small>Ingresa tu nombre de usuario.</small>
+      }
+      <label for="contrasena">Contraseña</label>
+      <input
+        pInputText
+        id="contrasena"
+        type="password"
+        autocomplete="current-password"
+        [formControl]="formulario.controls.contrasena"
+      />
+      @if (formulario.controls.contrasena.touched && formulario.controls.contrasena.invalid) {
+        <small>Ingresa tu contraseña.</small>
+      }
+      @if (mensajeError) {
+        <div class="error" role="alert">{{ mensajeError }}</div>
+      }
+      <p-button type="button" label="Ingresar" [loading]="enviando" (onClick)="ingresar()" />
+    </form>
+  </section>
+</main>

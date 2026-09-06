@@ -1,0 +1,324 @@
+.usuarios-vista {
+  width: min(1180px, 100%);
+  margin: 34px auto 0;
+  color: #172033;
+}
+.usuarios-cabecera {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.usuarios-cabecera h2 {
+  margin: 6px 0;
+  color: #12213d;
+  font-size: 1.8rem;
+}
+.usuarios-cabecera p {
+  margin: 0;
+  color: #61708a;
+}
+.usuario-formulario,
+.resultado {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  background: #ffffffb8;
+  border: 1px solid #c9d5e1;
+  border-radius: 14px;
+  box-shadow: 0 18px 45px #29435f1c;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.usuario-formulario {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 22px;
+}
+.usuario-formulario::before,
+.resultado::before {
+  position: absolute;
+  top: -90px;
+  right: -70px;
+  width: 250px;
+  height: 190px;
+  border-radius: 50%;
+  background: #2f7df615;
+  content: '';
+  filter: blur(28px);
+  pointer-events: none;
+}
+.formulario-cabecera {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #d5dfeb;
+}
+.formulario-cabecera h3,
+.resultado h3 {
+  margin: 0;
+  color: #172033;
+}
+.campo-usuario {
+  display: grid;
+  gap: 8px;
+  color: #53627a;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.campo-usuario input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #c3d1e0;
+  border-radius: 9px;
+  color: #172033;
+  background: #ffffffd9;
+}
+.campo-usuario input:focus {
+  border-color: #2f7df6;
+  box-shadow: 0 0 0 3px #2f7df61c;
+  outline: 0;
+}
+.campo-usuario input[readonly] {
+  color: #526a82;
+  background: #eef4fbd9;
+}
+.campo-rol ::ng-deep .selector-rol {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #c3d1e0;
+  border-radius: 9px;
+  color: #172033;
+  background: #ffffffa8;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.campo-rol ::ng-deep .selector-rol.p-focus {
+  border-color: #2f7df6;
+  box-shadow: 0 0 0 3px #2f7df61c;
+}
+.campo-rol ::ng-deep .p-select-label,
+::ng-deep .selector-rol-panel .p-select-option {
+  text-transform: capitalize;
+}
+::ng-deep .selector-rol-panel {
+  overflow: hidden;
+  border: 1px solid #bfd0e1 !important;
+  border-radius: 10px !important;
+  background: #f5f9ffd9 !important;
+  box-shadow: 0 16px 38px #29435f2b !important;
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+::ng-deep .selector-rol-panel .p-select-list {
+  gap: 3px;
+  padding: 7px;
+  background: transparent;
+}
+::ng-deep .selector-rol-panel .p-select-option {
+  border-radius: 7px;
+  color: #344c66;
+  background: transparent;
+}
+::ng-deep .selector-rol-panel .p-select-option.p-focus {
+  background: #dceaffb8;
+}
+::ng-deep .selector-rol-panel .p-select-option.p-select-option-selected {
+  color: #17304e;
+  background: #cfe2fcbf;
+  font-weight: 700;
+}
+.mensaje-validacion,
+.error {
+  grid-column: 1 / -1;
+  color: #b4232f;
+  font-size: 0.75rem;
+}
+.usuario-acciones {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 10px;
+  justify-content: end;
+  padding-top: 18px;
+  border-top: 1px solid #d5dfeb;
+}
+.usuario-acciones ::ng-deep .p-button {
+  width: 112px;
+  min-height: 44px;
+  justify-content: center;
+}
+.usuario-acciones ::ng-deep .p-button:not(.p-button-secondary),
+.resultado ::ng-deep .p-button {
+  border-color: #1c61e7;
+  background: #1c61e7;
+}
+.usuario-acciones ::ng-deep .p-button:not(.p-button-secondary):hover,
+.resultado ::ng-deep .p-button:hover {
+  border-color: #174fbf;
+  background: #174fbf;
+}
+.resultado {
+  max-width: 720px;
+}
+.usuarios-lista {
+  overflow: hidden;
+  background: #ffffffc7;
+  border: 1px solid #c9d5e1;
+  border-radius: 14px;
+  box-shadow: 0 18px 45px #29435f1c;
+}
+.usuarios-lista > header {
+  padding: 22px 24px;
+  border-bottom: 1px solid #d5dfeb;
+}
+.usuarios-lista h3,
+.usuarios-lista > p {
+  margin: 0;
+}
+.usuarios-lista > p {
+  padding: 24px;
+  color: #61708a;
+}
+.tabla-usuarios {
+  overflow-x: auto;
+}
+.tabla-usuarios table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.tabla-usuarios th,
+.tabla-usuarios td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e7ef;
+  color: #53627a;
+  white-space: nowrap;
+}
+.tabla-usuarios th {
+  color: #61708a;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.tabla-usuarios td {
+  font-size: 0.78rem;
+}
+.tabla-usuarios tbody tr:last-child td {
+  border-bottom: 0;
+}
+.tabla-usuarios strong {
+  color: #172033;
+}
+.nombre-usuario {
+  padding: 0;
+  border: 0;
+  color: #172033;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: #1c61e766;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.nombre-usuario:hover {
+  color: #1c61e7;
+}
+.opcion-usuario {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  color: #53627a;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.opcion-usuario input {
+  width: 18px;
+  height: 18px;
+  accent-color: #1c61e7;
+}
+.restablecer-clave {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #d5dfeb;
+  border-radius: 9px;
+  background: #f5f8fc;
+}
+.restablecer-clave small {
+  color: #61708a;
+  font-size: 0.7rem;
+}
+.tabla-usuarios .rol {
+  color: #1c61e7;
+  text-transform: capitalize;
+}
+.usuario-navegacion {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.usuario-navegacion ::ng-deep .p-button {
+  width: 46px;
+  height: 46px;
+  border-color: #1c61e7;
+  color: #fff;
+  background: #1c61e7;
+  box-shadow: 0 7px 18px #1c61e72e;
+}
+.usuario-navegacion ::ng-deep .p-button:hover {
+  border-color: #174fbf;
+  background: #174fbf;
+}
+.resultado p {
+  margin: 8px 0 20px;
+  color: #61708a;
+}
+.clave {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border: 1px solid #c3d1e0;
+  border-radius: 9px;
+  background: #eef4fbd9;
+}
+.clave code {
+  flex: 1;
+  color: #17304e;
+  font-size: 1rem;
+}
+.clave button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid #c3d1e0;
+  border-radius: 8px;
+  color: #17304e;
+  background: #fff;
+  cursor: pointer;
+}
+@media (max-width: 560px) {
+  .usuarios-cabecera {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .usuario-formulario {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 20px;
+  }
+  .usuario-acciones {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .usuario-acciones ::ng-deep .p-button {
+    width: 100%;
+  }
+  .clave {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

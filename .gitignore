@@ -4,5 +4,7 @@
 **/.angular/
 **/.env
 *.log
+*.tmp
+*.exe
+~$*
 .DS_Store
-

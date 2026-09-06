@@ -1,0 +1,99 @@
+<section class="sucursales-vista" aria-labelledby="titulo-sucursales">
+  <div class="sucursales-cabecera">
+    <div>
+      <span class="seccion-etiqueta">ADMINISTRACIÓN</span>
+      <h2 id="titulo-sucursales">Sucursales y destinos</h2>
+      <p>Puntos disponibles para enviar y recibir paquetes.</p>
+    </div>
+  </div>
+
+  @if (puedeEditar() && !listaVisible()) {
+    <form class="sucursal-formulario" [formGroup]="formulario" (ngSubmit)="guardar()">
+      <header class="formulario-cabecera">
+        <h3>{{ tituloFormulario() }}</h3>
+      </header>
+      <label class="campo-sucursal"
+        >Nombre<input pInputText formControlName="nombre" placeholder="Nombre del destino"
+      /></label>
+      <label class="campo-sucursal"
+        >Código<input pInputText formControlName="codigo" placeholder="Código del destino"
+      /></label>
+      <label class="campo-sucursal campo-direccion"
+        >Dirección<input pInputText formControlName="direccion" placeholder="Dirección del destino"
+      /></label>
+      <label class="campo-sucursal">Departamento<p-select formControlName="departamentoCodigo"
+        [options]="departamentos()" optionLabel="nombre" optionValue="codigo"
+        placeholder="Selecciona un departamento" appendTo="body" /></label>
+      <label class="campo-sucursal">Ciudad<p-select formControlName="ciudadCodigo"
+        [options]="ciudadesDisponibles()" optionLabel="nombre" optionValue="codigo"
+        placeholder="Selecciona una ciudad" appendTo="body" /></label>
+      <label class="campo-sucursal"
+        >Teléfono<input pInputText formControlName="telefono" placeholder="Número de teléfono"
+      /></label>
+      @if (mensaje()) {
+        <p class="mensaje-formulario" role="alert">{{ mensaje() }}</p>
+      }
+      <div class="sucursal-acciones">
+        <p-button type="button" label="Guardar" (onClick)="guardar()" />
+        <p-button type="button" label="Cancelar" severity="secondary" (onClick)="cancelar()" />
+      </div>
+    </form>
+  } @else {
+    <section class="destinos-lista" aria-labelledby="titulo-lista-destinos">
+      <header><h3 id="titulo-lista-destinos">Destinos registrados</h3></header>
+      @if (cargando()) {
+        <p>Cargando destinos...</p>
+      } @else if (mensaje()) {
+        <p role="alert">{{ mensaje() }}</p>
+      } @else if (sucursales().length === 0) {
+        <p>No hay destinos registrados.</p>
+      } @else {
+        <div class="tabla-destinos">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Código</th>
+                <th>Departamento</th>
+                <th>Ciudad</th>
+                <th>Teléfono</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (sucursal of sucursales(); track sucursal.sucursalId) {
+                <tr>
+                  <td>
+                    @if (puedeEditar()) {
+                      <button class="nombre-destino" type="button" (click)="editar(sucursal)">
+                        {{ sucursal.nombre }}
+                      </button>
+                    } @else {
+                      <strong>{{ sucursal.nombre }}</strong>
+                    }
+                    <small>{{ sucursal.direccion }}</small>
+                  </td>
+                  <td class="codigo">{{ sucursal.codigo }}</td>
+                  <td>{{ sucursal.departamento }}</td>
+                  <td>{{ sucursal.ciudad }}</td>
+                  <td>{{ sucursal.telefono }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+
+  @if (puedeEditar()) {
+    <div class="sucursal-navegacion">
+      <p-button
+        [icon]="listaVisible() ? 'pi pi-plus' : 'pi pi-building'"
+        [ariaLabel]="listaVisible() ? 'Nuevo destino' : 'Ver destinos'"
+        [title]="listaVisible() ? 'Nuevo destino' : 'Ver destinos'"
+        rounded
+        (onClick)="cambiarVista()"
+      />
+    </div>
+  }
+</section>

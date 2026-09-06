@@ -1,5 +1,0 @@
-.pagina-detalle { width: min(100% - 2rem, 1400px); }
-
-@media (max-width: 680px) {
-  .pagina-detalle { width: min(100% - 1rem, 1400px); }
-}

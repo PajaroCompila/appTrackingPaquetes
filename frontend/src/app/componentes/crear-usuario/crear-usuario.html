@@ -1,0 +1,166 @@
+<section class="usuarios-vista" aria-labelledby="tituloCrearUsuario">
+  <div class="usuarios-cabecera">
+    <div>
+      <span class="seccion-etiqueta">ADMINISTRACIÓN</span>
+      <h2 id="tituloCrearUsuario">Usuarios</h2>
+      <p>Datos de acceso y rol de la cuenta.</p>
+    </div>
+  </div>
+
+  @if (listaVisible() && !mensajeExito()) {
+    <section class="usuarios-lista" aria-labelledby="titulo-lista-usuarios">
+      <header><h3 id="titulo-lista-usuarios">Usuarios registrados</h3></header>
+      @if (cargandoUsuarios()) {
+        <p>Cargando usuarios...</p>
+      } @else if (mensajeLista()) {
+        <p role="alert">{{ mensajeLista() }}</p>
+      } @else if (usuariosRegistrados().length === 0) {
+        <p>No hay usuarios registrados.</p>
+      } @else {
+        <div class="tabla-usuarios">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Usuario</th>
+                <th>Correo</th>
+                <th>Rol</th>
+                <th>Sucursal</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (usuario of usuariosRegistrados(); track usuario.usuarioId) {
+                <tr>
+                  <td>
+                    <button class="nombre-usuario" type="button" (click)="editar(usuario)">
+                      {{ usuario.nombres }} {{ usuario.apellidos }}
+                    </button>
+                  </td>
+                  <td>{{ usuario.nombreUsuario }}</td>
+                  <td>{{ usuario.correoElectronico }}</td>
+                  <td class="rol">{{ usuario.rol }}</td>
+                  <td>{{ usuario.nombreSucursal }}</td>
+                  <td>{{ usuario.activo ? 'Activo' : 'Inactivo' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  } @else if (!mensajeExito()) {
+    <form class="usuario-formulario" (ngSubmit)="crear()">
+      <header class="formulario-cabecera">
+        <h3>{{ editando() ? 'Editar usuario' : 'Datos del usuario' }}</h3>
+      </header>
+      <label class="campo-usuario"
+        >Nombres<input
+          pInputText
+          type="text"
+          autocomplete="off"
+          placeholder="Nombres"
+          [formControl]="formulario.controls.nombres"
+      /></label>
+      <label class="campo-usuario"
+        >Apellidos<input
+          pInputText
+          type="text"
+          autocomplete="off"
+          placeholder="Apellidos"
+          [formControl]="formulario.controls.apellidos"
+      /></label>
+      <label class="campo-usuario"
+        >Nombre de usuario<input
+          pInputText
+          type="text"
+          autocomplete="off"
+          placeholder="Se completa con el nombre y apellido"
+          readonly
+          [formControl]="formulario.controls.nombreUsuario"
+      /></label>
+      <label class="campo-usuario"
+        >Correo electrónico<input
+          pInputText
+          type="email"
+          autocomplete="off"
+          placeholder="Correo electrónico"
+          [formControl]="formulario.controls.correoElectronico"
+      /></label>
+      <label class="campo-usuario campo-rol"
+        >Rol<p-select
+          [formControl]="formulario.controls.rol"
+          [options]="rolesDisponibles()"
+          styleClass="selector-rol"
+          panelStyleClass="selector-rol-panel"
+          appendTo="body"
+      /></label>
+      <label class="campo-usuario campo-rol">Sucursal o destino<p-select
+        [formControl]="formulario.controls.sucursalId"
+        [options]="sucursales()"
+        optionValue="sucursalId"
+        optionLabel="nombre"
+        placeholder="Selecciona una sucursal"
+        styleClass="selector-rol"
+        panelStyleClass="selector-rol-panel"
+        appendTo="body"
+      /></label>
+      @if (editando()) {
+        <label class="opcion-usuario">
+          <input type="checkbox" [formControl]="formulario.controls.activo" />
+          <span>Usuario activo</span>
+        </label>
+        <div class="restablecer-clave">
+          <label class="opcion-usuario">
+            <input type="checkbox" [formControl]="formulario.controls.restablecerContrasena" />
+            <span>Restablecer contraseña</span>
+          </label>
+          <label class="campo-usuario"
+            >Contraseña temporal<input pInputText type="text" value="Pajaroazul1" readonly
+          /></label>
+          <small>El usuario deberá cambiarla al iniciar sesión.</small>
+        </div>
+      }
+      @if (formulario.touched && formulario.invalid) {
+        <small class="mensaje-validacion" role="alert">Revisa los campos marcados.</small>
+      }
+      @if (mensajeError) {
+        <div class="error" role="alert">{{ mensajeError }}</div>
+      }
+      <div class="usuario-acciones">
+        <p-button type="button" label="Guardar" [loading]="enviando" (onClick)="crear()" />
+        <p-button
+          type="button"
+          label="Cancelar"
+          severity="secondary"
+          (onClick)="cancelarFormulario()"
+        />
+      </div>
+    </form>
+  } @else {
+    <section class="resultado" aria-live="polite">
+      <h3>{{ mensajeExito() }}</h3>
+      @if (contrasenaTemporal) {
+        <p>Guarda la contraseña temporal antes de continuar.</p>
+        <div class="clave">
+          <code>{{ contrasenaTemporal }}</code
+          ><button type="button" (click)="copiarContrasena()">Copiar</button>
+        </div>
+      } @else {
+        <p>Los cambios quedaron guardados.</p>
+      }
+      <p-button label="Ver usuarios" (onClick)="verUsuariosDespuesCrear()" />
+    </section>
+  }
+  @if (!mensajeExito()) {
+    <div class="usuario-navegacion">
+      <p-button
+        [icon]="listaVisible() ? 'pi pi-user-plus' : 'pi pi-users'"
+        [ariaLabel]="listaVisible() ? 'Nuevo usuario' : 'Ver usuarios'"
+        [title]="listaVisible() ? 'Nuevo usuario' : 'Ver usuarios'"
+        rounded
+        (onClick)="cambiarVista()"
+      />
+    </div>
+  }
+</section>

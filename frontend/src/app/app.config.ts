@@ -1,14 +1,23 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-
+import Aura from '@primeuix/themes/aura';
+import { providePrimeNG } from 'primeng/config';
 import { routes } from './app.routes';
-import { autenticacionInterceptor } from './funcionalidades/autenticacion/autenticacion.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(withInterceptors([autenticacionInterceptor])),
+    provideHttpClient(),
     provideRouter(routes),
+    provideAnimationsAsync(),
+    providePrimeNG({
+      ripple: true,
+      theme: {
+        preset: Aura,
+        options: { darkModeSelector: false },
+      },
+    }),
   ],
 };

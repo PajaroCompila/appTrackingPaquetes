@@ -1,31 +1,280 @@
-<div class="estructura-aplicacion" [class.modo-login]="esLogin()">
-  @if (!esLogin()) {
-    <aside class="barra-lateral" aria-label="Navegación principal">
-      <img class="marca-icono" src="/imagenes/isotipo-pajaro-azul.png" alt="Pájaro Azul" />
-      <nav class="navegacion-principal">
-        @if (usuario()?.codigoRol === 'ADMINISTRADOR') {
-          <a routerLink="/dashboard" routerLinkActive="activo" aria-label="Dashboard"><i class="pi pi-chart-bar" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Dashboard</span></a>
-        }
-        <a routerLink="/pedidos" routerLinkActive="activo" aria-label="Pedidos pendientes"><i class="pi pi-list-check" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos pendientes</span></a>
-        <a routerLink="/pedidos-despachados" routerLinkActive="activo" aria-label="Pedidos despachados"><i class="pi pi-check-circle" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos despachados</span></a>
-        <a routerLink="/historial-validados" routerLinkActive="activo" aria-label="Historial"><i class="pi pi-history" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Historial</span></a>
-        @if (usuario()?.codigoRol === 'ADMINISTRADOR') {
-          <a routerLink="/configuracion/usuarios" routerLinkActive="activo" aria-label="Configuración, Usuarios"><i class="pi pi-cog" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Configuración · Usuarios</span></a>
-        }
-        <button type="button" aria-label="Cerrar sesión" (click)="cerrarSesion()"><i class="pi pi-sign-out" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Cerrar sesión</span></button>
+@if (!sesion.usuario()) {
+  <div class="portada">
+    <header class="portada-encabezado">
+      <a class="portada-marca" href="#portada" aria-label="Almacén Pájaro Azul, inicio">
+        <img
+          src="https://almacenpajaroazul.com/wp-content/uploads/2026/05/Logo-pajaro-azul.png"
+          alt="Almacén Pájaro Azul"
+        />
+      </a>
+      <nav aria-label="Navegación de bienvenida">
+        <a href="#como-funciona">Cómo funciona</a>
+        <button type="button" (click)="abrirPanel()">Ingresar al sistema</button>
       </nav>
-    </aside>
-  }
-  <div class="area-aplicacion">
-    @if (!esLogin()) {
-      <header class="barra-superior">
-        <div class="marca"><strong>Pedidos Bodega</strong><span>Control de pedidos</span></div>
-        @if (usuario(); as sesion) { <div class="sesion-actual"><strong>{{ sesion.nombreVisible }}</strong><span>{{ sesion.codigoRol }}</span></div> }
-      </header>
-    }
-    <main><router-outlet /></main>
-    @if (!esLogin()) {
-      <footer class="pie-aplicacion">Todos los derechos reservados. 2026© Almacén Pájaro Azul.</footer>
+    </header>
+
+    <main id="portada">
+      <section class="portada-principal">
+        <div class="portada-resplandor"></div>
+        <div class="portada-contenido">
+          <span class="portada-etiqueta">CONSULTA DE ENVÍOS</span>
+          <h1>Seguimiento de<br /><em>encomiendas.</em></h1>
+          <p>Ingresa el número de guía para consultar el recorrido y el estado del envío.</p>
+          <form class="portada-busqueda" (ngSubmit)="buscarEnvio()">
+            <label for="guiaPortada">Número de guía</label>
+            <div>
+              <input
+                pInputText
+                id="guiaPortada"
+                name="guiaPortada"
+                type="search"
+                autocomplete="off"
+                placeholder="Ej. PA-2026-0842"
+                [(ngModel)]="numeroGuia"
+              />
+              <p-button type="submit" label="Consultar envío" [loading]="buscandoGuia()" />
+            </div>
+            <small>Ingresa la guía completa o sus últimos seis dígitos.</small>
+          </form>
+        </div>
+        <div class="portada-ruta" aria-hidden="true">
+          <span class="ruta-punto"></span>
+          <span class="ruta-linea"></span>
+          <span class="ruta-paquete"></span>
+          <span class="ruta-linea activa"></span>
+          <span class="ruta-punto"></span>
+        </div>
+      </section>
+
+      <section class="como-funciona" id="como-funciona" aria-labelledby="titulo-como-funciona">
+        <span class="portada-etiqueta">PROCESO DE CONSULTA</span>
+        <h2 id="titulo-como-funciona">Cómo consultar un envío</h2>
+        <p class="como-funciona-intro">Solo necesitas el número de guía de la encomienda.</p>
+        <div class="pasos">
+          <article>
+            <span class="paso-numero">01</span>
+            <h3>Ubica el número de guía</h3>
+            <p>Está impreso en el comprobante que recibes al registrar la encomienda.</p>
+          </article>
+          <article>
+            <span class="paso-numero">02</span>
+            <h3>Ingresa la guía</h3>
+            <p>Escribe el número completo en el campo de consulta.</p>
+          </article>
+          <article>
+            <span class="paso-numero">03</span>
+            <h3>Revisa el estado</h3>
+            <p>Consulta el origen, el destino y el último movimiento registrado.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+    <footer class="portada-pie">
+      <img src="icono-usuario.png" alt="Logotipo de Pájaro Azul" />
+      <span>Todos los derechos reservados ©Almacén Pájaro Azul 2026.</span>
+    </footer>
+    @if (panelVisible()) {
+      <app-inicio-sesion (volver)="volverAlInicio()" />
     }
   </div>
-</div>
+} @else {
+  <div class="aplicacion">
+    <svg class="iconos-sistema" aria-hidden="true">
+      <symbol id="icono-inicio" viewBox="0 0 24 24">
+        <path d="M3.5 10.5 12 3l8.5 7.5" />
+        <path d="M5.5 9.3V21h13V9.3M9.5 21v-7h5v7" />
+      </symbol>
+      <symbol id="icono-seguimiento" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m15.4 15.4 5.1 5.1" />
+      </symbol>
+      <symbol id="icono-envios" viewBox="0 0 24 24">
+        <path d="m3 11 18-8-7.5 18-2.4-7.6L3 11Z" />
+        <path d="m11.1 13.4 4.4-4.4" />
+      </symbol>
+      <symbol id="icono-recepciones" viewBox="0 0 24 24">
+        <path d="M4.5 8.5h15l2 5.5v6h-19v-6l2-5.5Z" />
+        <path d="M2.5 14h5l1.5 2h6l1.5-2h5M8 8.5V5h8v3.5" />
+      </symbol>
+      <symbol id="icono-destinos" viewBox="0 0 24 24">
+        <path d="M20 10c0 5.7-8 11-8 11s-8-5.3-8-11a8 8 0 1 1 16 0Z" />
+        <circle cx="12" cy="10" r="2.5" />
+      </symbol>
+      <symbol id="icono-usuarios" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3.5" />
+        <path
+          d="M2.8 20v-1.8A5.2 5.2 0 0 1 8 13h2a5.2 5.2 0 0 1 5.2 5.2V20M17 8.5a3 3 0 0 1 0 5.8M17.5 15.5a4.5 4.5 0 0 1 3.7 4.5"
+        />
+      </symbol>
+      <symbol id="icono-volver" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7M3 12h18" /></symbol>
+      <symbol id="icono-salir" viewBox="0 0 24 24">
+        <path d="M10 4H4v16h6M14 8l4 4-4 4M8 12h10" />
+      </symbol>
+    </svg>
+    <aside class="barra-lateral" [class.abierta]="menuAbierto()" aria-label="Navegación principal">
+      <div class="marca">
+        <img
+          class="marca-logotipo"
+          src="https://almacenpajaroazul.com/wp-content/uploads/2026/05/Logo-pajaro-azul.png"
+          alt="Almacén Pájaro Azul"
+        />
+        <button class="cerrar-menu" type="button" aria-label="Cerrar menú" (click)="cerrarMenu()">
+          Cerrar
+        </button>
+      </div>
+      <nav class="menu">
+        <span class="menu-titulo">OPERACIÓN</span>
+        <a
+          class="menu-enlace"
+          [class.activo]="!enviosVisible() && !recepcionesVisible() && !sucursalesVisible() && !crearUsuarioVisible()"
+          href="#inicio"
+          (click)="abrirInicio()"
+          ><svg class="menu-icono" aria-hidden="true"><use href="#icono-inicio" /></svg
+          ><span>Inicio</span></a
+        >
+        <a class="menu-enlace" href="#seguimiento" (click)="cerrarMenu()"
+          ><svg class="menu-icono" aria-hidden="true"><use href="#icono-seguimiento" /></svg
+          ><span>Seguimiento</span></a
+        >
+        <button
+          class="menu-enlace"
+          [class.activo]="enviosVisible()"
+          type="button"
+          (click)="abrirEnvios()"
+        >
+          <svg class="menu-icono" aria-hidden="true"><use href="#icono-envios" /></svg
+          ><span>Envíos</span>
+        </button>
+        <button class="menu-enlace" [class.activo]="recepcionesVisible()" type="button" (click)="abrirRecepciones()"
+          ><svg class="menu-icono" aria-hidden="true"><use href="#icono-recepciones" /></svg
+          ><span>Recepciones</span></button
+        >
+        <span class="menu-titulo administracion">ADMINISTRACIÓN</span>
+        <button
+          class="menu-enlace"
+          [class.activo]="sucursalesVisible()"
+          type="button"
+          (click)="abrirSucursales()"
+        >
+          <svg class="menu-icono" aria-hidden="true"><use href="#icono-destinos" /></svg
+          ><span>Sucursales y destinos</span>
+        </button>
+        @if (puedeCrearUsuarios()) {
+          <button
+            class="menu-enlace"
+            [class.activo]="crearUsuarioVisible()"
+            type="button"
+            (click)="abrirCrearUsuario()"
+          >
+            <svg class="menu-icono" aria-hidden="true"><use href="#icono-usuarios" /></svg
+            ><span>Usuarios</span>
+          </button>
+        }
+        <button class="menu-enlace volver-portada" type="button" (click)="volverAlInicio()">
+          <svg class="menu-icono" aria-hidden="true"><use href="#icono-volver" /></svg
+          ><span>Volver al portal</span>
+        </button>
+        <button class="menu-enlace" type="button" (click)="cerrarSesion()">
+          <svg class="menu-icono" aria-hidden="true"><use href="#icono-salir" /></svg
+          ><span>Cerrar sesión</span>
+        </button>
+      </nav>
+      <div class="usuario">
+        <div>
+          <strong>{{ nombreUsuarioActual() }}</strong>
+          <span>{{ rolUsuarioActual() }}</span>
+        </div>
+      </div>
+    </aside>
+
+    @if (menuAbierto()) {
+      <button
+        class="fondo-menu"
+        type="button"
+        aria-label="Cerrar menú"
+        (click)="cerrarMenu()"
+      ></button>
+    }
+
+    <main class="contenido" id="inicio">
+      <header class="encabezado">
+        <button class="abrir-menu" type="button" aria-label="Abrir menú" (click)="alternarMenu()">
+          Menú
+        </button>
+        <div>
+          <p>Almacén Pájaro Azul</p>
+          <h1>Panel de operaciones</h1>
+        </div>
+      </header>
+
+      <section class="busqueda" id="seguimiento" aria-labelledby="titulo-seguimiento">
+        <div>
+          <span class="seccion-etiqueta">SEGUIMIENTO</span>
+          <h2 id="titulo-seguimiento">Consulta por número de guía</h2>
+          <p>Revisa el recorrido y el estado actual de una encomienda.</p>
+        </div>
+        <form class="busqueda-formulario" (ngSubmit)="buscarEnvio()">
+          <label for="numeroGuia">Número de guía</label>
+          <div class="campo-busqueda">
+            <i class="pi pi-search" aria-hidden="true"></i>
+            <input
+              pInputText
+              id="numeroGuia"
+              name="numeroGuia"
+              type="search"
+              autocomplete="off"
+              placeholder="Ej. PA-2026-0842"
+              [(ngModel)]="numeroGuia"
+            />
+            <p-button type="submit" label="Consultar guía" [loading]="buscandoGuia()" />
+          </div>
+          <small>Ingresa la guía completa o sus últimos seis dígitos.</small>
+        </form>
+      </section>
+
+      @if (sucursalesVisible()) {
+        <app-sucursales [puedeEditar]="sesion.usuario()?.rol === 'administrador'" />
+      }
+      @if (enviosVisible()) {
+        <app-envios [puedeCrear]="true" [rolUsuario]="sesion.usuario()!.rol" [sucursalIdUsuario]="sesion.usuario()!.sucursalId" />
+      }
+      @if (recepcionesVisible()) { <app-recepciones /> }
+      @if (crearUsuarioVisible() && sesion.usuario(); as usuarioActual) {
+        <app-crear-usuario
+          [rolCreador]="usuarioActual.rol"
+          (cerrarVista)="crearUsuarioVisible.set(false)"
+        />
+      }
+
+      <footer class="pie-pagina">
+        <img src="icono-usuario.png" alt="Logotipo de Pájaro Azul" />
+        <span>Todos los derechos reservados ©Almacén Pájaro Azul 2026.</span>
+      </footer>
+    </main>
+  </div>
+}
+
+@if (envioConsultado() || mensajeConsulta()) {
+  <div class="consulta-superpuesta">
+    <button class="consulta-fondo" type="button" aria-label="Cerrar consulta" (click)="cerrarConsulta()"></button>
+    <section class="consulta-resultado" role="dialog" aria-modal="true" aria-labelledby="titulo-resultado-guia">
+      <button class="consulta-cerrar" type="button" (click)="cerrarConsulta()">Cerrar</button>
+      @if (envioConsultado(); as envio) {
+        <span class="seccion-etiqueta">SEGUIMIENTO</span>
+        <h2 id="titulo-resultado-guia">{{ envio.numeroGuia }}</h2>
+        <span class="consulta-estado">{{ nombreEstado(envio.estadoActual) }}</span>
+        <dl>
+          <div><dt>Origen</dt><dd>{{ envio.puntoOrigen }}</dd></div>
+          <div><dt>Destino</dt><dd>{{ envio.puntoDestino }}</dd></div>
+          <div><dt>Contenido</dt><dd>{{ envio.descripcion }}</dd></div>
+          <div><dt>Paquetes</dt><dd>{{ envio.cantidadPaquetes }}</dd></div>
+          <div><dt>Fecha de registro</dt><dd>{{ envio.fechaCreacion | date: 'dd/MM/yyyy, h:mm a' }}</dd></div>
+        </dl>
+      } @else {
+        <span class="seccion-etiqueta">SEGUIMIENTO</span>
+        <h2 id="titulo-resultado-guia">Guía no encontrada</h2>
+        <p>{{ mensajeConsulta() }}</p>
+      }
+    </section>
+  </div>
+}

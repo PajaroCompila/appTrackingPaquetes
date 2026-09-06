@@ -1,0 +1,147 @@
+:host {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: block;
+}
+.acceso {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: mostrar-fondo 180ms ease-out both;
+}
+.fondo-acceso {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(16, 31, 75, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+section {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  padding: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  background: rgba(249, 252, 255, 0.88);
+  box-shadow: 0 22px 60px rgba(18, 43, 78, 0.24);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  animation: mostrar-cuadro 200ms ease-out both;
+}
+.cerrar {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  padding: 4px;
+  border: 0;
+  color: #536a82;
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.icono {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: #276fdc;
+}
+.icono svg {
+  width: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+section > p:first-of-type {
+  margin: 22px 0 8px;
+  color: #5fa3ff;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+}
+h1 {
+  margin: 0;
+  color: #17304e;
+  font-size: 1.8rem;
+}
+.descripcion {
+  margin: 8px 0 26px;
+  color: #65778b;
+  font-size: 0.8rem;
+}
+label {
+  display: block;
+  margin: 16px 0 7px;
+  color: #344c66;
+  font-size: 0.75rem;
+}
+input {
+  width: 100%;
+  color: #17283d;
+  border-color: #bdcad8;
+  background: rgba(248, 251, 254, 0.9);
+}
+small {
+  display: block;
+  margin-top: 5px;
+  color: #ff818a;
+}
+.error {
+  margin-top: 16px;
+  padding: 10px;
+  border-radius: 7px;
+  color: #ffadb3;
+  background: #541d233d;
+  font-size: 0.75rem;
+}
+::ng-deep .p-button {
+  width: 100%;
+  margin-top: 22px;
+  border-color: #2f7df6;
+  background: #2f7df6;
+}
+
+.acceso.cerrando {
+  pointer-events: none;
+  animation: ocultar-fondo 180ms ease-in both;
+}
+.acceso.cerrando section {
+  animation: ocultar-cuadro 180ms ease-in both;
+}
+
+@keyframes mostrar-fondo {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ocultar-fondo {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes mostrar-cuadro {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ocultar-cuadro {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(7px) scale(0.99); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acceso,
+  .acceso section,
+  .acceso.cerrando,
+  .acceso.cerrando section {
+    animation-duration: 1ms;
+  }
+}

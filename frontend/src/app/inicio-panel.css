@@ -1,0 +1,269 @@
+.marca-logotipo {
+  width: 160px;
+  height: auto;
+  flex: none;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.inicio-panel {
+  display: grid;
+  width: min(1180px, 100%);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  margin: 26px auto 0;
+  color: #17283d;
+}
+
+.inicio-columna-principal {
+  min-width: 0;
+}
+
+.inicio-titulo {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.inicio-titulo h2 {
+  margin: 0;
+  color: #17283d;
+  font-size: 1.55rem;
+  letter-spacing: -0.025em;
+}
+
+.inicio-titulo p {
+  margin: 4px 0 0;
+  color: #60748a;
+  font-size: 0.82rem;
+}
+
+.accesos-rapidos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.accesos-rapidos button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 14px;
+  border: 1px solid #bdcad8;
+  border-radius: 6px;
+  color: #29435f;
+  background: #fff;
+  font-size: 0.79rem;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 1px 2px #29435f12;
+}
+
+.accesos-rapidos button:hover {
+  border-color: #7ba8da;
+  background: #f5f9ff;
+}
+
+.operaciones-panel,
+.sesion-panel {
+  overflow: hidden;
+  border: 1px solid #c9d5e1;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 2px 8px #29435f12;
+}
+
+.operaciones-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 55px;
+  padding: 0 18px;
+  border-bottom: 1px solid #d5dfeb;
+}
+
+.operaciones-panel h3,
+.sesion-panel h3 {
+  margin: 0;
+  color: #17283d;
+  font-size: 0.92rem;
+}
+
+.operaciones-panel > header span {
+  color: #708197;
+  font-size: 0.7rem;
+}
+
+.operaciones-panel > button,
+.operaciones-panel > a {
+  display: grid;
+  width: 100%;
+  min-height: 84px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 13px;
+  align-items: center;
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 1px solid #e0e7ef;
+  color: #17283d;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.operaciones-panel > :last-child {
+  border-bottom: 0;
+}
+
+.operaciones-panel > button:hover,
+.operaciones-panel > a:hover {
+  background: #f6f9fd;
+}
+
+.operacion-simbolo {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #bdd0e4;
+  border-radius: 6px;
+  color: #236fbd;
+  background: #eaf3fc;
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.operaciones-panel strong,
+.operaciones-panel small {
+  display: block;
+}
+
+.operaciones-panel strong {
+  font-size: 0.82rem;
+}
+
+.operaciones-panel small {
+  margin-top: 5px;
+  color: #60748a;
+  font-size: 0.72rem;
+}
+
+.operaciones-panel b {
+  color: #236fbd;
+  font-size: 0.72rem;
+}
+
+.sesion-panel {
+  align-self: start;
+  padding: 19px;
+}
+
+.sesion-identidad {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 16px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid #d5dfeb;
+}
+
+.sesion-identidad strong,
+.sesion-identidad span {
+  display: block;
+}
+
+.sesion-identidad strong {
+  font-size: 0.82rem;
+}
+
+.sesion-identidad span {
+  margin-top: 3px;
+  color: #60748a;
+  font-size: 0.71rem;
+}
+
+.sesion-seccion {
+  padding: 17px 0;
+}
+
+.sesion-seccion > span {
+  color: #60748a;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.sesion-seccion ul {
+  display: grid;
+  gap: 10px;
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sesion-seccion li {
+  position: relative;
+  padding-left: 15px;
+  color: #344c66;
+  font-size: 0.74rem;
+}
+
+.sesion-seccion li::before {
+  position: absolute;
+  top: 0.42em;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2f7df6;
+  content: '';
+}
+
+.sesion-panel > button {
+  width: 100%;
+  min-height: 39px;
+  border: 1px solid #bdcad8;
+  border-radius: 6px;
+  color: #344c66;
+  background: #f5f8fb;
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+@media (max-width: 1080px) {
+  .inicio-panel {
+    grid-template-columns: 1fr;
+  }
+  .sesion-panel {
+    width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .accesos-rapidos {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .accesos-rapidos button {
+    justify-content: center;
+  }
+  .operaciones-panel > button,
+  .operaciones-panel > a {
+    grid-template-columns: 36px minmax(0, 1fr);
+    padding: 13px;
+  }
+  .operacion-simbolo {
+    width: 34px;
+    height: 34px;
+  }
+  .operaciones-panel b {
+    display: none;
+  }
+}

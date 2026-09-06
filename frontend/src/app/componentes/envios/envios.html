@@ -1,0 +1,137 @@
+<section class="envios-vista" aria-labelledby="titulo-envios">
+  <div class="envios-cabecera">
+    <div>
+      <span class="seccion-etiqueta">OPERACIÓN</span>
+      <h2 id="titulo-envios">Envíos</h2>
+      <p>Registro y consulta de encomiendas entre sucursales.</p>
+    </div>
+  </div>
+  @if (puedeCrear()) {
+    <form class="envio-formulario" [formGroup]="formulario" (ngSubmit)="guardar()">
+      <header class="formulario-cabecera">
+        <div>
+          <h3>{{ envioEnEdicion() ? 'Editar envío' : 'Registrar envío' }}</h3>
+          <small>{{ envioEnEdicion()?.numeroGuia || 'Datos de la encomienda' }}</small>
+        </div>
+      </header>
+      <label class="campo-envio">
+        <span class="campo-etiqueta">Origen</span>
+        <p-select
+          formControlName="puntoOrigenId"
+          [options]="sucursales()"
+          optionValue="sucursalId"
+          optionLabel="nombre"
+          placeholder="Selecciona una sucursal"
+          styleClass="selector-sucursal"
+          panelStyleClass="selector-blur-panel"
+          appendTo="body"
+        >
+          <ng-template #selectedItem let-sucursal
+            >{{ sucursal.codigo }} · {{ sucursal.nombre }}</ng-template
+          >
+          <ng-template #item let-sucursal
+            >{{ sucursal.codigo }} · {{ sucursal.nombre }}</ng-template
+          >
+        </p-select>
+        @if (rolUsuario() !== 'administrador') { <small>Origen asignado según tu sucursal.</small> }
+      </label>
+      <label class="campo-envio">
+        <span class="campo-etiqueta">Destino</span>
+        <p-select
+          formControlName="puntoDestinoId"
+          [options]="sucursales()"
+          optionValue="sucursalId"
+          optionLabel="nombre"
+          placeholder="Selecciona una sucursal"
+          styleClass="selector-sucursal"
+          panelStyleClass="selector-blur-panel"
+          appendTo="body"
+        >
+          <ng-template #selectedItem let-sucursal
+            >{{ sucursal.codigo }} · {{ sucursal.nombre }}</ng-template
+          >
+          <ng-template #item let-sucursal
+            >{{ sucursal.codigo }} · {{ sucursal.nombre }}</ng-template
+          >
+        </p-select>
+      </label>
+      <label class="campo-envio"
+        ><span class="campo-etiqueta">Remitente</span
+        ><input pInputText formControlName="nombreRemitente" placeholder="Nombre del remitente"
+      /></label>
+      <label class="campo-envio"
+        ><span class="campo-etiqueta">Teléfono del remitente</span
+        ><input pInputText formControlName="telefonoRemitente" placeholder="Número de teléfono"
+      /></label>
+      <label class="campo-envio"
+        ><span class="campo-etiqueta">Destinatario</span
+        ><input
+          pInputText
+          formControlName="nombreDestinatario"
+          placeholder="Nombre del destinatario"
+      /></label>
+      <label class="campo-envio"
+        ><span class="campo-etiqueta">Teléfono del destinatario</span
+        ><input pInputText formControlName="telefonoDestinatario" placeholder="Número de teléfono"
+      /></label>
+      <label class="campo-envio"
+        ><span class="campo-etiqueta">Contenido</span
+        ><input pInputText formControlName="descripcion" placeholder="Descripción del contenido"
+      /></label>
+      <label class="campo-envio"
+        ><span class="campo-etiqueta">Cantidad de paquetes</span
+        ><input pInputText type="number" formControlName="cantidadPaquetes" min="1"
+      /></label>
+      @if (envioEnEdicion()) {
+        <label class="campo-envio">
+          <span class="campo-etiqueta">Estado</span>
+          <p-select
+            formControlName="estadoActual"
+            [options]="estados"
+            optionValue="valor"
+            optionLabel="etiqueta"
+            styleClass="selector-sucursal"
+            panelStyleClass="selector-blur-panel"
+            appendTo="body"
+          />
+        </label>
+      }
+      <div class="envio-acciones">
+        @if (envioEnEdicion()) {
+          <button class="boton-secundario" type="button" (click)="cancelarEdicion()">Cancelar</button>
+        }
+        <button class="boton-registrar" type="submit">
+          <span>{{ envioEnEdicion() ? 'Guardar cambios' : 'Registrar envío' }}</span>
+        </button>
+      </div>
+    </form>
+  }
+  @if (cargando()) {
+    <p>Cargando envíos...</p>
+  } @else if (envios().length === 0) {
+    <p>No hay envíos registrados.</p>
+  }
+  @if (mensaje()) {
+    <p role="alert">{{ mensaje() }}</p>
+  }
+  <div class="envios-lista">
+    @for (envio of envios(); track envio.envioId) {
+      <article class="envio-item">
+        <div>
+          <strong>{{ envio.numeroGuia }}</strong
+          ><app-codigo-barras [valor]="envio.numeroGuia" />
+          ><span>{{ envio.puntoOrigen }} → {{ envio.puntoDestino }}</span
+          ><small
+            >{{ envio.nombreDestinatario }} · {{ envio.cantidadPaquetes }}
+            {{ envio.cantidadPaquetes === 1 ? 'paquete' : 'paquetes' }} ·
+            {{ envio.estadoActual }}</small
+          >
+        </div>
+        <div class="envio-item-acciones">
+          <button type="button" (click)="editar(envio)">Editar</button>
+          <button class="eliminar" type="button" (click)="eliminar(envio)">Eliminar</button>
+        </div>
+      </article>
+    }
+  </div>
+</section>
