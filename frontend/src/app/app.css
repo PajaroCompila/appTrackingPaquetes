@@ -1085,7 +1085,27 @@ td,
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
   animation: aparecer-consulta 180ms ease-out both;
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
 }
+.mapa-trazabilidad { display:block; width:100%; padding:0; margin-top:20px; overflow:hidden; border:1px solid #c4d3e2; border-radius:11px; color:#172033; background:rgba(238,246,255,.72); text-align:left; cursor:zoom-in; }
+.mapa-titulo { display:block; padding:12px 14px 9px; color:#29435f; font-size:.75rem; font-weight:700; }
+.mapa-lienzo { position:relative; display:block; height:150px; overflow:hidden; background:linear-gradient(145deg,rgba(221,235,249,.8),rgba(248,251,255,.78)); }
+.mapa-trama { position:absolute; inset:0; opacity:.4; background-image:linear-gradient(rgba(75,116,158,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(75,116,158,.12) 1px,transparent 1px); background-size:28px 28px; }
+.mapa-ruta { position:absolute; top:50%; right:15%; left:15%; height:3px; border-radius:4px; background:#aebed0; box-shadow:0 0 0 5px rgba(47,125,246,.08); transform:translateY(-50%); }
+.mapa-lienzo[data-estado='en_transito'] .mapa-ruta { background:linear-gradient(90deg,#1f67cc 0 50%,#aebed0 50%); }
+.mapa-lienzo[data-estado='recibido'] .mapa-ruta { background:#1f67cc; }
+.mapa-lienzo[data-estado='cancelado'] .mapa-ruta { background:#b8848a; }
+.mapa-punto { position:absolute; top:50%; display:grid; min-width:90px; justify-items:center; color:#6b7b90; transform:translate(-50%,-8px); }
+.mapa-punto.origen { left:15%; }.mapa-punto.transito { left:50%; }.mapa-punto.destino { left:85%; }
+.mapa-punto i { display:block; width:16px; height:16px; margin-bottom:7px; border:4px solid #fff; border-radius:50%; background:#aebed0; box-shadow:0 2px 9px rgba(27,58,94,.25); }
+.mapa-punto.activo i { background:#2f7df6; box-shadow:0 0 0 6px rgba(47,125,246,.16); }
+.mapa-punto b { margin-top:2px; color:#29435f; font-size:.68rem; line-height:1.25; }.mapa-punto small { max-width:150px; margin-top:3px; overflow:hidden; font-size:.6rem; line-height:1.35; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+.mapa-ayuda { display:block; padding:8px 14px; color:#6b7b90; font-size:.62rem; }
+.mapa-superpuesto { position:fixed; z-index:1400; inset:0; display:grid; place-items:center; padding:24px; }
+.mapa-fondo { position:absolute; inset:0; border:0; background:rgba(13,28,70,.45); backdrop-filter:blur(10px); }
+.mapa-ampliado { position:relative; z-index:1; width:min(960px,100%); padding:24px; border:1px solid rgba(255,255,255,.75); border-radius:15px; background:rgba(248,252,255,.9); box-shadow:0 28px 75px rgba(18,43,78,.3); backdrop-filter:blur(22px); animation:aparecer-consulta 180ms ease-out both; }
+.mapa-ampliado header,.mapa-ampliado footer { display:flex; align-items:center; justify-content:space-between; gap:18px; }.mapa-ampliado h2 { margin:5px 0 0; font-size:1.35rem; }.mapa-ampliado header button { border:0; color:#536a82; background:transparent; cursor:pointer; }.mapa-lienzo-grande { height:min(52vh,430px); margin-top:20px; border:1px solid #c4d3e2; border-radius:12px; }.mapa-lienzo-grande .mapa-punto b { font-size:.82rem; }.mapa-lienzo-grande .mapa-punto small { max-width:210px; font-size:.72rem; }.mapa-ampliado footer { padding-top:17px; color:#61708a; font-size:.75rem; }.mapa-ampliado footer strong { color:#145aa8; }
 .consulta-resultado h2 {
   margin: 8px 0 12px;
   color: #12213d;

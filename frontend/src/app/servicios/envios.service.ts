@@ -13,7 +13,7 @@ export class ServicioEnvios {
     return this.http.get<Envio[]>(this.url, this.opciones);
   }
   consultar(numeroGuia: string) {
-    return this.http.get<SeguimientoEnvio>(`${this.url}/guia/${encodeURIComponent(numeroGuia)}`);
+    return this.http.get<SeguimientoEnvio>(`${this.url}/guia/${encodeURIComponent(numeroGuia)}`, this.opciones);
   }
   crear(datos: DatosEnvio) {
     return this.http.post<Envio>(this.url, datos, this.opciones);

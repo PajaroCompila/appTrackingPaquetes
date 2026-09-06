@@ -91,7 +91,7 @@ export function crearAplicacion(
     );
   }
   if (controladorEnvios) {
-    aplicacion.get("/api/envios/guia/:numeroGuia", controladorEnvios.consultar);
+    aplicacion.get("/api/envios/guia/:numeroGuia", requiereSesion, controladorEnvios.consultar);
     aplicacion.get("/api/envios", requiereSesion, controladorEnvios.listar);
     aplicacion.post("/api/envios", requiereSesion, controladorEnvios.crear);
     aplicacion.patch("/api/envios/:envioId", requiereSesion, controladorEnvios.actualizar);

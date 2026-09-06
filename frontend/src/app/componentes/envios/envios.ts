@@ -26,12 +26,6 @@ export class Envios {
   readonly cargando = signal(true);
   readonly mensaje = signal('');
   readonly envioEnEdicion = signal<Envio | null>(null);
-  readonly estados: { etiqueta: string; valor: EstadoEnvio }[] = [
-    { etiqueta: 'Registrado', valor: 'registrado' },
-    { etiqueta: 'En tránsito', valor: 'en_transito' },
-    { etiqueta: 'Recibido', valor: 'recibido' },
-    { etiqueta: 'Cancelado', valor: 'cancelado' },
-  ];
   readonly formulario = new FormGroup({
     puntoOrigenId: new FormControl<number | null>(null, [Validators.required]),
     puntoDestinoId: new FormControl<number | null>(null, [Validators.required]),

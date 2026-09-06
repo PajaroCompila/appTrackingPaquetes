@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, HostListener, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
@@ -56,11 +56,38 @@ export class Aplicacion {
   protected readonly envioConsultado = signal<SeguimientoEnvio | null>(null);
   protected readonly buscandoGuia = signal(false);
   protected readonly mensajeConsulta = signal('');
+  protected readonly mapaAmpliado = signal(false);
+  protected readonly consultaPendiente = signal(false);
 
   private readonly servicioEnvios = inject(ServicioEnvios);
 
   constructor() {
     this.sesion.comprobar().subscribe();
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  protected manejarEscape(evento: KeyboardEvent): void {
+    if (this.mapaAmpliado()) {
+      evento.preventDefault();
+      this.cerrarMapa();
+      return;
+    }
+    if (this.envioConsultado() || this.mensajeConsulta()) {
+      evento.preventDefault();
+      this.cerrarConsulta();
+      return;
+    }
+    if (this.menuAbierto()) {
+      this.cerrarMenu();
+      return;
+    }
+    if (!this.sesion.usuario() && this.panelVisible()) {
+      this.volverAlInicio();
+      return;
+    }
+    if (this.seguimientoVisible() || this.enviosVisible() || this.recepcionesVisible() || this.sucursalesVisible() || this.crearUsuarioVisible()) {
+      this.abrirInicio();
+    }
   }
 
   protected alternarMenu(): void {
@@ -83,6 +110,15 @@ export class Aplicacion {
   protected buscarEnvio(): void {
     this.numeroGuia = this.numeroGuia.trim();
     if (!this.numeroGuia || this.buscandoGuia()) return;
+    if (!this.sesion.usuario()) {
+      this.consultaPendiente.set(true);
+      this.panelVisible.set(true);
+      return;
+    }
+    this.ejecutarConsulta();
+  }
+
+  private ejecutarConsulta(): void {
     this.buscandoGuia.set(true);
     this.mensajeConsulta.set('');
     this.envioConsultado.set(null);
@@ -98,9 +134,25 @@ export class Aplicacion {
     });
   }
 
+  protected continuarConsulta(): void {
+    this.panelVisible.set(false);
+    if (!this.consultaPendiente()) return;
+    this.consultaPendiente.set(false);
+    this.ejecutarConsulta();
+  }
+
   protected cerrarConsulta(): void {
+    this.mapaAmpliado.set(false);
     this.envioConsultado.set(null);
     this.mensajeConsulta.set('');
+  }
+
+  protected ampliarMapa(): void {
+    this.mapaAmpliado.set(true);
+  }
+
+  protected cerrarMapa(): void {
+    this.mapaAmpliado.set(false);
   }
 
   protected nombreEstado(estado: SeguimientoEnvio['estadoActual']): string {
@@ -130,6 +182,7 @@ export class Aplicacion {
   }
 
   protected volverAlInicio(): void {
+    this.consultaPendiente.set(false);
     this.menuAbierto.set(false);
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(false);

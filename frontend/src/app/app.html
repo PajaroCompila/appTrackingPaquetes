@@ -74,7 +74,7 @@
       <span>Todos los derechos reservados ©Almacén Pájaro Azul 2026.</span>
     </footer>
     @if (panelVisible()) {
-      <app-inicio-sesion (volver)="volverAlInicio()" />
+      <app-inicio-sesion (volver)="volverAlInicio()" (ingresoCorrecto)="continuarConsulta()" />
     }
   </div>
 } @else {
@@ -273,11 +273,38 @@
           <div><dt>Paquetes</dt><dd>{{ envio.cantidadPaquetes }}</dd></div>
           <div><dt>Fecha de registro</dt><dd>{{ envio.fechaCreacion | date: 'dd/MM/yyyy, h:mm a' }}</dd></div>
         </dl>
+        <button class="mapa-trazabilidad" type="button" (click)="ampliarMapa()" aria-label="Ampliar mapa de trazabilidad">
+          <span class="mapa-titulo">Mapa de trazabilidad</span>
+          <span class="mapa-lienzo" [attr.data-estado]="envio.estadoActual">
+            <span class="mapa-trama" aria-hidden="true"></span>
+            <span class="mapa-ruta" aria-hidden="true"></span>
+            <span class="mapa-punto origen activo"><i></i><b>Origen</b><small>{{ envio.puntoOrigen }}</small></span>
+            <span class="mapa-punto transito" [class.activo]="envio.estadoActual === 'en_transito' || envio.estadoActual === 'recibido'"><i></i><b>En tránsito</b><small>Ruta de traslado</small></span>
+            <span class="mapa-punto destino" [class.activo]="envio.estadoActual === 'recibido'"><i></i><b>Destino</b><small>{{ envio.puntoDestino }}</small></span>
+          </span>
+          <small class="mapa-ayuda">Pulsa el mapa para ampliarlo</small>
+        </button>
       } @else {
         <span class="seccion-etiqueta">SEGUIMIENTO</span>
         <h2 id="titulo-resultado-guia">Guía no encontrada</h2>
         <p>{{ mensajeConsulta() }}</p>
       }
+    </section>
+  </div>
+}
+
+@if (mapaAmpliado() && envioConsultado(); as envio) {
+  <div class="mapa-superpuesto" role="dialog" aria-modal="true" aria-labelledby="titulo-mapa-ampliado">
+    <button class="mapa-fondo" type="button" aria-label="Cerrar mapa" (click)="cerrarMapa()"></button>
+    <section class="mapa-ampliado">
+      <header><div><span class="seccion-etiqueta">TRAZABILIDAD</span><h2 id="titulo-mapa-ampliado">{{ envio.numeroGuia }}</h2></div><button type="button" (click)="cerrarMapa()">Cerrar</button></header>
+      <div class="mapa-lienzo mapa-lienzo-grande" [attr.data-estado]="envio.estadoActual">
+        <span class="mapa-trama" aria-hidden="true"></span><span class="mapa-ruta" aria-hidden="true"></span>
+        <span class="mapa-punto origen activo"><i></i><b>Origen</b><small>{{ envio.puntoOrigen }}</small></span>
+        <span class="mapa-punto transito" [class.activo]="envio.estadoActual === 'en_transito' || envio.estadoActual === 'recibido'"><i></i><b>En tránsito</b><small>Ruta de traslado</small></span>
+        <span class="mapa-punto destino" [class.activo]="envio.estadoActual === 'recibido'"><i></i><b>Destino</b><small>{{ envio.puntoDestino }}</small></span>
+      </div>
+      <footer><span>Estado actual</span><strong>{{ nombreEstado(envio.estadoActual) }}</strong></footer>
     </section>
   </div>
 }

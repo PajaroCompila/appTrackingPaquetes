@@ -75,7 +75,7 @@ export class RepositorioEnviosSql implements RepositorioEnvios {
       .input("cantidadPaquetes", sql.Int, datos.cantidadPaquetes)
       .input("estadoActual", sql.VarChar(20), datos.estadoActual);
     const alcance = identidad.rol !== "administrador" ? "AND usuarioQueRegistraId = @usuarioId" : "";
-    await solicitud.query(`UPDATE dbo.Envios SET puntoOrigenId = @puntoOrigenId, puntoDestinoId = @puntoDestinoId, nombreRemitente = @nombreRemitente, telefonoRemitente = @telefonoRemitente, nombreDestinatario = @nombreDestinatario, telefonoDestinatario = @telefonoDestinatario, descripcion = @descripcion, cantidadPaquetes = @cantidadPaquetes, estadoActual = @estadoActual WHERE envioId = @envioId ${alcance}`);
+    await solicitud.query(`UPDATE dbo.Envios SET puntoOrigenId = @puntoOrigenId, puntoDestinoId = @puntoDestinoId, nombreRemitente = @nombreRemitente, telefonoRemitente = @telefonoRemitente, nombreDestinatario = @nombreDestinatario, telefonoDestinatario = @telefonoDestinatario, descripcion = @descripcion, cantidadPaquetes = @cantidadPaquetes WHERE envioId = @envioId ${alcance}`);
     const resultado = await solicitud.query<Envio>(`SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId INNER JOIN dbo.Usuarios u ON u.usuarioId = e.usuarioQueRegistraId WHERE e.envioId = @envioId ${identidad.rol !== "administrador" ? "AND e.usuarioQueRegistraId = @usuarioId" : ""}`);
     return resultado.recordset[0] ?? null;
   }
