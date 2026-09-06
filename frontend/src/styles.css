@@ -80,3 +80,44 @@ input:focus-visible {
 .inicio-panel .accesos-rapidos button:hover {
   background: rgba(245, 249, 255, 0.82) !important;
 }
+
+button:not(:disabled):not(.consulta-fondo):not(.mapa-fondo):not(.fondo-menu),
+.p-button:not(:disabled) {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    background-color 160ms ease;
+}
+
+button:not(:disabled):not(.consulta-fondo):not(.mapa-fondo):not(.fondo-menu):hover,
+.p-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  filter: saturate(1.05);
+}
+
+button:not(:disabled):not(.consulta-fondo):not(.mapa-fondo):not(.fondo-menu):active,
+.p-button:not(:disabled):active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 70ms;
+}
+
+button:focus-visible,
+.p-button:focus-visible {
+  outline: 2px solid #2f7df6;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .p-button {
+    transition: none !important;
+  }
+
+  button:hover,
+  button:active,
+  .p-button:hover,
+  .p-button:active {
+    transform: none !important;
+  }
+}

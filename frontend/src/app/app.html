@@ -239,6 +239,9 @@
         </form>
       </section>
 
+      @if (sesion.usuario()?.rol === 'administrador' && !seguimientoVisible() && !enviosVisible() && !despachosVisible() && !recepcionesVisible() && !sucursalesVisible() && !crearUsuarioVisible()) {
+        <app-dashboard-administrativo />
+      }
       @if (sucursalesVisible()) {
         <app-sucursales [puedeEditar]="sesion.usuario()?.rol === 'administrador'" />
       }

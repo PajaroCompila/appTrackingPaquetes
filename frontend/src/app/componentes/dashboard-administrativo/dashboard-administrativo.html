@@ -1,0 +1,37 @@
+<section class="dashboard" aria-labelledby="titulo-dashboard">
+  <header class="dashboard-cabecera">
+    <div><span class="seccion-etiqueta">RESUMEN</span><h2 id="titulo-dashboard">Actividad general</h2></div>
+    <p>Movimientos registrados en el sistema.</p>
+  </header>
+
+  <div class="metricas" [class.cargando]="cargando()">
+    <article><div><span>Paquetes</span><strong>{{ paquetes().length }}</strong><small>Total registrado</small></div><i class="tendencia azul"><b></b><b></b><b></b><b></b><b></b></i></article>
+    <article><div><span>En tránsito</span><strong>{{ totalEnTransito() }}</strong><small>En recorrido</small></div><i class="tendencia celeste"><b></b><b></b><b></b><b></b><b></b></i></article>
+    <article><div><span>Recibidos</span><strong>{{ totalRecibidos() }}</strong><small>Entrega final</small></div><i class="tendencia marino"><b></b><b></b><b></b><b></b><b></b></i></article>
+    <article><div><span>Despachos activos</span><strong>{{ despachosActivos() }}</strong><small>Vehículos en ruta</small></div><i class="tendencia gris"><b></b><b></b><b></b><b></b><b></b></i></article>
+  </div>
+
+  <div class="dashboard-grid">
+    <section class="panel actividad-reciente">
+      <header><div><span class="seccion-etiqueta">PAQUETES</span><h3>Últimos registros</h3></div><small>{{ usuariosActivos() }} usuarios activos</small></header>
+      <div class="tabla-cabecera"><span>Guía</span><span>Ruta</span><span>Estado</span><span>Fecha</span></div>
+      @if (ultimosPaquetes().length === 0) { <p class="sin-datos">No hay paquetes registrados.</p> }
+      @for (paquete of ultimosPaquetes(); track paquete.envioId) {
+        <div class="fila-paquete">
+          <strong>{{ paquete.numeroGuia }}</strong>
+          <span>{{ paquete.puntoOrigen }} → {{ paquete.puntoDestino }}</span>
+          <b [attr.data-estado]="paquete.estadoActual">{{ nombreEstado(paquete.estadoActual) }}</b>
+          <small>{{ paquete.fechaCreacion | date: 'dd/MM/yyyy' }}</small>
+        </div>
+      }
+    </section>
+
+    <section class="panel sucursales-resumen">
+      <header><div><span class="seccion-etiqueta">COBERTURA</span><h3>Sucursales activas</h3></div><strong>{{ sucursalesActivas().length }}</strong></header>
+      @if (sucursalesActivas().length === 0) { <p class="sin-datos">No hay sucursales disponibles.</p> }
+      @for (sucursal of sucursalesActivas(); track sucursal.sucursalId) {
+        <div class="fila-sucursal"><span><b>{{ sucursal.nombre }}</b><small>{{ sucursal.ciudad }}, {{ sucursal.departamento }}</small></span><i></i></div>
+      }
+    </section>
+  </div>
+</section>

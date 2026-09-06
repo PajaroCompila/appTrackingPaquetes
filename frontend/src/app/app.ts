@@ -11,6 +11,7 @@ import { Recepciones } from './componentes/recepciones/recepciones';
 import { Sucursales } from './componentes/sucursales/sucursales';
 import { SeguimientoEnvios } from './componentes/seguimiento-envios/seguimiento-envios';
 import { CodigoBarras } from './componentes/codigo-barras/codigo-barras';
+import { DashboardAdministrativo } from './componentes/dashboard-administrativo/dashboard-administrativo';
 import { ServicioSesion } from './servicios/sesion.service';
 import { ServicioEnvios } from './servicios/envios.service';
 import type { SeguimientoEnvio } from './modelos/envio';
@@ -29,6 +30,7 @@ import type { SeguimientoEnvio } from './modelos/envio';
     Recepciones,
     SeguimientoEnvios,
     CodigoBarras,
+    DashboardAdministrativo,
     DatePipe,
   ],
   templateUrl: './app.html',
