@@ -8,6 +8,7 @@ import { InicioSesion } from './componentes/inicio-sesion/inicio-sesion';
 import { Envios } from './componentes/envios/envios';
 import { Recepciones } from './componentes/recepciones/recepciones';
 import { Sucursales } from './componentes/sucursales/sucursales';
+import { SeguimientoEnvios } from './componentes/seguimiento-envios/seguimiento-envios';
 import { ServicioSesion } from './servicios/sesion.service';
 import { ServicioEnvios } from './servicios/envios.service';
 import type { SeguimientoEnvio } from './modelos/envio';
@@ -23,6 +24,7 @@ import type { SeguimientoEnvio } from './modelos/envio';
     Sucursales,
     Envios,
     Recepciones,
+    SeguimientoEnvios,
     DatePipe,
   ],
   templateUrl: './app.html',
@@ -49,6 +51,7 @@ export class Aplicacion {
   protected readonly sucursalesVisible = signal(false);
   protected readonly enviosVisible = signal(false);
   protected readonly recepcionesVisible = signal(false);
+  protected readonly seguimientoVisible = signal(false);
   protected numeroGuia = '';
   protected readonly envioConsultado = signal<SeguimientoEnvio | null>(null);
   protected readonly buscandoGuia = signal(false);
@@ -73,6 +76,7 @@ export class Aplicacion {
     this.enviosVisible.set(false);
     this.sucursalesVisible.set(false);
     this.recepcionesVisible.set(false);
+    this.seguimientoVisible.set(false);
     this.cerrarMenu();
   }
 
@@ -116,11 +120,21 @@ export class Aplicacion {
     this.panelVisible.set(true);
   }
 
+  protected abrirSeguimiento(): void {
+    this.crearUsuarioVisible.set(false);
+    this.sucursalesVisible.set(false);
+    this.enviosVisible.set(false);
+    this.recepcionesVisible.set(false);
+    this.seguimientoVisible.set(true);
+    this.cerrarMenu();
+  }
+
   protected volverAlInicio(): void {
     this.menuAbierto.set(false);
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(false);
     this.enviosVisible.set(false);
+    this.seguimientoVisible.set(false);
     this.panelVisible.set(false);
   }
 
@@ -129,6 +143,7 @@ export class Aplicacion {
       this.crearUsuarioVisible.set(true);
       this.sucursalesVisible.set(false);
       this.enviosVisible.set(false);
+      this.seguimientoVisible.set(false);
       this.cerrarMenu();
     }
   }
@@ -147,6 +162,7 @@ export class Aplicacion {
         this.crearUsuarioVisible.set(false);
         this.sucursalesVisible.set(false);
         this.enviosVisible.set(false);
+        this.seguimientoVisible.set(false);
         this.panelVisible.set(false);
       },
     });
@@ -156,6 +172,7 @@ export class Aplicacion {
     this.crearUsuarioVisible.set(false);
     this.sucursalesVisible.set(true);
     this.enviosVisible.set(false);
+    this.seguimientoVisible.set(false);
     this.cerrarMenu();
   }
 
@@ -164,7 +181,8 @@ export class Aplicacion {
     this.sucursalesVisible.set(false);
     this.enviosVisible.set(true);
     this.recepcionesVisible.set(false);
+    this.seguimientoVisible.set(false);
     this.cerrarMenu();
   }
-  protected abrirRecepciones(): void { this.crearUsuarioVisible.set(false);this.sucursalesVisible.set(false);this.enviosVisible.set(false);this.recepcionesVisible.set(true);this.cerrarMenu(); }
+  protected abrirRecepciones(): void { this.crearUsuarioVisible.set(false);this.sucursalesVisible.set(false);this.enviosVisible.set(false);this.seguimientoVisible.set(false);this.recepcionesVisible.set(true);this.cerrarMenu(); }
 }

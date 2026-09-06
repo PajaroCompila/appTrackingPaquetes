@@ -1,0 +1,35 @@
+<section class="seguimiento-listado" aria-labelledby="titulo-listado-envios">
+  <header class="listado-cabecera">
+    <div>
+      <span class="seccion-etiqueta">SEGUIMIENTO</span>
+      <h2 id="titulo-listado-envios">{{ esAdministrador() ? 'Todos los envíos' : 'Mis envíos' }}</h2>
+      <p>{{ esAdministrador() ? 'Consulta los envíos registrados en el sistema.' : 'Consulta los envíos que has registrado.' }}</p>
+    </div>
+    <strong>{{ enviosFiltrados().length }} envíos</strong>
+  </header>
+
+  @if (esAdministrador()) {
+    <div class="filtros" aria-label="Filtros de envíos">
+      <label>Usuario<input type="search" [(ngModel)]="usuario" placeholder="Nombre de usuario" /></label>
+      <label>Sucursal<input type="search" [(ngModel)]="sucursal" placeholder="Origen o destino" /></label>
+      <label>Número de guía<input type="search" [(ngModel)]="guia" placeholder="Número o últimos dígitos" /></label>
+      <label>Fecha<input type="date" [(ngModel)]="fecha" /></label>
+      <label>Estado<select [(ngModel)]="estado"><option value="">Todos</option><option value="registrado">Registrado</option><option value="en_transito">En tránsito</option><option value="recibido">Recibido</option><option value="cancelado">Cancelado</option></select></label>
+      <button type="button" (click)="limpiarFiltros()">Limpiar</button>
+    </div>
+  }
+
+  <div class="matriz-envios">
+    @if (cargando()) { <p>Cargando envíos...</p> }
+    @else if (mensaje()) { <p role="alert">{{ mensaje() }}</p> }
+    @else if (enviosFiltrados().length === 0) { <p>No hay envíos para mostrar.</p> }
+    @else {
+      <table>
+        <thead><tr><th>Guía</th>@if (esAdministrador()) { <th>Usuario</th> }<th>Origen</th><th>Destino</th><th>Fecha</th><th>Estado</th></tr></thead>
+        <tbody>@for (envio of enviosFiltrados(); track envio.envioId) {
+          <tr><td class="guia">{{ envio.numeroGuia }}</td>@if (esAdministrador()) { <td>{{ envio.nombreUsuario }}</td> }<td>{{ envio.puntoOrigen }}</td><td>{{ envio.puntoDestino }}</td><td>{{ envio.fechaCreacion | date:'dd/MM/yyyy' }}</td><td><span class="estado" [attr.data-estado]="envio.estadoActual">{{ nombreEstado(envio.estadoActual) }}</span></td></tr>
+        }</tbody>
+      </table>
+    }
+  </div>
+</section>

@@ -8,6 +8,8 @@ export interface Envio {
   puntoOrigen: string;
   puntoDestinoId: number;
   puntoDestino: string;
+  usuarioQueRegistraId: number;
+  nombreUsuario: string;
   nombreRemitente: string;
   telefonoRemitente: string;
   nombreDestinatario: string;
@@ -19,7 +21,7 @@ export interface Envio {
 }
 export type DatosEnvio = Omit<
   Envio,
-  'envioId' | 'numeroGuia' | 'puntoOrigen' | 'puntoDestino' | 'estadoActual' | 'fechaCreacion'
+  'envioId' | 'numeroGuia' | 'usuarioQueRegistraId' | 'nombreUsuario' | 'puntoOrigen' | 'puntoDestino' | 'estadoActual' | 'fechaCreacion'
 >;
 export type ActualizacionEnvio = DatosEnvio & { estadoActual: EstadoEnvio };
 export type SeguimientoEnvio = Pick<

@@ -13,6 +13,7 @@ export interface Envio {
   puntoDestinoId: number;
   puntoDestino: string;
   usuarioQueRegistraId: number;
+  nombreUsuario: string;
   nombreRemitente: string;
   telefonoRemitente: string;
   nombreDestinatario: string;
@@ -23,7 +24,7 @@ export interface Envio {
   fechaCreacion: Date;
 }
 
-export type DatosEnvio = Omit<Envio, "envioId" | "numeroGuia" | "usuarioQueRegistraId" | "puntoOrigen" | "puntoDestino" | "estadoActual" | "fechaCreacion">;
+export type DatosEnvio = Omit<Envio, "envioId" | "numeroGuia" | "usuarioQueRegistraId" | "nombreUsuario" | "puntoOrigen" | "puntoDestino" | "estadoActual" | "fechaCreacion">;
 export type ActualizacionEnvio = DatosEnvio & { estadoActual: EstadoEnvio };
 export type SeguimientoEnvio = Pick<
   Envio,

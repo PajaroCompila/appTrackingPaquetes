@@ -64,6 +64,8 @@ input:focus-visible {
 .recepciones form,
 .recepciones .lote,
 .recepciones .lista article,
+.seguimiento-listado .filtros,
+.seguimiento-listado .matriz-envios,
 .p-dialog,
 .p-popover,
 .p-select-overlay {

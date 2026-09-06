@@ -1,0 +1,21 @@
+.seguimiento-listado { width:min(1180px,100%); margin:34px auto 0; color:#172033; }
+.listado-cabecera { display:flex; align-items:end; justify-content:space-between; gap:20px; margin-bottom:18px; }
+.listado-cabecera h2 { margin:6px 0; font-size:1.65rem; }
+.listado-cabecera p { margin:0; color:#61708a; }
+.listado-cabecera > strong { color:#245d9c; font-size:.78rem; }
+.filtros { display:grid; grid-template-columns:repeat(5,minmax(130px,1fr)) auto; gap:12px; align-items:end; padding:20px; margin-bottom:16px; border:1px solid #c9d5e1; border-radius:12px; background:rgba(255,255,255,.76); backdrop-filter:blur(14px); box-shadow:0 12px 32px rgba(41,67,95,.1); }
+.filtros label { display:grid; gap:7px; color:#53627a; font-size:.72rem; font-weight:650; }
+.filtros input,.filtros select { width:100%; min-height:42px; padding:0 11px; border:1px solid #c3d1e0; border-radius:8px; color:#172033; background:rgba(255,255,255,.7); font:inherit; }
+.filtros button { min-height:42px; padding:0 16px; border:1px solid #aec2d7; border-radius:8px; color:#29435f; background:rgba(239,245,251,.82); font-weight:650; cursor:pointer; }
+.matriz-envios { overflow:hidden; border:1px solid #c9d5e1; border-radius:12px; background:rgba(255,255,255,.76); backdrop-filter:blur(14px); box-shadow:0 12px 32px rgba(41,67,95,.1); }
+.matriz-envios > p { margin:0; padding:24px; color:#61708a; }
+table { width:100%; border-collapse:collapse; text-align:left; }
+th,td { padding:15px 18px; border-bottom:1px solid #dce5ee; color:#53627a; font-size:.76rem; white-space:nowrap; }
+th { color:#60748a; font-size:.69rem; }
+tbody tr:last-child td { border-bottom:0; }
+.guia { color:#1c61e7; font-weight:700; }
+.estado { display:inline-block; padding:5px 9px; border-radius:20px; color:#245d9c; background:#e2eefb; font-weight:650; }
+.estado[data-estado='recibido'] { color:#28725a; background:#e2f3ec; }
+.estado[data-estado='cancelado'] { color:#98404b; background:#f8e8eb; }
+@media(max-width:900px){.filtros{grid-template-columns:repeat(2,minmax(0,1fr))}.matriz-envios{overflow-x:auto}}
+@media(max-width:560px){.listado-cabecera{align-items:start;flex-direction:column}.filtros{grid-template-columns:1fr}}

@@ -5,7 +5,7 @@ import type { ActualizacionEnvio, DatosEnvio, Envio, SeguimientoEnvio, DatosRece
 import type { IdentidadAutenticada } from "../modelos/usuario.js";
 
 const columnas = `e.envioId, e.numeroGuia, e.puntoOrigenId, origen.nombre AS puntoOrigen,
-  e.puntoDestinoId, destino.nombre AS puntoDestino, e.usuarioQueRegistraId,
+  e.puntoDestinoId, destino.nombre AS puntoDestino, e.usuarioQueRegistraId, u.nombreUsuario,
   e.nombreRemitente, e.telefonoRemitente, e.nombreDestinatario, e.telefonoDestinatario,
   e.descripcion, e.cantidadPaquetes, e.estadoActual, e.fechaCreacion`;
 
@@ -26,9 +26,9 @@ export class RepositorioEnviosSql implements RepositorioEnvios {
   async listar(identidad: IdentidadAutenticada): Promise<Envio[]> {
     const conexion = await obtenerConexion(this.configuracion);
     const solicitud = conexion.request();
-    const filtro = identidad.rol === "usuario" ? "WHERE e.usuarioQueRegistraId = @usuarioId" : "";
+    const filtro = identidad.rol !== "administrador" ? "WHERE e.usuarioQueRegistraId = @usuarioId" : "";
     if (filtro) solicitud.input("usuarioId", sql.Int, identidad.usuarioId);
-    const resultado = await solicitud.query<Envio>(`SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId ${filtro} ORDER BY e.fechaCreacion DESC`);
+    const resultado = await solicitud.query<Envio>(`SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId INNER JOIN dbo.Usuarios u ON u.usuarioId = e.usuarioQueRegistraId ${filtro} ORDER BY e.fechaCreacion DESC`);
     return resultado.recordset;
   }
 
@@ -45,7 +45,7 @@ export class RepositorioEnviosSql implements RepositorioEnvios {
       .input("telefonoDestinatario", sql.VarChar(30), datos.telefonoDestinatario)
       .input("descripcion", sql.NVarChar(250), datos.descripcion)
       .input("cantidadPaquetes", sql.Int, datos.cantidadPaquetes);
-    const resultado = await solicitud.query<Envio>(`INSERT INTO dbo.Envios (numeroGuia, puntoOrigenId, puntoDestinoId, usuarioQueRegistraId, nombreRemitente, telefonoRemitente, nombreDestinatario, telefonoDestinatario, descripcion, cantidadPaquetes) VALUES (@numeroGuia, @puntoOrigenId, @puntoDestinoId, @usuarioQueRegistraId, @nombreRemitente, @telefonoRemitente, @nombreDestinatario, @telefonoDestinatario, @descripcion, @cantidadPaquetes); SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId WHERE e.envioId = SCOPE_IDENTITY()`);
+    const resultado = await solicitud.query<Envio>(`INSERT INTO dbo.Envios (numeroGuia, puntoOrigenId, puntoDestinoId, usuarioQueRegistraId, nombreRemitente, telefonoRemitente, nombreDestinatario, telefonoDestinatario, descripcion, cantidadPaquetes) VALUES (@numeroGuia, @puntoOrigenId, @puntoDestinoId, @usuarioQueRegistraId, @nombreRemitente, @telefonoRemitente, @nombreDestinatario, @telefonoDestinatario, @descripcion, @cantidadPaquetes); SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId INNER JOIN dbo.Usuarios u ON u.usuarioId = e.usuarioQueRegistraId WHERE e.envioId = SCOPE_IDENTITY()`);
     const creado = resultado.recordset[0];
     if (!creado) throw new Error("No se obtuvo el envío creado");
     return creado;
@@ -74,16 +74,16 @@ export class RepositorioEnviosSql implements RepositorioEnvios {
       .input("descripcion", sql.NVarChar(250), datos.descripcion)
       .input("cantidadPaquetes", sql.Int, datos.cantidadPaquetes)
       .input("estadoActual", sql.VarChar(20), datos.estadoActual);
-    const alcance = identidad.rol === "usuario" ? "AND usuarioQueRegistraId = @usuarioId" : "";
+    const alcance = identidad.rol !== "administrador" ? "AND usuarioQueRegistraId = @usuarioId" : "";
     await solicitud.query(`UPDATE dbo.Envios SET puntoOrigenId = @puntoOrigenId, puntoDestinoId = @puntoDestinoId, nombreRemitente = @nombreRemitente, telefonoRemitente = @telefonoRemitente, nombreDestinatario = @nombreDestinatario, telefonoDestinatario = @telefonoDestinatario, descripcion = @descripcion, cantidadPaquetes = @cantidadPaquetes, estadoActual = @estadoActual WHERE envioId = @envioId ${alcance}`);
-    const resultado = await solicitud.query<Envio>(`SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId WHERE e.envioId = @envioId ${identidad.rol === "usuario" ? "AND e.usuarioQueRegistraId = @usuarioId" : ""}`);
+    const resultado = await solicitud.query<Envio>(`SELECT ${columnas} FROM dbo.Envios e INNER JOIN dbo.Sucursales origen ON origen.sucursalId = e.puntoOrigenId INNER JOIN dbo.Sucursales destino ON destino.sucursalId = e.puntoDestinoId INNER JOIN dbo.Usuarios u ON u.usuarioId = e.usuarioQueRegistraId WHERE e.envioId = @envioId ${identidad.rol !== "administrador" ? "AND e.usuarioQueRegistraId = @usuarioId" : ""}`);
     return resultado.recordset[0] ?? null;
   }
 
   async eliminar(envioId: number, identidad: IdentidadAutenticada): Promise<boolean> {
     const conexion = await obtenerConexion(this.configuracion);
     const solicitud = conexion.request().input("envioId", sql.Int, envioId).input("usuarioId", sql.Int, identidad.usuarioId);
-    const alcance = identidad.rol === "usuario" ? "AND usuarioQueRegistraId = @usuarioId" : "";
+    const alcance = identidad.rol !== "administrador" ? "AND usuarioQueRegistraId = @usuarioId" : "";
     const resultado = await solicitud.query(`DELETE FROM dbo.Envios WHERE envioId = @envioId ${alcance}`);
     return (resultado.rowsAffected[0] ?? 0) > 0;
   }

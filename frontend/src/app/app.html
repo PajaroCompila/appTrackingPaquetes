@@ -126,15 +126,15 @@
         <span class="menu-titulo">OPERACIÓN</span>
         <a
           class="menu-enlace"
-          [class.activo]="!enviosVisible() && !recepcionesVisible() && !sucursalesVisible() && !crearUsuarioVisible()"
+          [class.activo]="!seguimientoVisible() && !enviosVisible() && !recepcionesVisible() && !sucursalesVisible() && !crearUsuarioVisible()"
           href="#inicio"
           (click)="abrirInicio()"
           ><svg class="menu-icono" aria-hidden="true"><use href="#icono-inicio" /></svg
           ><span>Inicio</span></a
         >
-        <a class="menu-enlace" href="#seguimiento" (click)="cerrarMenu()"
+        <button class="menu-enlace" [class.activo]="seguimientoVisible()" type="button" (click)="abrirSeguimiento()"
           ><svg class="menu-icono" aria-hidden="true"><use href="#icono-seguimiento" /></svg
-          ><span>Seguimiento</span></a
+          ><span>Seguimiento</span></button
         >
         <button
           class="menu-enlace"
@@ -234,6 +234,9 @@
 
       @if (sucursalesVisible()) {
         <app-sucursales [puedeEditar]="sesion.usuario()?.rol === 'administrador'" />
+      }
+      @if (seguimientoVisible()) {
+        <app-seguimiento-envios [rolUsuario]="sesion.usuario()!.rol" />
       }
       @if (enviosVisible()) {
         <app-envios [puedeCrear]="true" [rolUsuario]="sesion.usuario()!.rol" [sucursalIdUsuario]="sesion.usuario()!.sucursalId" />
