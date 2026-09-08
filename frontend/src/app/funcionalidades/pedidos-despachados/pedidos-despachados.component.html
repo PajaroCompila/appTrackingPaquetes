@@ -79,9 +79,7 @@
       </form>
     </div>
 
-    @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
-    @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
-    @if (!actualizando() && ultimaActualizacion()) {
+    @if (ultimaActualizacion()) {
       <p class="estado-actualizacion">Última actualización: {{ fecha(ultimaActualizacion()) }}</p>
     }
 
@@ -92,6 +90,15 @@
     } @else if (!pedidos().length) {
       <div class="estado-interfaz"><p>No hay pedidos despachados.</p></div>
     } @else {
+      <div class="acciones-transferencia acciones-solo-impresion">
+        <button
+          class="boton boton-secundario boton-imprimir-seleccionados"
+          type="button"
+          [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion()"
+          (click)="imprimirSeleccionados()"
+        >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
+      </div>
+      @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
       <div class="panel tabla-contenedor">
         <table>
           <colgroup>
@@ -106,8 +113,9 @@
             <col class="ancho-despachado" />
             <col class="ancho-usuario" />
             <col class="ancho-detalle" />
+            <col class="ancho-imprimir" />
           </colgroup>
-          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Imprimir</th></tr></thead>
           @for (pedido of pedidos(); track pedido.idOrigen) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
@@ -122,6 +130,23 @@
                   <td data-label="Despachado" [title]="fecha(articulo.transferidoEn || pedido.despachadoEn)"><span class="texto-dos-lineas">{{ fecha(articulo.transferidoEn || pedido.despachadoEn) }}</span></td>
                   <td data-label="Usuario" [title]="articulo.usuarioTransferencia || pedido.usuarioDespacho"><span class="texto-dos-lineas">{{ articulo.usuarioTransferencia || pedido.usuarioDespacho }}</span></td>
                   <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
+                  <td class="columna-seleccion columna-imprimir" data-label="Imprimir">
+                    <div class="control-impresion">
+                      <label class="selector-linea selector-impresion" title="Seleccionar para impresión">
+                        <input type="checkbox"
+                          [disabled]="!articulo.identificadorDetalle"
+                          [checked]="estaSeleccionadoParaImpresion(pedido, articulo.identificadorDetalle)"
+                          [attr.aria-label]="'Seleccionar ' + (articulo.codigoArticulo || 'artículo') + ' para impresión'"
+                          (change)="alternarSeleccionImpresion(pedido, articulo.identificadorDetalle, $any($event.target).checked)" />
+                        <span aria-hidden="true">✓</span>
+                      </label>
+                      @if (estaImpreso(pedido, articulo.identificadorDetalle)) {
+                        <span class="indicador-impreso" title="Este artículo ya fue impreso">
+                          <i class="pi pi-check-circle" aria-hidden="true"></i> Impreso
+                        </span>
+                      }
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -134,5 +159,11 @@
         <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button>
       </nav>
     }
+  }
+  @if (!idOrigen()) {
+    <app-vista-impresion-pedido
+      [articulos]="articulosImpresion()"
+      [fechaHora]="fechaHoraImpresion()"
+    />
   }
 </section>

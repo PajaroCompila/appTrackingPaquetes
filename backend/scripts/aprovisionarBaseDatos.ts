@@ -186,6 +186,45 @@ async function aprovisionar(): Promise<void> {
         );
       END;
 
+      IF OBJECT_ID(N'dbo.ImpresionArticulo', N'U') IS NULL
+      BEGIN
+        CREATE TABLE dbo.ImpresionArticulo (
+          idImpresion bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_ImpresionArticulo PRIMARY KEY,
+          idOrigen nvarchar(150) NOT NULL,
+          identificadorDetalle nvarchar(150) NOT NULL,
+          cantidadImpresiones int NOT NULL CONSTRAINT DF_ImpresionArticulo_cantidad DEFAULT 1,
+          primeraImpresionEn datetime2(3) NOT NULL CONSTRAINT DF_ImpresionArticulo_primera DEFAULT SYSUTCDATETIME(),
+          ultimaImpresionEn datetime2(3) NOT NULL CONSTRAINT DF_ImpresionArticulo_ultima DEFAULT SYSUTCDATETIME(),
+          idUltimoUsuario uniqueidentifier NOT NULL,
+          CONSTRAINT UQ_ImpresionArticulo_identidad UNIQUE(idOrigen, identificadorDetalle),
+          CONSTRAINT FK_ImpresionArticulo_usuario FOREIGN KEY(idUltimoUsuario)
+            REFERENCES dbo.UsuarioAplicacion(idUsuario),
+          CONSTRAINT CK_ImpresionArticulo_cantidad CHECK(cantidadImpresiones > 0)
+        );
+        CREATE INDEX IX_ImpresionArticulo_ultima
+          ON dbo.ImpresionArticulo(ultimaImpresionEn DESC);
+      END;
+
+      IF OBJECT_ID(N'dbo.AsignacionArticuloPedido', N'U') IS NULL
+      BEGIN
+        CREATE TABLE dbo.AsignacionArticuloPedido (
+          idOrigen nvarchar(150) NOT NULL,
+          identificadorDetalle nvarchar(150) NOT NULL,
+          usuarioAsignado nvarchar(100) NULL,
+          nombreAsignado nvarchar(150) NULL,
+          asignadoPor uniqueidentifier NOT NULL,
+          creadoEn datetime2(3) NOT NULL
+            CONSTRAINT DF_AsignacionArticuloPedido_creado DEFAULT SYSUTCDATETIME(),
+          actualizadoEn datetime2(3) NOT NULL
+            CONSTRAINT DF_AsignacionArticuloPedido_actualizado DEFAULT SYSUTCDATETIME(),
+          CONSTRAINT PK_AsignacionArticuloPedido PRIMARY KEY(idOrigen, identificadorDetalle),
+          CONSTRAINT FK_AsignacionArticuloPedido_usuario FOREIGN KEY(asignadoPor)
+            REFERENCES dbo.UsuarioAplicacion(idUsuario)
+        );
+        CREATE INDEX IX_AsignacionArticuloPedido_usuario
+          ON dbo.AsignacionArticuloPedido(usuarioAsignado, actualizadoEn DESC);
+      END;
+
       IF NOT EXISTS (SELECT 1 FROM dbo.MigracionEsquema WHERE versionMigracion = 1)
         INSERT INTO dbo.MigracionEsquema(versionMigracion, nombre)
         VALUES (1, N'esquema inicial de usuarios, historial y auditoría');
@@ -198,6 +237,8 @@ async function aprovisionar(): Promise<void> {
       GRANT SELECT, INSERT, UPDATE ON dbo.HistorialPedidoValidado TO [pedidos_bodega_app];
       GRANT SELECT, INSERT ON dbo.EventoAplicacion TO [pedidos_bodega_app];
       GRANT SELECT, INSERT, UPDATE ON dbo.SincronizacionHistorial TO [pedidos_bodega_app];
+      GRANT SELECT, INSERT, UPDATE ON dbo.ImpresionArticulo TO [pedidos_bodega_app];
+      GRANT SELECT, INSERT, UPDATE ON dbo.AsignacionArticuloPedido TO [pedidos_bodega_app];
       GRANT SELECT ON dbo.MigracionEsquema TO [pedidos_bodega_app];
       DENY DELETE TO [pedidos_bodega_app];
     `);

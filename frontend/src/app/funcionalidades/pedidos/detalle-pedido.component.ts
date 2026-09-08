@@ -44,6 +44,7 @@ export class DetallePedidoComponent implements OnInit {
     if (!detalle) return null;
     const { cabecera, partidas } = detalle;
     return {
+      idOrigen: cabecera.idOrigen,
       numeroPedido: cabecera.numeroPedido,
       vendedor: cabecera.nombreVendedor,
       fechaPedido: cabecera.fechaHoraPedido,
@@ -55,6 +56,7 @@ export class DetallePedidoComponent implements OnInit {
       ],
       articulos: partidas.map((partida, indice) => ({
         clave: partida.numeroPartida ?? `${partida.codigoArticulo ?? 'articulo'}-${indice}`,
+        identificadorDetalle: partida.numeroPartida,
         numeroPartida: partida.numeroPartida,
         codigo: partida.codigoArticulo,
         descripcion: partida.descripcionArticulo,

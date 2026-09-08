@@ -10,7 +10,14 @@ import { PedidoSapRepositorio, type IPedidoSapRepositorio } from './pedidoSapRep
 import type { IDespachoRepositorio } from '../despachos/despachoRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 
+interface EstadoCacheSap {
+  resultado?: PaginaPedidos;
+  actualizacion?: Promise<PaginaPedidos | null>;
+}
+
 export class PedidoServicio {
+  private readonly cacheSap = new Map<string, EstadoCacheSap>();
+
   public constructor(
     private readonly pedidoRepositorio: IPedidoRepositorio,
     private readonly pedidoSapRepositorio: IPedidoSapRepositorio = new PedidoSapRepositorio(),
@@ -21,17 +28,26 @@ export class PedidoServicio {
     try {
       const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
       const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
-      const [resultadoRetailOne, resultadoSap] = await Promise.allSettled([
-        this.pedidoRepositorio.buscarPedidos(filtrosAcumulados),
-        this.pedidoSapRepositorio.buscarPedidos(filtrosAcumulados),
-      ]);
-      const retailOne = resultadoRetailOne.status === 'fulfilled' ? resultadoRetailOne.value : null;
-      const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
+      const claveCacheSap = this.crearClaveCacheSap(filtrosAcumulados);
+      const estadoCacheSap = this.obtenerEstadoCacheSap(claveCacheSap);
+      const sapAnterior = estadoCacheSap.resultado ?? null;
+      const actualizacionSap = this.actualizarSapEnSegundoPlano(
+        claveCacheSap,
+        filtrosAcumulados,
+        estadoCacheSap,
+      );
+
+      let retailOne: PaginaPedidos | null = null;
+      try {
+        retailOne = await this.pedidoRepositorio.buscarPedidos(filtrosAcumulados);
+      } catch {
+        console.warn('La fuente RetailOne no estuvo disponible durante la consulta.');
+      }
+
+      const sap = sapAnterior ?? (retailOne ? null : await actualizacionSap);
       if (!retailOne && !sap) {
         throw new ErrorDependenciaDatos();
       }
-      if (!retailOne) console.warn('La fuente RetailOne no estuvo disponible durante la consulta.');
-      if (!sap) console.warn('La fuente SAP no estuvo disponible durante la consulta.');
       const lineasDespachadas = this.despachoRepositorio
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
@@ -56,6 +72,57 @@ export class PedidoServicio {
     } catch (error) {
       this.procesarErrorRepositorio(error, 'No fue posible consultar los pedidos.');
     }
+  }
+
+  private crearClaveCacheSap(filtros: FiltrosPedidos): string {
+    return JSON.stringify({
+      numeroPedido: filtros.numeroPedido ?? null,
+      fechaDesde: filtros.fechaDesde ?? null,
+      fechaHasta: filtros.fechaHasta ?? null,
+      codigosAlmacen: [...(filtros.codigosAlmacen ?? [])].sort(),
+      codigoEstadoVenta: filtros.codigoEstadoVenta ?? null,
+      codigoSincronizacion: filtros.codigoSincronizacion ?? null,
+      pagina: filtros.pagina,
+      cantidadPorPagina: filtros.cantidadPorPagina,
+    });
+  }
+
+  private obtenerEstadoCacheSap(clave: string): EstadoCacheSap {
+    const existente = this.cacheSap.get(clave);
+    if (existente) return existente;
+
+    if (this.cacheSap.size >= 100) {
+      const primeraClave = this.cacheSap.keys().next().value as string | undefined;
+      if (primeraClave) this.cacheSap.delete(primeraClave);
+    }
+    const nuevo: EstadoCacheSap = {};
+    this.cacheSap.set(clave, nuevo);
+    return nuevo;
+  }
+
+  private actualizarSapEnSegundoPlano(
+    clave: string,
+    filtros: FiltrosPedidos,
+    estado: EstadoCacheSap,
+  ): Promise<PaginaPedidos | null> {
+    if (estado.actualizacion) return estado.actualizacion;
+
+    const actualizacion = this.pedidoSapRepositorio.buscarPedidos(filtros)
+      .then((resultado) => {
+        estado.resultado = resultado;
+        return resultado;
+      })
+      .catch(() => {
+        estado.resultado = undefined;
+        console.warn('La fuente SAP no estuvo disponible durante la consulta en segundo plano.');
+        return null;
+      })
+      .finally(() => {
+        estado.actualizacion = undefined;
+        this.cacheSap.set(clave, estado);
+      });
+    estado.actualizacion = actualizacion;
+    return actualizacion;
   }
 
   public async obtenerDetallePedido(

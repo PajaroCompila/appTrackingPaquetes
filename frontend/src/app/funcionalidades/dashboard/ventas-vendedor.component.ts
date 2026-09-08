@@ -58,7 +58,7 @@ export class VentasVendedorComponent implements OnInit {
         this.datos.set(datos); this.cargando.set(false); this.actualizando.set(false); this.advertencia.set('');
       }), catchError(() => {
         this.cargando.set(false); this.actualizando.set(false);
-        this.advertencia.set('No pudimos actualizar. Mostramos los datos anteriores.');
+        if (!this.datos()) this.advertencia.set('No fue posible obtener la información.');
         return EMPTY;
       }));
     }))), takeUntilDestroyed(this.destruirRef)).subscribe();

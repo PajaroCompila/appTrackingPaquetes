@@ -14,6 +14,7 @@
   --transicion-normal: 200ms;
   --easing-corporativo: cubic-bezier(.2, 0, 0, 1);
   --sombra-interaccion: 0 3px 9px rgb(22 47 75 / 13%);
+  --ancho-matriz-pedidos: 1450px;
   background: var(--fondo);
   color: var(--gris-900);
 }
@@ -179,6 +180,26 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
     box-shadow var(--transicion-normal) var(--easing-corporativo);
 }
 
+/* Impresión disponible dentro del detalle del pedido. */
+.acciones-articulos-detalle { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .65rem; }
+.boton-imprimir-detalle { min-height: 2.45rem; }
+.mensaje-impresion-detalle { margin: 0 0 .8rem; color: #8a4b08; font-size: .82rem; font-weight: 600; text-align: right; }
+.columna-imprimir-detalle { min-width: 7.5rem; text-align: center; }
+.control-impresion-detalle { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .35rem; }
+.selector-impresion-detalle { position: relative; display: inline-grid; width: 1.5rem; height: 1.5rem; place-items: center; cursor: pointer; }
+.selector-impresion-detalle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.selector-impresion-detalle span { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border: 2px solid #7f9dbb; border-radius: 50%; color: transparent; font-size: .75rem; }
+.selector-impresion-detalle input:checked + span { border-color: var(--azul-700); background: var(--azul-700); color: #fff; }
+.selector-impresion-detalle input:focus-visible + span { outline: 3px solid #65a8df; outline-offset: 2px; }
+.selector-impresion-detalle input:disabled + span { cursor: not-allowed; opacity: .45; }
+.indicador-impreso-detalle { display: inline-flex; align-items: center; gap: .2rem; padding: .2rem .4rem; border-radius: 999px; background: #e7f6ed; color: #166534; font-size: .7rem; font-weight: 600; line-height: 1.15; white-space: nowrap; }
+.indicador-impreso-detalle .pi { font-size: .72rem; }
+
+@media (max-width: 600px) {
+  .titulo-articulos { align-items: flex-start; }
+  .acciones-articulos-detalle { justify-content: flex-start; }
+}
+
 .dashboard .tarjeta {
   transition: box-shadow var(--transicion-normal) var(--easing-corporativo), transform var(--transicion-rapida) var(--easing-corporativo);
 }
@@ -222,6 +243,14 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
 .detalle-pedido-compartido :is(.boton-regresar-detalle, .boton-reintentar):is(:hover, :focus-visible) i { transform: translateY(-1px); }
 
 /* Patrón visual compartido por pendientes, despachados e historial. */
+.vista-pedidos {
+  width: min(100% - 2rem, var(--ancho-matriz-pedidos));
+}
+.vista-pedidos .bloque-superior-operativo,
+.vista-pedidos .tabla-contenedor {
+  width: 100%;
+  max-width: 100%;
+}
 .vista-pedidos .encabezado-pagina {
   min-height: 5.25rem;
   align-items: flex-start;
@@ -291,14 +320,14 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   color: #72500a;
 }
 
-/* Contención puntual de la tabla con once columnas de Pedidos despachados. */
+/* Contención puntual de la tabla de Pedidos despachados. */
 .vista-pedidos.vista-despachados,
 .vista-despachados .tabla-contenedor {
   min-width: 0;
   max-width: 100%;
 }
 .vista-pedidos.vista-despachados {
-  width: min(100% - 2rem, 1450px);
+  width: min(100% - 2rem, var(--ancho-matriz-pedidos));
 }
 .vista-despachados .tabla-contenedor {
   width: 100%;
@@ -307,20 +336,26 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
 }
 .vista-pedidos.vista-despachados table {
   width: 100%;
-  min-width: 1360px;
+  min-width: 1400px;
   table-layout: fixed;
 }
-.vista-despachados .ancho-pedido { width: 100px; }
-.vista-despachados .ancho-codigo { width: 145px; }
-.vista-despachados .ancho-descripcion { width: 190px; }
-.vista-despachados .ancho-cantidad { width: 80px; }
-.vista-despachados .ancho-bodega { width: 90px; }
-.vista-despachados .ancho-fecha { width: 130px; }
+.vista-despachados .ancho-pedido { width: 90px; }
+.vista-despachados .ancho-codigo { width: 165px; }
+.vista-despachados .ancho-descripcion { width: 180px; }
+.vista-despachados .ancho-cantidad { width: 70px; }
+.vista-despachados .ancho-bodega { width: 80px; }
+.vista-despachados .ancho-fecha { width: 120px; }
 .vista-despachados .ancho-estado { width: 110px; }
-.vista-despachados .ancho-vendedor { width: 160px; }
-.vista-despachados .ancho-despachado { width: 130px; }
-.vista-despachados .ancho-usuario { width: 120px; }
-.vista-despachados .ancho-detalle { width: 105px; }
+.vista-despachados .ancho-vendedor { width: 150px; }
+.vista-despachados .ancho-despachado { width: 120px; }
+.vista-despachados .ancho-usuario { width: 100px; }
+.vista-despachados .ancho-detalle { width: 95px; }
+.vista-despachados .ancho-imprimir { width: 120px; }
+.vista-despachados .acciones-solo-impresion .boton-imprimir-seleccionados {
+  min-width: 15rem;
+  min-height: 2.65rem;
+}
+.vista-despachados td[data-label="Pedido"] strong { font-size: .78rem; }
 .vista-despachados th,
 .vista-despachados td {
   padding-right: .5rem;
@@ -332,10 +367,12 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   white-space: normal;
 }
 .vista-despachados .codigo-articulo-en-linea {
-  overflow: hidden;
+  overflow: visible;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
 }
 .vista-despachados .texto-dos-lineas {
   display: -webkit-box;
@@ -416,11 +453,11 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   .vista-pedidos .tabla-contenedor { margin-top: .75rem; padding: .65rem; overflow: visible; }
   .vista-pedidos td { min-height: 0; padding: .48rem; }
   .vista-pedidos .accion-tabla { text-align: left; }
-  .vista-pedidos.vista-despachados { width: min(100% - 1rem, 1450px); }
+  .vista-pedidos { width: min(100% - 1rem, var(--ancho-matriz-pedidos)); }
   .vista-pedidos.vista-despachados table { width: 100%; min-width: 0; table-layout: auto; }
   .vista-despachados col { width: auto; }
   .vista-despachados th,
   .vista-despachados td { overflow: visible; }
   .vista-despachados .texto-dos-lineas { overflow: visible; -webkit-line-clamp: initial; }
-  .vista-despachados .codigo-articulo-en-linea { overflow: hidden; }
+  .vista-despachados .codigo-articulo-en-linea { overflow: visible; }
 }

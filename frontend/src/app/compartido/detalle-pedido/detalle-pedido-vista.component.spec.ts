@@ -5,10 +5,14 @@ import type {
 } from './detalle-pedido-vista.interface';
 import { DetallePedidoVistaComponent } from './detalle-pedido-vista.component';
 import { ConsultaInventarioArticuloService } from '../inventario/consulta-inventario-articulo.service';
+import { ImpresionesService } from '../impresiones/impresiones.service';
+import { of } from 'rxjs';
 
 describe('DetallePedidoVistaComponent', () => {
   let fixture: ComponentFixture<DetallePedidoVistaComponent>;
   const abrirInventario = vi.fn();
+  const consultarImpresiones = vi.fn();
+  const registrarImpresiones = vi.fn();
   const configuracion: ConfiguracionDetallePedido = {
     contexto: 'Consulta', titulo: 'Detalle del pedido', descripcion: 'Descripción contextual',
     etiquetaEstado: 'Pendiente', severidadEstado: 'advertencia',
@@ -16,22 +20,36 @@ describe('DetallePedidoVistaComponent', () => {
     etiquetaArticulos: 'Artículos del pedido', soloConsulta: true,
   };
   const pedido: PedidoDetalleVisual = {
-    numeroPedido: '001234', vendedor: null, fechaPedido: '2026-08-06T12:30:00', bodega: null,
+    idOrigen: 'R1:F1', numeroPedido: '001234', vendedor: null,
+    fechaPedido: '2026-08-06T12:30:00', bodega: null,
     datosOperativos: [
       { etiqueta: 'Usuario', valor: null, icono: 'pi pi-user' },
       { etiqueta: 'Fecha', valor: '2026-08-06T13:00:00', icono: 'pi pi-calendar', esFecha: true },
     ],
     articulos: [
-      { clave: '1', codigo: 'ARTICULO-CODIGO-EXTENSO-001', descripcion: 'Descripción extensa que debe conservarse completa y ajustarse dentro de la celda.', cantidad: 2, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Bodega original' },
-      { clave: '2', codigo: 'A2', descripcion: 'Segundo artículo', cantidad: 1, codigoAlmacen: 'BTGU01' },
+      { clave: '1', identificadorDetalle: '1', codigo: 'ARTICULO-CODIGO-EXTENSO-001', descripcion: 'Descripción extensa que debe conservarse completa y ajustarse dentro de la celda.', cantidad: 2, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Bodega original' },
+      { clave: '2', identificadorDetalle: '2', codigo: 'A2', descripcion: 'Segundo artículo', cantidad: 1, codigoAlmacen: 'BTGU01' },
     ],
   };
 
   beforeEach(async () => {
     abrirInventario.mockClear();
+    consultarImpresiones.mockReset().mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1', cantidadImpresiones: 1,
+      ultimaImpresionEn: '2026-09-08T10:00:00.000Z',
+    }] }));
+    registrarImpresiones.mockReset().mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '2', cantidadImpresiones: 1,
+      ultimaImpresionEn: '2026-09-08T10:05:00.000Z',
+    }] }));
     await TestBed.configureTestingModule({
       imports: [DetallePedidoVistaComponent],
-      providers: [{ provide: ConsultaInventarioArticuloService, useValue: { abrir: abrirInventario } }],
+      providers: [
+        { provide: ConsultaInventarioArticuloService, useValue: { abrir: abrirInventario } },
+        { provide: ImpresionesService, useValue: {
+          consultar: consultarImpresiones, registrar: registrarImpresiones,
+        } },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(DetallePedidoVistaComponent);
     fixture.componentRef.setInput('configuracion', configuracion);
@@ -61,6 +79,43 @@ describe('DetallePedidoVistaComponent', () => {
     expect(abrirInventario).toHaveBeenCalledWith('ARTICULO-CODIGO-EXTENSO-001', 'BSPS01');
   });
 
+  it('recupera y muestra el estado impreso usando la identidad estable del artículo', () => {
+    fixture.componentRef.setInput('pedido', pedido);
+    fixture.detectChanges();
+
+    expect(consultarImpresiones).toHaveBeenCalledWith([
+      { idOrigen: 'R1:F1', identificadorDetalle: '1' },
+      { idOrigen: 'R1:F1', identificadorDetalle: '2' },
+    ]);
+    expect(fixture.nativeElement.querySelectorAll('.indicador-impreso-detalle')).toHaveLength(1);
+    expect(fixture.nativeElement.textContent).toContain('Impreso');
+  });
+
+  it('imprime una sola vez y guarda el indicador del artículo seleccionado', () => {
+    vi.useFakeTimers();
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    fixture.componentRef.setInput('pedido', pedido);
+    fixture.detectChanges();
+    const checks = fixture.nativeElement.querySelectorAll(
+      '.selector-impresion-detalle input',
+    ) as NodeListOf<HTMLInputElement>;
+    checks[1]!.checked = true;
+    checks[1]!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.boton-imprimir-detalle') as HTMLButtonElement).click();
+    vi.runAllTimers();
+    fixture.detectChanges();
+
+    expect(imprimir).toHaveBeenCalledOnce();
+    expect(registrarImpresiones).toHaveBeenCalledWith([
+      { idOrigen: 'R1:F1', identificadorDetalle: '2' },
+    ]);
+    expect(fixture.nativeElement.querySelectorAll('.indicador-impreso-detalle')).toHaveLength(2);
+    imprimir.mockRestore();
+    vi.useRealTimers();
+  });
+
   it('muestra un esqueleto durante la carga sin presentar datos anteriores', () => {
     fixture.componentRef.setInput('pedido', pedido);
     fixture.componentRef.setInput('cargando', true);
@@ -75,7 +130,7 @@ describe('DetallePedidoVistaComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Este pedido no tiene artículos.');
-    expect(fixture.nativeElement.querySelector('table')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.tabla-detalle-articulos')).toBeNull();
   });
 
   it('presenta un error controlado y permite reintentar', () => {

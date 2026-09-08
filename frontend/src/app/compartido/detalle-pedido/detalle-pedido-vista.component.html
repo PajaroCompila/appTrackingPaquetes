@@ -110,8 +110,20 @@
           <p class="etiqueta-seccion">Artículos</p>
           <h2 id="titulo-articulos-detalle">{{ configuracion.etiquetaArticulos }}</h2>
         </div>
-        <span class="contador-articulos">{{ textoArticulos(detalle.articulos.length) }}</span>
+        <div class="acciones-articulos-detalle">
+          <span class="contador-articulos">{{ textoArticulos(detalle.articulos.length) }}</span>
+          <button
+            class="boton boton-secundario boton-imprimir-detalle"
+            type="button"
+            [disabled]="lineasSeleccionadas().size === 0 || preparandoImpresion()"
+            (click)="imprimirSeleccionados()"
+          >Imprimir seleccionados ({{ lineasSeleccionadas().size }})</button>
+        </div>
       </div>
+
+      @if (mensajeImpresion()) {
+        <p class="mensaje-impresion-detalle" role="alert">{{ mensajeImpresion() }}</p>
+      }
 
       @if (detalle.articulos.length === 0) {
         <div class="estado-vacio" role="status">
@@ -132,6 +144,7 @@
                 @if (tieneDatosDespacho(detalle.articulos)) {
                   <th scope="col">Despachado</th><th scope="col">Usuario</th>
                 }
+                <th scope="col" class="columna-imprimir-detalle">Imprimir</th>
               </tr>
             </thead>
             <tbody>
@@ -158,6 +171,25 @@
                   @if (tieneDatosDespacho(detalle.articulos)) {
                     <td>{{ fecha(articulo.fechaDespacho) }}</td><td>{{ valor(articulo.usuario) }}</td>
                   }
+                  <td class="columna-imprimir-detalle">
+                    <div class="control-impresion-detalle">
+                      <label class="selector-impresion-detalle" title="Seleccionar para impresión">
+                        <input
+                          type="checkbox"
+                          [disabled]="!puedeImprimir(articulo)"
+                          [checked]="estaSeleccionado(articulo)"
+                          [attr.aria-label]="'Seleccionar ' + valor(articulo.codigo) + ' para impresión'"
+                          (change)="alternarSeleccion(articulo, $any($event.target).checked)"
+                        />
+                        <span aria-hidden="true">✓</span>
+                      </label>
+                      @if (estaImpreso(articulo)) {
+                        <span class="indicador-impreso-detalle" title="Este artículo ya fue impreso">
+                          <i class="pi pi-check-circle" aria-hidden="true"></i> Impreso
+                        </span>
+                      }
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -166,4 +198,9 @@
       }
     </section>
   }
+
+  <app-vista-impresion-pedido
+    [articulos]="articulosImpresion()"
+    [fechaHora]="fechaHoraImpresion()"
+  />
 </section>

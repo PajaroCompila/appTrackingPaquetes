@@ -89,13 +89,7 @@
     </form>
   </div>
 
-  @if (informacionIncompleta()) {
-    <p class="aviso-fuente" role="status">Una fuente no respondió. Los datos pueden estar incompletos.</p>
-  }
-
-  @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
-  @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
-  @if (!actualizando() && ultimaActualizacion()) {
+  @if (ultimaActualizacion()) {
     <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a':'-0600' }}</p>
   }
 
@@ -121,12 +115,6 @@
   } @else {
     <div class="acciones-transferencia">
       <button
-        class="boton boton-secundario boton-imprimir-seleccionados"
-        type="button"
-        [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion()"
-        (click)="imprimirSeleccionados()"
-      >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
-      <button
         class="boton boton-primario"
         type="button"
         [disabled]="lineasSeleccionadasTransferencia().size === 0 || transfiriendo()"
@@ -134,7 +122,7 @@
       >Transferir a despachados ({{ lineasSeleccionadasTransferencia().size }})</button>
     </div>
     @if (mensajeTransferencia()) { <p class="mensaje-transferencia" role="status">{{ mensajeTransferencia() }}</p> }
-    @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
+    @if (mensajeAsignacion()) { <p class="mensaje-asignacion" role="alert">{{ mensajeAsignacion() }}</p> }
     <div class="panel tabla-contenedor">
       <table>
         <caption class="solo-lectores">Listado de pedidos encontrados</caption>
@@ -149,7 +137,7 @@
             <th class="columna-fecha" scope="col">Fecha y hora</th>
             <th class="columna-vendedor" scope="col">Vendedor</th>
             <th class="columna-detalle" scope="col">Ver detalle</th>
-            <th class="columna-seleccion columna-imprimir" scope="col">Imprimir</th>
+            <th class="columna-asignado" scope="col">Asignado a</th>
           </tr>
         </thead>
         @for (pedido of pedidos(); track pedido.idOrigen) {
@@ -197,17 +185,26 @@
                     }"
                   >Ver detalle</a>
                 </td>
-                <td class="columna-seleccion columna-imprimir" data-label="Imprimir">
-                  <label class="selector-linea selector-impresion" title="Seleccionar para impresión">
-                    <input
-                      type="checkbox"
-                      [checked]="estaSeleccionadoParaImpresion(pedido, articulo, $index)"
-                      [attr.aria-label]="'Seleccionar ' + marcador(articulo.codigoArticulo) + ' para impresión'"
-                      (click)="$event.stopPropagation()"
-                      (change)="alternarSeleccionImpresion(pedido, articulo, $index, $any($event.target).checked)"
-                    />
-                    <span aria-hidden="true">✓</span>
-                  </label>
+                <td class="columna-asignado" data-label="Asignado a">
+                  @if (puedeAsignar()) {
+                    <select
+                      class="selector-asignacion"
+                      [ngModel]="asignacionActual(pedido, articulo)?.usuarioAsignado ?? ''"
+                      [ngModelOptions]="{ standalone: true }"
+                      [disabled]="asignacionGuardando(pedido, articulo) || !articulo.identificadorDetalle"
+                      [attr.aria-label]="'Asignar técnico al artículo ' + marcador(articulo.codigoArticulo)"
+                      (ngModelChange)="cambiarAsignacion(pedido, articulo, $event)"
+                    >
+                      <option value="">Sin asignar</option>
+                      @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
+                        <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <span class="asignacion-lectura" [class.sin-asignar]="!asignacionActual(pedido, articulo)?.nombreAsignado">
+                      {{ nombreAsignado(pedido, articulo) }}
+                    </span>
+                  }
                 </td>
               </tr>
             }
@@ -226,9 +223,4 @@
       Siguiente
     </button>
   </nav>
-
-  <app-vista-impresion-pedido
-    [articulos]="articulosImpresion()"
-    [fechaHora]="fechaHoraImpresion()"
-  />
 </section>

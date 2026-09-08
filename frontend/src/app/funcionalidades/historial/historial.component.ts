@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -18,6 +18,12 @@ import { HistorialService } from './historial.service';
 import type { Almacen } from '../pedidos/almacen.interface';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
+import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from '../pedidos/vista-impresion-pedido.component';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
+import {
+  claveArticuloImpreso,
+  type IdentidadArticuloImpresion,
+} from '../../compartido/impresiones/impresion.interface';
 
 const claveFiltrosHistorial = 'historial';
 const intervaloActualizacionHistorialMs = 15000;
@@ -36,7 +42,7 @@ type VistaHistorial = 'pedido' | 'articulos';
 @Component({
   selector: 'app-historial',
   imports: [FormsModule, RouterLink, DetallePedidoVistaComponent,
-    CodigoArticuloInventarioDirective],
+    CodigoArticuloInventarioDirective, VistaImpresionPedidoComponent],
   templateUrl: './historial.component.html',
   styleUrls: ['../pedidos/lista-pedidos.component.css', './historial.component.css'],
 })
@@ -47,9 +53,11 @@ export class HistorialComponent implements OnInit {
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
+  private readonly impresionesService = inject(ImpresionesService);
   private temporizador?: ReturnType<typeof setInterval>;
   private haCargado = false;
   private recargaManualPendiente = false;
+  private lineasPendientesRegistroImpresion: IdentidadArticuloImpresion[] = [];
   public readonly idOrigen = signal<string | null>(null);
   public filtros = {
     fechaDesde: obtenerFechaLocalActual(),
@@ -63,8 +71,13 @@ export class HistorialComponent implements OnInit {
   public readonly hayMas = signal(false);
   public readonly cargando = signal(false);
   public readonly actualizando = signal(false);
-  public readonly avisoActualizacion = signal('');
   public readonly error = signal<MensajeError | null>(null);
+  public readonly articulosImpresion = signal<readonly ArticuloImpresionPedido[]>([]);
+  public readonly fechaHoraImpresion = signal('');
+  public readonly preparandoImpresion = signal(false);
+  public readonly lineasSeleccionadasImpresion = signal<ReadonlySet<string>>(new Set());
+  public readonly lineasImpresas = signal<ReadonlySet<string>>(new Set());
+  public readonly mensajeImpresion = signal('');
   public readonly configuracionDetalle: ConfiguracionDetallePedido = {
     contexto: 'Historial',
     titulo: 'Detalle del pedido',
@@ -81,6 +94,7 @@ export class HistorialComponent implements OnInit {
     const pedido = this.registros()[0];
     if (!pedido) return null;
     return {
+      idOrigen: pedido.idOrigen,
       numeroPedido: pedido.numeroPedido,
       vendedor: pedido.nombreVendedor,
       fechaPedido: pedido.fechaHoraPedido,
@@ -93,6 +107,7 @@ export class HistorialComponent implements OnInit {
       ].filter(({ valor }) => valor !== null && valor !== undefined && String(valor).trim() !== ''),
       articulos: pedido.articulos.map((articulo, indice) => ({
         clave: articulo.identificadorDetalle ?? `${articulo.codigoArticulo ?? 'articulo'}-${indice}`,
+        identificadorDetalle: articulo.identificadorDetalle,
         codigo: articulo.codigoArticulo,
         descripcion: articulo.descripcion,
         cantidad: articulo.cantidad,
@@ -131,7 +146,7 @@ export class HistorialComponent implements OnInit {
   public cambiarVista(vista: VistaHistorial): void {
     if (this.vista() === vista) return;
     this.vista.set(vista); this.pagina.set(1); this.haCargado = false; this.hayMas.set(false);
-    this.avisoActualizacion.set('');
+    this.lineasSeleccionadasImpresion.set(new Set());
     if (vista === 'articulos') this.articulos.set([]); else this.registros.set([]);
     this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
@@ -185,6 +200,61 @@ export class HistorialComponent implements OnInit {
     if (idOrigen) this.cargarDetalle(idOrigen);
   }
   public rutaRetorno(): string { return `/historial-validados?${this.parametrosActuales().toString()}`; }
+
+  public claveLineaImpresion(articulo: ArticuloHistorial): string {
+    return claveArticuloImpreso({
+      idOrigen: articulo.idOrigen,
+      identificadorDetalle: articulo.identificadorDetalle?.trim() ?? '',
+    });
+  }
+
+  public estaSeleccionadoParaImpresion(articulo: ArticuloHistorial): boolean {
+    return this.lineasSeleccionadasImpresion().has(this.claveLineaImpresion(articulo));
+  }
+
+  public alternarSeleccionImpresion(articulo: ArticuloHistorial, seleccionado: boolean): void {
+    if (!articulo.identificadorDetalle?.trim()) return;
+    const nuevas = new Set(this.lineasSeleccionadasImpresion());
+    const clave = this.claveLineaImpresion(articulo);
+    if (seleccionado) nuevas.add(clave); else nuevas.delete(clave);
+    this.lineasSeleccionadasImpresion.set(nuevas);
+    this.mensajeImpresion.set('');
+  }
+
+  public estaImpreso(articulo: ArticuloHistorial): boolean {
+    return Boolean(articulo.identificadorDetalle?.trim()
+      && this.lineasImpresas().has(this.claveLineaImpresion(articulo)));
+  }
+
+  public imprimirSeleccionados(): void {
+    if (this.preparandoImpresion() || this.lineasSeleccionadasImpresion().size === 0) return;
+    const seleccionadas = this.lineasSeleccionadasImpresion();
+    const elegidos = this.articulos().filter((articulo) =>
+      articulo.identificadorDetalle?.trim()
+      && seleccionadas.has(this.claveLineaImpresion(articulo)));
+    if (elegidos.length === 0) return;
+    this.articulosImpresion.set(elegidos.map((articulo) => ({
+      codigo: articulo.codigoArticulo?.trim() || '—',
+      descripcion: articulo.descripcion?.trim() || '—',
+      cantidad: articulo.cantidad,
+      bodega: articulo.codigoAlmacen?.trim() || '—',
+    })));
+    this.lineasPendientesRegistroImpresion = elegidos.map((articulo) => ({
+      idOrigen: articulo.idOrigen,
+      identificadorDetalle: articulo.identificadorDetalle!.trim(),
+    }));
+    this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
+    this.preparandoImpresion.set(true);
+    setTimeout(() => {
+      window.print();
+      this.confirmarImpresion();
+    });
+  }
+
+  @HostListener('window:afterprint')
+  public finalizarImpresion(): void {
+    this.confirmarImpresion();
+  }
 
   private hidratarFiltros(): void {
     const parametros = this.ruta.snapshot.queryParamMap;
@@ -242,10 +312,14 @@ export class HistorialComponent implements OnInit {
     consulta
       .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
         next: ({ datos, paginacion }) => {
-          if (vistaConsulta === 'articulos') this.articulos.set(datos as ArticuloHistorial[]);
+          if (vistaConsulta === 'articulos') {
+            const articulos = datos as ArticuloHistorial[];
+            this.articulos.set(articulos);
+            this.cargarEstadoImpresion(articulos);
+          }
           else this.registros.set(datos as HistorialValidado[]);
           if (this.vista() === vistaConsulta) {
-            this.hayMas.set(paginacion.hayMas); this.haCargado = true; this.avisoActualizacion.set('');
+            this.hayMas.set(paginacion.hayMas); this.haCargado = true;
           } else {
             this.hayMas.set(false); this.haCargado = false;
           }
@@ -255,8 +329,6 @@ export class HistorialComponent implements OnInit {
           if (!this.haCargado && this.vista() === vistaConsulta) {
             this.registros.set([]); this.articulos.set([]); this.hayMas.set(false);
             this.error.set(obtenerMensajeError(error, 'historial'));
-          } else if (this.vista() === vistaConsulta) {
-            this.avisoActualizacion.set('No pudimos actualizar. Mostramos los datos anteriores.');
           }
           this.finalizarConsulta(vistaConsulta);
         },
@@ -286,6 +358,54 @@ export class HistorialComponent implements OnInit {
       .subscribe({
         next: ({ datos }) => this.almacenes.set(datos),
         error: () => this.almacenes.set([]),
+      });
+  }
+
+  private cargarEstadoImpresion(articulos: ArticuloHistorial[]): void {
+    const lineas = articulos.flatMap((articulo) => {
+      const identificadorDetalle = articulo.identificadorDetalle?.trim();
+      return identificadorDetalle ? [{ idOrigen: articulo.idOrigen, identificadorDetalle }] : [];
+    });
+    const visibles = new Set(lineas.map(claveArticuloImpreso));
+    this.lineasSeleccionadasImpresion.set(new Set(
+      [...this.lineasSeleccionadasImpresion()].filter((clave) => visibles.has(clave)),
+    ));
+    if (lineas.length === 0) {
+      this.lineasImpresas.set(new Set());
+      return;
+    }
+    this.impresionesService.consultar(lineas)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe({
+        next: ({ datos }) => {
+          const impresas = new Set(this.lineasImpresas());
+          datos.forEach((linea) => impresas.add(claveArticuloImpreso(linea)));
+          this.lineasImpresas.set(impresas);
+        },
+        error: () => undefined,
+      });
+  }
+
+  private confirmarImpresion(): void {
+    const lineas = this.lineasPendientesRegistroImpresion;
+    if (lineas.length === 0) {
+      this.preparandoImpresion.set(false);
+      return;
+    }
+    this.lineasPendientesRegistroImpresion = [];
+    this.preparandoImpresion.set(false);
+    this.lineasSeleccionadasImpresion.set(new Set());
+    this.impresionesService.registrar(lineas)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe({
+        next: ({ datos }) => {
+          const impresas = new Set(this.lineasImpresas());
+          datos.forEach((linea) => impresas.add(claveArticuloImpreso(linea)));
+          this.lineasImpresas.set(impresas);
+        },
+        error: () => this.mensajeImpresion.set(
+          'La impresión se abrió, pero no pudimos guardar el indicativo. Probá nuevamente.',
+        ),
       });
   }
 

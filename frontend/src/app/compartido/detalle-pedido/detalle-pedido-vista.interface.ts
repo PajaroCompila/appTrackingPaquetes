@@ -22,6 +22,7 @@ export interface DatoOperativoDetalle {
 
 export interface ArticuloDetalleVisual {
   clave: string;
+  identificadorDetalle?: string | null;
   codigo: string | null;
   descripcion: string | null;
   cantidad: number | null;
@@ -34,6 +35,7 @@ export interface ArticuloDetalleVisual {
 }
 
 export interface PedidoDetalleVisual {
+  idOrigen: string;
   numeroPedido: string | null;
   vendedor: string | null;
   fechaPedido: string | null;

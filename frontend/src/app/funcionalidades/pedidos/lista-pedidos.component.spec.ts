@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
@@ -6,6 +7,9 @@ import { AlmacenesService } from './almacenes.service';
 import { ListaPedidosComponent } from './lista-pedidos.component';
 import { PedidosService } from './pedidos.service';
 import { ConsultaInventarioArticuloService } from '../../compartido/inventario/consulta-inventario-articulo.service';
+import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
 
 const respuestaLista = {
   datos: [{
@@ -33,6 +37,15 @@ describe('ListaPedidosComponent', () => {
     despacharLineas: ReturnType<typeof vi.fn>;
   };
   let almacenesService: { obtenerAlmacenes: ReturnType<typeof vi.fn> };
+  let asignacionesService: {
+    obtenerUsuarios: ReturnType<typeof vi.fn>;
+    consultar: ReturnType<typeof vi.fn>;
+    guardar: ReturnType<typeof vi.fn>;
+  };
+  const usuarioSesion = signal<UsuarioSesion>({
+    usuarioId: '1', nombreUsuario: 'admin', nombreVisible: 'Administrador',
+    codigoRol: 'ADMINISTRADOR' as const, codigoAlmacen: null, debeCambiarContrasena: false,
+  });
   let enrutador: { navigate: ReturnType<typeof vi.fn>; url: string };
 
   beforeEach(async () => {
@@ -75,6 +88,35 @@ describe('ListaPedidosComponent', () => {
         ],
       })),
     };
+    usuarioSesion.set({
+      usuarioId: '1', nombreUsuario: 'admin', nombreVisible: 'Administrador',
+      codigoRol: 'ADMINISTRADOR', codigoAlmacen: null, debeCambiarContrasena: false,
+    });
+    asignacionesService = {
+      obtenerUsuarios: vi.fn().mockReturnValue(of({
+        puedeAsignar: true,
+        datos: [
+          { usuario: 'mperez', nombre: 'Marcos Perez' },
+          { usuario: 'gcruz', nombre: 'Gregorio Cruz' },
+          { usuario: 'operdomo', nombre: 'Olvin Perdomo' },
+          { usuario: 'omencia', nombre: 'Osmar Mencia' },
+          { usuario: 'maperdomo', nombre: 'Manuel A. Perdomo' },
+          { usuario: 'osmith', nombre: 'Orlin Smith' },
+          { usuario: 'dvelasquez', nombre: 'Daniel Velasquez' },
+        ],
+      })),
+      consultar: vi.fn().mockReturnValue(of({ datos: [{
+        idOrigen: 'R1:F1', identificadorDetalle: '1',
+        usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+        actualizadoEn: '2026-08-03T12:00:00',
+      }] })),
+      guardar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
+        ...linea,
+        usuarioAsignado,
+        nombreAsignado: usuarioAsignado === 'mperez' ? 'Marcos Perez' : null,
+        actualizadoEn: '2026-08-03T12:01:00',
+      } })),
+    };
     enrutador = { navigate: vi.fn().mockResolvedValue(true), url: '/pedidos?pagina=1' };
 
     await TestBed.configureTestingModule({
@@ -82,6 +124,8 @@ describe('ListaPedidosComponent', () => {
       providers: [
         { provide: PedidosService, useValue: pedidosService },
         { provide: AlmacenesService, useValue: almacenesService },
+        { provide: AsignacionesService, useValue: asignacionesService },
+        { provide: AutenticacionService, useValue: { usuario: usuarioSesion } },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -128,6 +172,8 @@ describe('ListaPedidosComponent', () => {
       .map((encabezado) => encabezado.textContent.trim());
     expect(encabezados).not.toContain('Estado');
     expect(encabezados).not.toContain('Creado en R1');
+    expect(encabezados).toContain('Asignado a');
+    expect(encabezados).not.toContain('Imprimir');
     expect(encabezados).toHaveLength(10);
     expect(componente.filtrosFormulario.fechaDesde).toBe('2026-08-03');
     expect(componente.filtrosFormulario.fechaHasta).toBe('2026-08-03');
@@ -360,7 +406,7 @@ describe('ListaPedidosComponent', () => {
     expect(fixture.nativeElement.textContent.match(/101468453/g)).toHaveLength(3);
     expect(fixture.nativeElement.textContent.match(/Vendedor original/g)).toHaveLength(3);
     expect(fixture.nativeElement.querySelectorAll('.enlace-detalle')).toHaveLength(3);
-    expect(fixture.nativeElement.querySelectorAll('.selector-impresion input[type="checkbox"]')).toHaveLength(3);
+    expect(fixture.nativeElement.querySelectorAll('.selector-asignacion')).toHaveLength(3);
     expect(fixture.nativeElement.querySelectorAll('.pi-print')).toHaveLength(0);
     expect(filas[1]?.textContent).toContain('Descripción suficientemente extensa');
     filas[1]?.click();
@@ -411,7 +457,6 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
     const fila = fixture.nativeElement.querySelector('.grupo-pedido tr') as HTMLElement;
     const checkTransferencia = fixture.nativeElement.querySelector('.selector-transferencia input') as HTMLInputElement;
-    const checkImpresion = fixture.nativeElement.querySelector('.selector-impresion input') as HTMLInputElement;
     const boton = fixture.nativeElement.querySelector('.acciones-transferencia .boton-primario') as HTMLButtonElement;
 
     fila.click();
@@ -419,8 +464,6 @@ describe('ListaPedidosComponent', () => {
     checkTransferencia.click();
     fixture.detectChanges();
     expect(componente.lineasSeleccionadasTransferencia().size).toBe(1);
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
-    expect(checkImpresion.checked).toBe(false);
     expect(boton.disabled).toBe(false);
     expect(boton.textContent).toContain('(1)');
     boton.click();
@@ -452,15 +495,14 @@ describe('ListaPedidosComponent', () => {
     expect(pedidosService.despacharLineas).toHaveBeenCalledOnce();
   });
 
-  it('advierte de forma discreta cuando una fuente no está disponible', () => {
+  it('mantiene la pantalla limpia cuando una fuente no está disponible', () => {
     pedidosService.obtenerPedidos.mockReturnValue(of({
       ...respuestaLista,
       fuentes: { retailOne: 'disponible', sap: 'no_disponible' },
     }));
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.aviso-fuente')?.textContent)
-      .toContain('datos pueden estar incompletos');
+    expect(fixture.nativeElement.querySelector('.aviso-fuente')).toBeNull();
   });
 
   it('abre el modal con doble clic usando código de artículo y almacén', () => {
@@ -501,82 +543,46 @@ describe('ListaPedidosComponent', () => {
     expect(consultaInventario.estado()).toBe('error');
   });
 
-  it('selecciona líneas independientes e imprime una sola vez en el orden visual', async () => {
-    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
-    const segundoPedido = { ...respuestaLista.datos[0], idOrigen: 'R1:F2', folioPedido: 'F2', numeroPedido: '101468454' };
-    pedidosService.obtenerPedidos.mockReturnValue(of({
-      ...respuestaLista,
-      datos: [
-        { ...respuestaLista.datos[0], articulos: [
-          { identificadorDetalle: '1', codigoArticulo: 'IGUAL', descripcion: 'Primero', cantidad: 1, codigoAlmacen: 'B1', nombreAlmacen: 'Bodega 1' },
-          { identificadorDetalle: '2', codigoArticulo: 'IGUAL', descripcion: 'Segundo', cantidad: 1.5, codigoAlmacen: 'B2', nombreAlmacen: 'Bodega 2' },
-        ] },
-        { ...segundoPedido, articulos: [
-          { identificadorDetalle: '1', codigoArticulo: 'A3', descripcion: 'Tercero', cantidad: 2, codigoAlmacen: 'B3', nombreAlmacen: 'Bodega 3' },
-        ] },
-      ],
-    }));
-    fixture.detectChanges();
-    const checks = fixture.nativeElement.querySelectorAll('.selector-impresion input') as NodeListOf<HTMLInputElement>;
-    const checksTransferencia = fixture.nativeElement.querySelectorAll('.selector-transferencia input') as NodeListOf<HTMLInputElement>;
-    expect(checks).toHaveLength(3);
-    expect(checksTransferencia).toHaveLength(3);
-    expect([...checks].every((check) => check.type === 'checkbox' && check.tabIndex === 0)).toBe(true);
-    const boton = fixture.nativeElement.querySelector('.boton-imprimir-seleccionados') as HTMLButtonElement;
-    expect(boton.disabled).toBe(true);
-    checksTransferencia[0]?.click();
-    checksTransferencia[1]?.click();
-    checksTransferencia[2]?.click();
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(3);
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
-    expect(componente.claveLineaTransferencia(componente.pedidos()[0], componente.pedidos()[0].articulos[0], 0))
-      .not.toBe(componente.claveLineaTransferencia(componente.pedidos()[0], componente.pedidos()[0].articulos[1], 1));
-    checks[0]?.click();
-    checks[1]?.click();
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(2);
-    checks[1]?.click();
-    checks[2]?.click();
-    fixture.detectChanges();
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(2);
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(3);
-    expect(boton.textContent).toContain('(2)');
-    expect(boton.disabled).toBe(false);
-    boton.click();
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(pedidosService.obtenerDetallePedido).not.toHaveBeenCalled();
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(3);
-    expect(pedidosService.despacharLineas).not.toHaveBeenCalled();
-    expect(componente.articulosImpresion()).toEqual([
-      { codigo: 'IGUAL', descripcion: 'Primero', cantidad: 1, bodega: 'B1' },
-      { codigo: 'A3', descripcion: 'Tercero', cantidad: 2, bodega: 'B3' },
-    ]);
-    expect(imprimir).toHaveBeenCalledOnce();
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
-  });
-
-  it('mantiene solo selecciones visibles durante el refresco y las limpia al paginar', async () => {
+  it('muestra los siete técnicos, guarda por línea y conserva la asignación durante el refresco', async () => {
     const pedido = respuestaLista.datos[0];
     fixture.detectChanges();
-    componente.alternarSeleccionImpresion(pedido, pedido.articulos[0], 0, true);
-    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(1);
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(1);
+    fixture.detectChanges();
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect(selector).toBeTruthy();
+    expect(selector.options).toHaveLength(8);
+    expect(asignacionesService.consultar).toHaveBeenCalledWith([
+      { idOrigen: 'R1:F1', identificadorDetalle: '1' },
+    ]);
+    expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Gregorio Cruz');
 
-    pedidosService.obtenerPedidos.mockReturnValue(of({
-      ...respuestaLista, datos: [{ ...pedido, articulos: [] }],
-    }));
-    await vi.advanceTimersByTimeAsync(15000);
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
+    selector.value = 'mperez';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(asignacionesService.guardar).toHaveBeenCalledWith(
+      { idOrigen: 'R1:F1', identificadorDetalle: '1' }, 'mperez',
+    );
+    expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Marcos Perez');
 
-    pedidosService.obtenerPedidos.mockReturnValue(of(respuestaLista));
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez',
+      actualizadoEn: '2026-08-03T12:01:00',
+    }] }));
     await vi.advanceTimersByTimeAsync(15000);
-    componente.alternarSeleccionImpresion(pedido, pedido.articulos[0], 0, true);
-    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
-    componente.paginaSiguiente();
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
+    expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Marcos Perez');
+  });
+
+  it('deja la asignación en modo lectura para usuarios sin permiso', () => {
+    usuarioSesion.set({
+      usuarioId: '2', nombreUsuario: 'consulta', nombreVisible: 'Consulta',
+      codigoRol: 'CONSULTA', codigoAlmacen: null, debeCambiarContrasena: false,
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.selector-asignacion')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.asignacion-lectura')?.textContent).toContain('Gregorio Cruz');
+    componente.cambiarAsignacion(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0], 'mperez');
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
   it.each([

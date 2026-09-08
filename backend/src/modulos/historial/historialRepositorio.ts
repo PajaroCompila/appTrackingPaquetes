@@ -33,6 +33,7 @@ interface FilaCerradaSap {
   codigoAlmacen: string | null;
   nombreAlmacen: string | null;
 }
+interface FilaNumeroCerradoR1 { numeroPedido: number | null }
 
 export class HistorialRepositorio {
   public constructor(
@@ -98,7 +99,7 @@ export class HistorialRepositorio {
     const fechaDesde = new Date(control?.ultimaConsultaEn
       ? control.ultimaConsultaEn.getTime() - margenMs
       : Date.now() - primeraCargaMs).toISOString().slice(0, 10);
-    const resultado = await consultarSap<FilaCerradaSap>(`
+    const [resultado, cerradosRetailOne] = await Promise.all([consultarSap<FilaCerradaSap>(`
       SELECT pedido.[DocEntry] AS docEntry, pedido.[DocNum] AS docNum,
         CONVERT(char(19), DATEADD(minute,
           (pedido.[DocTime] / 100) * 60 + (pedido.[DocTime] % 100),
@@ -124,7 +125,8 @@ export class HistorialRepositorio {
       .input('grupoMayoristaB', sql.Int, 113)
       .input('noCancelado', sql.Char(1), 'N')
       .input('estadoCerrado', sql.Char(1), 'C')
-      .input('fechaDesde', sql.Date, fechaDesde));
+      .input('fechaDesde', sql.Date, fechaDesde)),
+    this.obtenerCerradosRetailOneConfirmadosEnSap(fechaDesde)]);
 
     const existentes = await poolLocal.request().query<{ sapDocEntry: string }>(`
       SELECT CONVERT(nvarchar(50), sapDocEntry) AS sapDocEntry
@@ -136,7 +138,7 @@ export class HistorialRepositorio {
     `);
     const yaGuardados = new Set(existentes.recordset.map(({ sapDocEntry }) => sapDocEntry));
     const grupos = new Map<number, FilaCerradaSap[]>();
-    for (const fila of resultado.recordset) {
+    for (const fila of [...resultado.recordset, ...cerradosRetailOne]) {
       if (!yaGuardados.has(String(fila.docEntry))) {
         grupos.set(fila.docEntry, [...(grupos.get(fila.docEntry) ?? []), fila]);
       }
@@ -190,6 +192,63 @@ export class HistorialRepositorio {
       await transaccion.rollback();
       throw error;
     }
+  }
+
+  private async obtenerCerradosRetailOneConfirmadosEnSap(fechaDesde: string): Promise<FilaCerradaSap[]> {
+    const sucursales = this.sucursalesConfiguradas ?? obtenerSucursalesR1();
+    const resultadosR1 = await Promise.allSettled(sucursales.map(async (sucursal) => {
+      const pool = await this.proveedorSucursal(sucursal);
+      return (await pool.request()
+        .input('fechaDesde', sql.Date, fechaDesde)
+        .query<FilaNumeroCerradoR1>(`
+          SELECT DISTINCT TRY_CONVERT(int, venta.[U_SO1_DOCUMENTOSBO]) AS numeroPedido
+          FROM dbo.[@SO1_01VENTA] venta
+          WHERE venta.[U_SO1_TIPO] = 'PE'
+            AND venta.[U_SO1_STATUS] = 'C'
+            AND ISNULL(venta.[U_SO1_VERIFICADO], 'N') <> 'Y'
+            AND venta.[U_SO1_FECHA] >= @fechaDesde
+            AND TRY_CONVERT(int, venta.[U_SO1_DOCUMENTOSBO]) IS NOT NULL
+            AND TRY_CONVERT(int, venta.[U_SO1_DOCUMENTOSBO]) <> 0;
+        `)).recordset;
+    }));
+    const numerosPedido = [...new Set(resultadosR1.flatMap((resultado) =>
+      resultado.status === 'fulfilled'
+        ? resultado.value.map(({ numeroPedido }) => numeroPedido).filter((numero): numero is number => numero !== null)
+        : []))];
+    const filas: FilaCerradaSap[] = [];
+    const cantidadPorLote = 500;
+    for (let inicio = 0; inicio < numerosPedido.length; inicio += cantidadPorLote) {
+      const lote = numerosPedido.slice(inicio, inicio + cantidadPorLote);
+      const parametros = lote.map((_, indice) => `@numeroPedido${indice}`);
+      const resultado = await consultarSap<FilaCerradaSap>(`
+        SELECT pedido.[DocEntry] AS docEntry, pedido.[DocNum] AS docNum,
+          CONVERT(char(19), DATEADD(minute,
+            (pedido.[DocTime] / 100) * 60 + (pedido.[DocTime] % 100),
+            CONVERT(datetime2, CONVERT(date, pedido.[DocDate]))), 126) AS fechaHoraPedido,
+          vendedor.[SlpName] AS nombreVendedor,
+          detalle.[LineNum] AS numeroLinea, detalle.[ItemCode] AS codigoArticulo,
+          detalle.[Dscription] AS descripcion, detalle.[Quantity] AS cantidad,
+          detalle.[WhsCode] AS codigoAlmacen, almacen.[WhsName] AS nombreAlmacen
+        FROM dbo.[ORDR] pedido
+        LEFT JOIN dbo.[OSLP] vendedor ON vendedor.[SlpCode] = pedido.[SlpCode]
+        LEFT JOIN dbo.[RDR1] detalle ON detalle.[DocEntry] = pedido.[DocEntry]
+        LEFT JOIN dbo.[OWHS] almacen ON almacen.[WhsCode] = detalle.[WhsCode]
+        WHERE pedido.[DocNum] IN (${parametros.join(', ')})
+          AND pedido.[U_SO1_01RETAILONE] = @creadoRetailOne
+          AND pedido.[CANCELED] = @noCancelado
+          AND pedido.[DocStatus] = @estadoCerrado
+        ORDER BY pedido.[DocEntry], detalle.[LineNum];
+      `, (solicitud) => {
+        solicitud.input('creadoRetailOne', sql.Char(1), 'Y')
+          .input('noCancelado', sql.Char(1), 'N')
+          .input('estadoCerrado', sql.Char(1), 'C');
+        lote.forEach((numeroPedido, indice) =>
+          solicitud.input(`numeroPedido${indice}`, sql.Int, numeroPedido));
+        return solicitud;
+      });
+      filas.push(...resultado.recordset);
+    }
+    return filas;
   }
 
   public async obtenerEstadosR1(candidatos: CandidatoValidacion[]): Promise<Map<string, EstadoR1Detectado>> {

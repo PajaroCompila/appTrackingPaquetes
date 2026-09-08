@@ -121,7 +121,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
       const resultado = await consultarSistemaOrigen<FilaPedido>(`
           SELECT
             venta.[Name] AS folioPedido,
-            COALESCE(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]), '') AS numeroPedido,
+            COALESCE(
+              NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), ''),
+              venta.[Name]
+            ) AS numeroPedido,
             venta.[Code] AS codigoVenta,
             venta.[U_SO1_VENDEDOR] AS codigoVendedor,
             vendedor.[SlpName] AS nombreVendedor,
@@ -163,8 +166,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
           WHERE ISNULL(venta.[U_SO1_VERIFICADO], 'N') <> 'Y'
             AND venta.[U_SO1_TIPO] = 'PE'
             AND venta.[U_SO1_STATUS] = 'A'
-            AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), '') IS NOT NULL
-            AND (@numeroPedido IS NULL OR venta.[U_SO1_DOCUMENTOSBO] = TRY_CONVERT(int, @numeroPedido))
+            AND (@numeroPedido IS NULL OR COALESCE(
+              NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), ''),
+              venta.[Name]
+            ) = @numeroPedido)
             AND (@fechaDesde IS NULL OR venta.[U_SO1_FECHA] >= @fechaDesde)
             AND (@fechaHasta IS NULL OR venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta))
             AND (@codigoEstadoVenta IS NULL OR venta.[U_SO1_STATUS] = @codigoEstadoVenta)
@@ -271,7 +276,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
       const resultadoCabecera = await consultarSistemaOrigen<FilaPedido>(`
           SELECT TOP (1)
             venta.[Name] AS folioPedido,
-            COALESCE(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]), '') AS numeroPedido,
+            COALESCE(
+              NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), ''),
+              venta.[Name]
+            ) AS numeroPedido,
             venta.[Code] AS codigoVenta,
             venta.[U_SO1_VENDEDOR] AS codigoVendedor,
             vendedor.[SlpName] AS nombreVendedor,

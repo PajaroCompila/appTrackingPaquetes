@@ -65,8 +65,10 @@ describe('PedidoRepositorio', () => {
     expect(consultas[0]).toContain("ISNULL(venta.[U_SO1_VERIFICADO], 'N') <> 'Y'");
     expect(consultas[0]).toContain("venta.[U_SO1_TIPO] = 'PE'");
     expect(consultas[0]).toContain("venta.[U_SO1_STATUS] = 'A'");
-    expect(consultas[0]).toContain("NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), '') IS NOT NULL");
-    expect(consultas[0].indexOf('NULLIF(LTRIM')).toBeLessThan(consultas[0].indexOf('OFFSET @desplazamiento'));
+    expect(consultas[0]).toContain("NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), '')");
+    expect(consultas[0]).toContain('venta.[Name]');
+    expect(consultas[0]).not.toContain("IS NOT NULL\n            AND (@numeroPedido");
+    expect(consultas[0].indexOf('COALESCE(')).toBeLessThan(consultas[0].indexOf('OFFSET @desplazamiento'));
     expect(consultas[0]).toContain('OFFSET @desplazamiento');
     expect(consultas[0]).toContain('venta.[U_SO1_FECHA] ASC');
     expect(consultas[0]).toContain('venta.[U_SO1_HORA] ASC');

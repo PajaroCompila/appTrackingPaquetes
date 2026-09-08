@@ -6,12 +6,34 @@
 .pestanas-historial button.activa { color: var(--azul-700); }
 .pestanas-historial button.activa::after { background: var(--azul-700); }
 .pestanas-historial button:focus-visible { outline: 2px solid var(--azul-500); outline-offset: 2px; }
-.codigo-articulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codigo-articulo {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
+}
+.tabla-articulos table { min-width: 1400px; table-layout: fixed; }
+.tabla-articulos th:nth-child(1), .tabla-articulos td:nth-child(1) { width: 8%; }
+.tabla-articulos th:nth-child(2), .tabla-articulos td:nth-child(2) { width: 13%; }
+.tabla-articulos th:nth-child(3), .tabla-articulos td:nth-child(3) { width: 19%; }
+.tabla-articulos th:nth-child(4), .tabla-articulos td:nth-child(4) { width: 6%; }
+.tabla-articulos th:nth-child(5), .tabla-articulos td:nth-child(5) { width: 7%; }
+.tabla-articulos th:nth-child(6), .tabla-articulos td:nth-child(6) { width: 11%; }
+.tabla-articulos th:nth-child(7), .tabla-articulos td:nth-child(7) { width: 8%; }
+.tabla-articulos th:nth-child(8), .tabla-articulos td:nth-child(8) { width: 11%; }
+.tabla-articulos th:nth-child(9), .tabla-articulos td:nth-child(9) { width: 7%; }
+.tabla-articulos th:nth-child(10), .tabla-articulos td:nth-child(10) { width: 10%; }
+.acciones-impresion-historial { margin-top: .75rem; }
 .dato-consultable { cursor: pointer; transition: color var(--transicion-rapida) var(--easing-corporativo); }
 .dato-consultable:hover, .dato-consultable:focus-visible { color: var(--azul-700); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
 .texto-dos-lineas { display: -webkit-box; width: 100%; overflow: hidden; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .paginacion { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; font-weight: 600; }
 .etiqueta-estado { display: inline-flex; padding: .25rem .55rem; border-radius: 999px; background: #e7f6ed; color: #166534; font-weight: 600; }
+@media (max-width: 680px) {
+  .tabla-articulos table { min-width: 0; table-layout: auto; }
+  .tabla-articulos th, .tabla-articulos td { width: auto; }
+}
 @media (max-width: 540px) { .paginacion { justify-content: space-between; } }
 .estado-actualizacion { margin: 0; color: var(--gris-600); font-size: .78rem; text-align: right; }
 .aviso-actualizacion { margin: 0; padding: .55rem .7rem; border-radius: .45rem; background: #fff4d6; color: #6a4a00; font-size: .82rem; }

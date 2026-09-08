@@ -6,7 +6,7 @@
     <div class="campo"><label for="fechaHasta">Fecha hasta</label><input id="fechaHasta" name="fechaHasta" type="date" required [(ngModel)]="filtros.fechaHasta"></div>
     <div class="acciones"><button class="boton boton-primario">Aplicar filtros</button><button class="boton boton-secundario" type="button" (click)="limpiarFiltros()">Limpiar filtros</button></div>
   </form>
-  @if (advertencia()) { <p class="advertencia" role="status">{{ advertencia() }}</p> }
+  @if (advertencia() && !datos()) { <p class="advertencia" role="status">{{ advertencia() }}</p> }
   @if (cargando() && !datos()) { <div class="estado-interfaz"><span class="cargador"></span><p>Cargando pedidos…</p></div> }
   @if (datos(); as resumen) {
     <div class="tarjetas-resumen">
@@ -44,6 +44,6 @@
         @for (vendedor of resumen.porVendedor; track vendedor.codigoVendedor ?? vendedor.nombreVendedor) { <tr><td>{{ vendedor.codigoVendedor || '—' }}</td><td><button class="enlace-vendedor" type="button" (click)="seleccionarVendedor(vendedor)">{{ nombreVendedor(vendedor.nombreVendedor) }}</button></td><td>{{ vendedor.ventasValidadas }}</td></tr> }
       </tbody></table></div>
     }
-    <p class="actualizacion">@if (actualizando()) { Actualizando… · }Última actualización: {{ resumen.consultadoEn | date:'hh:mm:ss a':'-0600' }}</p>
+    <p class="actualizacion">Última actualización: {{ resumen.consultadoEn | date:'hh:mm:ss a':'-0600' }}</p>
   }
 </section>

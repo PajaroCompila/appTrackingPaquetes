@@ -1,4 +1,4 @@
-.bloque-superior-operativo { width: min(100%, 1200px); margin: 0 auto; }
+.bloque-superior-operativo { width: 100%; margin: 0 auto; }
 .filtros {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -130,16 +130,32 @@
   .codigo-consultable:hover, .descripcion-consultable:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
 .columna-seleccion { width: 3.5rem; text-align: center; }
 .columna-pedido { width: 5.75rem; min-width: 5.75rem; max-width: 5.75rem; font-size: .78rem; white-space: nowrap; }
-.columna-codigo { width: 14.5rem; max-width: 15.5rem; overflow: hidden; font-weight: 700; }
+.columna-pedido strong {
+  display: block;
+  max-width: 100%;
+  font-size: .64rem;
+  letter-spacing: -.025em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.columna-codigo {
+  width: 15.5rem;
+  max-width: 15.5rem;
+  overflow: visible;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: normal;
+}
 .columna-codigo-contenido {
   display: block;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   font-weight: 700;
-  overflow-wrap: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
   word-break: normal;
 }
 .columna-descripcion { width: 20%; min-width: 0; font-size: .82rem; }
@@ -148,7 +164,23 @@
 .columna-fecha { width: 8.75rem; }
 .columna-vendedor { width: 12%; }
 .columna-detalle { width: 6.75rem; white-space: nowrap; }
-.columna-imprimir { width: 5.75rem; min-width: 5.75rem; white-space: nowrap; text-align: center; }
+.columna-asignado { width: 12rem; min-width: 12rem; }
+.selector-asignacion {
+  width: 100%;
+  min-width: 0;
+  padding: .45rem 1.8rem .45rem .55rem;
+  border: 1px solid #a8bbcd;
+  border-radius: .45rem;
+  background: #fff;
+  color: var(--azul-900);
+  font-size: .78rem;
+}
+.selector-asignacion:focus-visible { border-color: var(--azul-700); outline: 3px solid rgb(29 82 137 / 13%); outline-offset: 1px; }
+.selector-asignacion:disabled { background: #f3f6f9; color: var(--gris-600); cursor: wait; }
+.asignacion-lectura { display: inline-block; color: var(--azul-900); font-size: .8rem; font-weight: 600; line-height: 1.3; }
+.asignacion-lectura.sin-asignar { color: var(--gris-600); font-weight: 400; }
+.mensaje-asignacion { margin: -.35rem 0 .75rem; color: #8a4b08; font-size: .82rem; font-weight: 600; text-align: right; }
+.columna-imprimir { width: 7.5rem; min-width: 7.5rem; white-space: nowrap; text-align: center; }
 .texto-maximo-dos-lineas {
   display: -webkit-box;
   max-height: 2.7em;
@@ -163,9 +195,25 @@
 .selector-linea input:checked + span { border-color: var(--azul-700); background: var(--azul-700); color: white; }
 .selector-linea input:focus-visible + span { outline: 3px solid #65a8df; outline-offset: 2px; }
 .selector-transferencia input:checked + span { border-color: #287052; background: #287052; }
+.control-impresion { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; }
+.indicador-impreso {
+  display: inline-flex;
+  align-items: center;
+  gap: .2rem;
+  padding: .2rem .38rem;
+  border-radius: 999px;
+  background: #e7f6ed;
+  color: #166534;
+  font-size: .7rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.indicador-impreso .pi { font-size: .72rem; }
+.acciones-solo-impresion { min-height: 2.65rem; }
+.mensaje-impresion { margin: -.35rem 0 .75rem; color: #8a4b08; font-size: .82rem; font-weight: 600; text-align: right; }
 
 @media (min-width: 681px) {
-  .tabla-contenedor table { min-width: 1050px; }
+  .tabla-contenedor table { min-width: 1400px; }
 }
 
 .pagina-detalle { width: min(100% - 2rem, 1400px); }
@@ -175,6 +223,6 @@
   .tabla-contenedor table { min-width: 0; table-layout: auto; }
   .columna-seleccion, .columna-pedido, .columna-codigo, .columna-descripcion,
   .columna-cantidad, .columna-bodega, .columna-fecha, .columna-vendedor,
-  .columna-detalle, .columna-imprimir { width: auto; min-width: 0; }
+  .columna-detalle, .columna-imprimir, .columna-asignado { width: auto; min-width: 0; }
   .columna-pedido, .columna-codigo { max-width: none; }
 }

@@ -54,7 +54,7 @@ export class DashboardComponent implements OnInit {
             catchError(() => {
               this.cargandoInicial.set(false);
               this.actualizando.set(false);
-              this.advertencia.set('No pudimos actualizar. Mostramos los datos anteriores.');
+              if (!this.datos()) this.advertencia.set('No fue posible obtener la información.');
               return EMPTY;
             }),
           );

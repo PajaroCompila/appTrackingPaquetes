@@ -19,6 +19,8 @@ import { usuarioRutas } from './modulos/usuarios/usuarioRutas.js';
 import { despachoRutas } from './modulos/despachos/despachoRutas.js';
 import { inventarioArticuloRutas } from './modulos/articulos/inventarioArticuloRutas.js';
 import { dashboardRutas } from './modulos/dashboard/dashboardRutas.js';
+import { impresionRutas } from './modulos/impresiones/impresionRutas.js';
+import { asignacionRutas } from './modulos/asignaciones/asignacionRutas.js';
 
 export const aplicacion = express();
 const directorioFrontend = join(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist/frontend/browser');
@@ -72,11 +74,14 @@ aplicacion.use('/api/autenticacion', autenticacionRutas);
 aplicacion.use('/api/salud', saludRutas);
 aplicacion.use('/api/usuarios', requerirAutenticacion, requerirContrasenaActualizada, usuarioRutas);
 aplicacion.use('/api/almacenes', requerirAutenticacion, requerirContrasenaActualizada, almacenRutas);
+aplicacion.use('/api/pedidos/asignaciones', requerirAutenticacion,
+  requerirContrasenaActualizada, asignacionRutas);
 aplicacion.use('/api/pedidos', requerirAutenticacion, requerirContrasenaActualizada, pedidoRutas);
 aplicacion.use('/api/articulos', requerirAutenticacion, requerirContrasenaActualizada, inventarioArticuloRutas);
 aplicacion.use('/api/historial-validados', requerirAutenticacion, requerirContrasenaActualizada, historialRutas);
 aplicacion.use('/api/pedidos-despachados', requerirAutenticacion, requerirContrasenaActualizada, despachoRutas);
 aplicacion.use('/api/dashboard', requerirAutenticacion, requerirContrasenaActualizada, dashboardRutas);
+aplicacion.use('/api/impresiones', requerirAutenticacion, requerirContrasenaActualizada, impresionRutas);
 
 if (configuracion.servirFrontend) {
   if (existsSync(archivoIndiceFrontend)) {

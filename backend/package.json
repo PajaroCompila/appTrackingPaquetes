@@ -13,6 +13,8 @@
     "db:migrate:pedidos-cerrados": "tsx scripts/migrarPedidosCerrados.ts",
     "db:migrate:historial-sap": "tsx scripts/migrarHistorialSap.ts",
     "db:corregir-horas-pedidos": "tsx scripts/corregirHorasPedidos.ts",
+    "db:migrate:impresiones": "tsx scripts/migrarRegistroImpresiones.ts",
+    "db:migrate:asignaciones": "tsx scripts/migrarAsignacionesArticulos.ts",
     "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",
     "usuario:cambiar-contrasena": "tsx scripts/cambiarContrasenaUsuario.ts",
     "dev": "tsx watch src/servidor.ts",
