@@ -22,6 +22,7 @@ import {
 } from '../../compartido/asignaciones/asignacion.interface';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { PedidosNotificacionesService } from '../../compartido/notificaciones/pedidos-notificaciones.service';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -58,6 +59,7 @@ export class ListaPedidosComponent implements OnInit {
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly asignacionesService = inject(AsignacionesService);
   private readonly autenticacion = inject(AutenticacionService);
+  private readonly notificaciones = inject(PedidosNotificacionesService);
   private readonly actualizarAhora = new Subject<boolean>();
   private primeraConsulta = true;
   private consultaEnCurso = false;
@@ -426,12 +428,13 @@ export class ListaPedidosComponent implements OnInit {
       filter(() => !this.consultaEnCurso),
       exhaustMap((esAutomatica) => {
         this.consultaEnCurso = true;
+        const filtrosConsulta = this.copiarFiltros(this.filtrosAplicados);
         const mostrarCargaInicial = this.primeraConsulta;
         if (mostrarCargaInicial) this.cargando.set(true);
         else this.actualizando.set(true);
         if (!esAutomatica) this.error.set(null);
-        return this.pedidosService.obtenerPedidos(this.copiarFiltros(this.filtrosAplicados)).pipe(
-          map((respuesta) => ({ respuesta, esAutomatica })),
+        return this.pedidosService.obtenerPedidos(filtrosConsulta).pipe(
+          map((respuesta) => ({ respuesta, esAutomatica, filtrosConsulta })),
           catchError((error: unknown) => {
             if (this.primeraConsulta) {
               this.pedidos.set([]);
@@ -454,12 +457,13 @@ export class ListaPedidosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta: { datos, paginacion }, esAutomatica }) => {
+    ).subscribe(({ respuesta: { datos, paginacion }, esAutomatica, filtrosConsulta }) => {
       if (!esAutomatica && datos.length === 0 && this.pagina() > 1) {
         void this.actualizarRuta(this.pagina() - 1);
         return;
       }
       this.reconciliarSeleccionTransferencia(datos);
+      this.notificaciones.procesarRespuesta(datos, filtrosConsulta, !esAutomatica);
       this.pedidos.set(datos);
       this.cargarAsignaciones(datos);
       this.pagina.set(paginacion.pagina);

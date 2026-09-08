@@ -132,6 +132,7 @@
 .pie-aplicacion { flex: 0 0 auto; padding: .8rem max(1rem, calc((100vw - 4.75rem - 1200px) / 2)); color: var(--gris-600); font-size: .75rem; text-align: left; }
 .barra-superior {
   position: relative;
+  z-index: 100;
   min-height: 4.5rem;
   display: flex;
   align-items: center;
@@ -139,7 +140,7 @@
   background: linear-gradient(110deg, #10285b, #1e5591);
   color: white;
   box-shadow: 0 4px 18px rgb(7 30 63 / 18%);
-  overflow: hidden;
+  overflow: visible;
 }
 .barra-superior::after {
   position: absolute;
@@ -154,19 +155,111 @@
 .marca { position: relative; z-index: 1; display: grid; gap: .1rem; }
 .marca strong { font-size: 1.05rem; }
 .marca span { color: #cfdef1; font-size: .78rem; }
-.sesion-actual { position: relative; z-index: 1; display: grid; margin-left: auto; margin-right: min(35vw, 23rem); text-align: right; }
+.controles-superiores {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  margin-left: auto;
+  margin-right: min(35vw, 23rem);
+}
+.sesion-actual { display: grid; text-align: right; }
 .sesion-actual strong { font-size: .82rem; }
 .sesion-actual span { color: #cfdef1; font-size: .7rem; }
+.campana-notificaciones {
+  position: relative;
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: .6rem;
+  background: rgb(255 255 255 / 8%);
+  color: white;
+  cursor: pointer;
+  transition:
+    background-color var(--transicion-rapida) var(--easing-corporativo),
+    border-color var(--transicion-rapida) var(--easing-corporativo),
+    box-shadow var(--transicion-rapida) var(--easing-corporativo);
+}
+.campana-notificaciones:hover,
+.campana-notificaciones:focus-visible {
+  border-color: rgb(255 255 255 / 34%);
+  background: rgb(255 255 255 / 15%);
+  box-shadow: 0 3px 10px rgb(7 30 63 / 24%);
+}
+.campana-notificaciones:focus-visible { outline: 2px solid #b9daf6; outline-offset: 2px; }
+.campana-notificaciones > .pi { font-size: 1.15rem; transform-origin: 50% 12%; }
+.contador-notificaciones {
+  position: absolute;
+  top: -.42rem;
+  right: -.48rem;
+  display: grid;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  padding: 0 .27rem;
+  border: 2px solid #1b4b86;
+  border-radius: 999px;
+  background: #c64141;
+  color: white;
+  font-size: .65rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.tooltip-campana {
+  position: absolute;
+  top: calc(100% + .55rem);
+  right: 0;
+  width: max-content;
+  max-width: 12rem;
+  padding: .42rem .65rem;
+  border-radius: .4rem;
+  background: #0c2857;
+  box-shadow: 0 5px 14px rgb(0 0 0 / 20%);
+  color: white;
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--transicion-rapida) var(--easing-corporativo),
+    transform var(--transicion-rapida) var(--easing-corporativo),
+    visibility var(--transicion-rapida) var(--easing-corporativo);
+}
+.campana-notificaciones:hover .tooltip-campana,
+.campana-notificaciones:focus-visible .tooltip-campana {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+.campana-notificaciones.animando > .pi { animation: aviso-campana 450ms ease-in-out; }
+
+@keyframes aviso-campana {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(10deg); }
+  50% { transform: rotate(-9deg); }
+  75% { transform: rotate(5deg); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .navegacion-principal a,
   .navegacion-principal button,
   .navegacion-principal .pi,
-  .etiqueta-nav { transition: none; }
+  .etiqueta-nav,
+  .campana-notificaciones,
+  .tooltip-campana { transition: none; }
   .navegacion-principal :is(a, button):hover,
   .navegacion-principal :is(a, button):focus-visible,
   .navegacion-principal :is(a, button):hover .pi,
   .navegacion-principal :is(a, button):focus-visible .pi { transform: none; }
+  .campana-notificaciones.animando > .pi { animation: none; }
 }
 
 @media (max-width: 680px) {
@@ -175,6 +268,7 @@
   .navegacion-principal a, .navegacion-principal button { width: 3.3rem; }
   .barra-superior { padding-inline: 1rem; }
   .barra-superior::after { right: .5rem; width: min(42vw, 11rem); opacity: .92; }
+  .controles-superiores { margin-right: min(42vw, 11rem); }
   .sesion-actual { display: none; }
 }
 @media print { .pie-aplicacion { display: none; } }

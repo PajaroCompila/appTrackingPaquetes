@@ -5,6 +5,7 @@ import { filter } from 'rxjs';
 import { AutenticacionService } from './funcionalidades/autenticacion/autenticacion.service';
 import { ConsultaInventarioArticuloHostComponent } from './compartido/inventario/consulta-inventario-articulo-host.component';
 import { ConsultaInventarioArticuloService } from './compartido/inventario/consulta-inventario-articulo.service';
+import { PedidosNotificacionesService } from './compartido/notificaciones/pedidos-notificaciones.service';
 
 @Component({
   selector: 'app-root',
@@ -17,6 +18,7 @@ export class App {
   private readonly autenticacion = inject(AutenticacionService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly consultaInventario = inject(ConsultaInventarioArticuloService);
+  public readonly notificaciones = inject(PedidosNotificacionesService);
   public readonly esLogin = signal(this.router.url.startsWith('/login'));
   public readonly usuario = this.autenticacion.usuario;
 
@@ -36,5 +38,16 @@ export class App {
       next: () => void this.router.navigate(['/login']),
       error: () => undefined,
     });
+  }
+
+  public textoCampana(): string {
+    const cantidad = this.notificaciones.noLeidos();
+    if (cantidad === 0) return 'Pedidos nuevos';
+    return cantidad === 1 ? '1 pedido nuevo' : `${cantidad} pedidos nuevos`;
+  }
+
+  public contadorCampana(): string {
+    const cantidad = this.notificaciones.noLeidos();
+    return cantidad > 99 ? '99+' : String(cantidad);
   }
 }

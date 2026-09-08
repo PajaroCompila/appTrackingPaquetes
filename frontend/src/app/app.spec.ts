@@ -6,6 +6,7 @@ import { App } from './app';
 import { routes } from './app.routes';
 import type { UsuarioSesion } from './funcionalidades/autenticacion/autenticacion.interface';
 import { AutenticacionService } from './funcionalidades/autenticacion/autenticacion.service';
+import { PedidosNotificacionesService } from './compartido/notificaciones/pedidos-notificaciones.service';
 
 describe('App', () => {
   let usuario: WritableSignal<UsuarioSesion | null>;
@@ -89,5 +90,34 @@ describe('App', () => {
     expect(router.url).toContain('/pedidos-despachados');
     expect(enlace.classList.contains('activo')).toBe(true);
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Pedidos despachados');
+  });
+
+  it('mantiene el contador entre rutas y lo limpia al pulsar la campana', async () => {
+    const fixture = TestBed.createComponent(App);
+    const notificaciones = TestBed.inject(PedidosNotificacionesService);
+    const filtros = { pagina: 1 as const, cantidadPorPagina: 25 as const };
+    const nuevo = {
+      idOrigen: 'R1:100', origenPedido: 'R1' as const, creadoEnR1: true,
+      sapDocEntry: null, folioPedido: '100', numeroPedido: '100', codigoVenta: null,
+      codigoVendedor: null, nombreVendedor: null, codigosAlmacen: ['BSPS03'],
+      nombresBodega: null, fechaHoraPedido: null, codigoEstadoVenta: null,
+      codigoSincronizacion: null, articulos: [],
+    };
+    notificaciones.procesarRespuesta([], filtros, true);
+    notificaciones.procesarRespuesta([nuevo], filtros, false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.contador-notificaciones')?.textContent.trim())
+      .toBe('1');
+
+    await TestBed.inject(Router).navigateByUrl('/historial-validados');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.contador-notificaciones')?.textContent.trim())
+      .toBe('1');
+
+    (fixture.nativeElement.querySelector('.campana-notificaciones') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(notificaciones.noLeidos()).toBe(0);
+    expect(fixture.nativeElement.querySelector('.contador-notificaciones')).toBeNull();
   });
 });

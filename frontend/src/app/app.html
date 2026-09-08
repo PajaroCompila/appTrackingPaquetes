@@ -20,7 +20,22 @@
     @if (!esLogin()) {
       <header class="barra-superior">
         <div class="marca"><strong>Pedidos Bodega</strong><span>Control de pedidos</span></div>
-        @if (usuario(); as sesion) { <div class="sesion-actual"><strong>{{ sesion.nombreVisible }}</strong><span>{{ sesion.codigoRol }}</span></div> }
+        <div class="controles-superiores">
+          @if (usuario(); as sesion) { <div class="sesion-actual"><strong>{{ sesion.nombreVisible }}</strong><span>{{ sesion.codigoRol }}</span></div> }
+          <button
+            class="campana-notificaciones"
+            type="button"
+            [class.animando]="notificaciones.animando()"
+            [attr.aria-label]="textoCampana()"
+            (click)="notificaciones.marcarComoVistos()">
+            <i class="pi pi-bell" aria-hidden="true"></i>
+            @if (notificaciones.noLeidos() > 0) {
+              <span class="contador-notificaciones" aria-hidden="true">{{ contadorCampana() }}</span>
+            }
+            <span class="tooltip-campana" aria-hidden="true">{{ textoCampana() }}</span>
+          </button>
+          <span class="solo-lectores" aria-live="polite">{{ textoCampana() }}</span>
+        </div>
       </header>
     }
     <main><router-outlet /></main>
