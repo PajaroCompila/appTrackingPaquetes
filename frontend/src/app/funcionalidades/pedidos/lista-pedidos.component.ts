@@ -83,6 +83,7 @@ export class ListaPedidosComponent implements OnInit {
   public readonly asignaciones = signal<ReadonlyMap<string, AsignacionArticulo>>(new Map());
   public readonly asignacionesGuardando = signal<ReadonlySet<string>>(new Set());
   public readonly puedeAsignar = signal(false);
+  public readonly puedeAsignarTodos = signal(false);
   public readonly mensajeAsignacion = signal('');
 
   public ngOnInit(): void {
@@ -199,7 +200,28 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public nombreAsignado(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
-    return this.asignacionActual(pedido, articulo)?.nombreAsignado ?? 'Sin asignar';
+    if (this.puedeAsignarPedidos()) {
+      return this.asignacionActual(pedido, articulo)?.nombreAsignado ?? 'Sin asignar';
+    }
+    return this.autenticacion.usuario()?.nombreVisible ?? 'Sin asignar';
+  }
+
+  public valorAsignacionVisible(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
+    const usuarioAsignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado;
+    return usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)
+      ? usuarioAsignado
+      : '';
+  }
+
+  public asignacionFueraDelCatalogo(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+  ): AsignacionArticulo | null {
+    const asignacion = this.asignacionActual(pedido, articulo);
+    return asignacion?.usuarioAsignado
+      && !this.usuariosAsignables().some(({ usuario }) => usuario === asignacion.usuarioAsignado)
+      ? asignacion
+      : null;
   }
 
   public asignacionGuardando(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
@@ -214,6 +236,9 @@ export class ListaPedidosComponent implements OnInit {
   ): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
     if (!identidad || !this.puedeAsignar() || this.asignacionGuardando(pedido, articulo)) return;
+    const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
+    if (!this.puedeAsignarTodos()
+      && usuarioAsignado.trim().toLowerCase() !== usuarioActual) return;
     const tecnico = this.usuariosAsignables().find(({ usuario }) => usuario === usuarioAsignado);
     if (usuarioAsignado && !tecnico) return;
     const clave = claveArticuloAsignado(identidad);
@@ -590,13 +615,20 @@ export class ListaPedidosComponent implements OnInit {
     this.asignacionesService.obtenerUsuarios()
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
-        next: ({ datos, puedeAsignar }) => {
-          this.usuariosAsignables.set(datos);
-          this.puedeAsignar.set(puedeAsignar && this.puedeAsignarPedidos());
+        next: ({ datos, puedeAsignar, puedeAsignarTodos }) => {
+          const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
+          const asignaTodos = puedeAsignarTodos && this.puedeAsignarPedidos();
+          const visibles = asignaTodos
+            ? datos
+            : datos.filter(({ usuario }) => usuario.trim().toLowerCase() === usuarioActual);
+          this.usuariosAsignables.set(visibles);
+          this.puedeAsignarTodos.set(asignaTodos);
+          this.puedeAsignar.set(puedeAsignar && visibles.length > 0);
         },
         error: () => {
           this.usuariosAsignables.set([]);
           this.puedeAsignar.set(false);
+          this.puedeAsignarTodos.set(false);
         },
       });
   }

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
+import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
+import type { TecnicoAsignable } from './asignacion.interface.js';
 import { AsignacionRepositorio } from './asignacionRepositorio.js';
 
 export const tecnicosAsignables = [
@@ -29,18 +31,45 @@ export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: str
     || nombreUsuario.trim().toLowerCase() === 'gcruz';
 }
 
+export function usuariosAsignablesParaSesion(
+  usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
+): readonly TecnicoAsignable[] {
+  if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) return tecnicosAsignables;
+  return [{ usuario: usuario.nombreUsuario, nombre: usuario.nombreVisible }];
+}
+
+export function resolverTecnicoAsignable(
+  usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
+  usuarioAsignado: string | null,
+): TecnicoAsignable | null {
+  if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) {
+    if (usuarioAsignado === null) return null;
+    const tecnico = tecnicosAsignables.find(({ usuario: codigo }) => codigo === usuarioAsignado);
+    if (!tecnico) {
+      throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
+        'El técnico seleccionado no está disponible.');
+    }
+    return tecnico;
+  }
+
+  if (usuarioAsignado?.trim().toLowerCase() !== usuario.nombreUsuario.trim().toLowerCase()) {
+    throw new ErrorAplicacion(403, 'ASIGNACION_OTRO_USUARIO_NO_PERMITIDA',
+      'No tiene permisos para asignar pedidos a otros usuarios.');
+  }
+  return { usuario: usuario.nombreUsuario, nombre: usuario.nombreVisible };
+}
+
 export function crearAsignacionRutas(
   repositorio: AsignacionRepositorio = new AsignacionRepositorio(),
 ): Router {
   const rutas = Router();
 
   rutas.get('/usuarios', (solicitud, respuesta) => {
+    const usuario = solicitud.user!;
     respuesta.json({
-      datos: tecnicosAsignables,
-      puedeAsignar: puedeAsignarPedidos(
-        solicitud.user?.codigoRol ?? null,
-        solicitud.user?.nombreUsuario ?? '',
-      ),
+      datos: usuariosAsignablesParaSesion(usuario),
+      puedeAsignar: true,
+      puedeAsignarTodos: puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario),
     });
   });
 
@@ -56,20 +85,15 @@ export function crearAsignacionRutas(
   rutas.patch('/', async (solicitud, respuesta, siguiente) => {
     try {
       const usuario = solicitud.user!;
-      if (!puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) {
-        throw new ErrorAplicacion(403, 'ASIGNACION_NO_PERMITIDA',
-          'No tenés permiso para cambiar la asignación.');
-      }
       const datos = esquemaGuardarAsignacion.parse(solicitud.body);
-      const tecnico = datos.usuarioAsignado === null
-        ? null
-        : tecnicosAsignables.find(({ usuario: codigo }) => codigo === datos.usuarioAsignado);
-      if (datos.usuarioAsignado !== null && !tecnico) {
-        throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
-          'El técnico seleccionado no está disponible.');
-      }
-      respuesta.json({ datos: await repositorio.guardar(datos, tecnico ?? null, usuario.usuarioId) });
+      const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
+      respuesta.json({ datos: await repositorio.guardar(datos, tecnico, usuario.usuarioId) });
     } catch (error) {
+      if (error instanceof ErrorAplicacion
+        && error.codigo === 'ASIGNACION_OTRO_USUARIO_NO_PERMITIDA') {
+        respuesta.status(error.estadoHttp).json({ exito: false, mensaje: error.message });
+        return;
+      }
       siguiente(error);
     }
   });

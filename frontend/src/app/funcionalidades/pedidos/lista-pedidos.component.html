@@ -189,13 +189,22 @@
                   @if (puedeAsignar()) {
                     <select
                       class="selector-asignacion"
-                      [ngModel]="asignacionActual(pedido, articulo)?.usuarioAsignado ?? ''"
+                      [ngModel]="valorAsignacionVisible(pedido, articulo)"
                       [ngModelOptions]="{ standalone: true }"
                       [disabled]="asignacionGuardando(pedido, articulo) || !articulo.identificadorDetalle"
                       [attr.aria-label]="'Asignar técnico al artículo ' + marcador(articulo.codigoArticulo)"
                       (ngModelChange)="cambiarAsignacion(pedido, articulo, $event)"
                     >
-                      <option value="">Sin asignar</option>
+                      @if (puedeAsignarTodos()) {
+                        <option value="">Sin asignar</option>
+                        @if (asignacionFueraDelCatalogo(pedido, articulo); as asignacionExterna) {
+                          <option [value]="asignacionExterna.usuarioAsignado" disabled>
+                            {{ asignacionExterna.nombreAsignado }}
+                          </option>
+                        }
+                      } @else {
+                        <option value="" disabled>Asignarme</option>
+                      }
                       @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
                         <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
                       }

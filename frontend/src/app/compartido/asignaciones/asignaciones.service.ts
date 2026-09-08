@@ -14,7 +14,11 @@ export class AsignacionesService {
   private readonly url = `${environment.urlApi}/pedidos/asignaciones`;
 
   public obtenerUsuarios() {
-    return this.http.get<{ datos: TecnicoAsignable[]; puedeAsignar: boolean }>(
+    return this.http.get<{
+      datos: TecnicoAsignable[];
+      puedeAsignar: boolean;
+      puedeAsignarTodos: boolean;
+    }>(
       `${this.url}/usuarios`,
     );
   }

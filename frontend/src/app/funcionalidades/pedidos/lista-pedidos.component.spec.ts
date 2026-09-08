@@ -95,6 +95,7 @@ describe('ListaPedidosComponent', () => {
     asignacionesService = {
       obtenerUsuarios: vi.fn().mockReturnValue(of({
         puedeAsignar: true,
+        puedeAsignarTodos: true,
         datos: [
           { usuario: 'mperez', nombre: 'Marcos Perez' },
           { usuario: 'gcruz', nombre: 'Gregorio Cruz' },
@@ -572,17 +573,38 @@ describe('ListaPedidosComponent', () => {
     expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Marcos Perez');
   });
 
-  it('deja la asignación en modo lectura para usuarios sin permiso', () => {
+  it('permite al usuario normal verse y asignarse solamente a sí mismo', () => {
     usuarioSesion.set({
-      usuarioId: '2', nombreUsuario: 'consulta', nombreVisible: 'Consulta',
+      usuarioId: '2', nombreUsuario: 'tlopez', nombreVisible: 'Tommy López',
       codigoRol: 'CONSULTA', codigoAlmacen: null, debeCambiarContrasena: false,
     });
+    asignacionesService.obtenerUsuarios.mockReturnValue(of({
+      puedeAsignar: true,
+      puedeAsignarTodos: false,
+      datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
+    }));
+    asignacionesService.guardar.mockReturnValue(of({ datos: {
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'tlopez', nombreAsignado: 'Tommy López',
+      actualizadoEn: '2026-08-03T12:01:00',
+    } }));
+    fixture.detectChanges();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.selector-asignacion')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.asignacion-lectura')?.textContent).toContain('Gregorio Cruz');
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    const textoSelector = [...selector.options].map(({ textContent }) => textContent?.trim());
+    expect(textoSelector).toEqual(['Asignarme', 'Tommy López']);
+    expect(fixture.nativeElement.textContent).not.toContain('Gregorio Cruz');
+    expect(fixture.nativeElement.textContent).not.toContain('Marcos Perez');
+
     componente.cambiarAsignacion(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0], 'mperez');
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
+    componente.cambiarAsignacion(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0], 'tlopez');
+    expect(asignacionesService.guardar).toHaveBeenCalledWith(
+      { idOrigen: 'R1:F1', identificadorDetalle: '1' }, 'tlopez',
+    );
+    expect(componente.nombreAsignado(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0]))
+      .toBe('Tommy López');
   });
 
   it.each([
