@@ -34,6 +34,17 @@ export class AsignacionesService {
     ))).pipe(map((respuestas) => ({ datos: respuestas.flatMap(({ datos }) => datos) })));
   }
 
+  public autoasignar(lineas: readonly IdentidadArticuloAsignacion[]) {
+    if (lineas.length === 0) return of({ datos: [] as AsignacionArticulo[] });
+    const grupos: IdentidadArticuloAsignacion[][] = [];
+    for (let inicio = 0; inicio < lineas.length; inicio += 100) {
+      grupos.push(lineas.slice(inicio, inicio + 100));
+    }
+    return forkJoin(grupos.map((grupo) => this.http.post<{ datos: AsignacionArticulo[] }>(
+      `${this.url}/autoasignar`, { lineas: grupo },
+    ))).pipe(map((respuestas) => ({ datos: respuestas.flatMap(({ datos }) => datos) })));
+  }
+
   public guardar(linea: IdentidadArticuloAsignacion, usuarioAsignado: string | null) {
     return this.http.patch<{ datos: AsignacionArticulo }>(
       this.url, { ...linea, usuarioAsignado },

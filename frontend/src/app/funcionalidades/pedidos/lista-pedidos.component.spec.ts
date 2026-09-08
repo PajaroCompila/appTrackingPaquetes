@@ -40,6 +40,7 @@ describe('ListaPedidosComponent', () => {
   let asignacionesService: {
     obtenerUsuarios: ReturnType<typeof vi.fn>;
     consultar: ReturnType<typeof vi.fn>;
+    autoasignar: ReturnType<typeof vi.fn>;
     guardar: ReturnType<typeof vi.fn>;
   };
   const usuarioSesion = signal<UsuarioSesion>({
@@ -109,6 +110,11 @@ describe('ListaPedidosComponent', () => {
       consultar: vi.fn().mockReturnValue(of({ datos: [{
         idOrigen: 'R1:F1', identificadorDetalle: '1',
         usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+        actualizadoEn: '2026-08-03T12:00:00',
+      }] })),
+      autoasignar: vi.fn().mockReturnValue(of({ datos: [{
+        idOrigen: 'R1:F1', identificadorDetalle: '1',
+        usuarioAsignado: 'tlopez', nombreAsignado: 'Tommy López',
         actualizadoEn: '2026-08-03T12:00:00',
       }] })),
       guardar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
@@ -573,38 +579,28 @@ describe('ListaPedidosComponent', () => {
     expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Marcos Perez');
   });
 
-  it('permite al usuario normal verse y asignarse solamente a sí mismo', () => {
+  it('autoasigna al usuario normal sin mostrarle un selector', () => {
     usuarioSesion.set({
       usuarioId: '2', nombreUsuario: 'tlopez', nombreVisible: 'Tommy López',
       codigoRol: 'CONSULTA', codigoAlmacen: null, debeCambiarContrasena: false,
     });
     asignacionesService.obtenerUsuarios.mockReturnValue(of({
-      puedeAsignar: true,
+      puedeAsignar: false,
       puedeAsignarTodos: false,
       datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
     }));
-    asignacionesService.guardar.mockReturnValue(of({ datos: {
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'tlopez', nombreAsignado: 'Tommy López',
-      actualizadoEn: '2026-08-03T12:01:00',
-    } }));
     fixture.detectChanges();
     fixture.detectChanges();
 
-    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const textoSelector = [...selector.options].map(({ textContent }) => textContent?.trim());
-    expect(textoSelector).toEqual(['Asignarme', 'Tommy López']);
+    expect(fixture.nativeElement.querySelector('.selector-asignacion')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.asignacion-lectura')?.textContent)
+      .toContain('Tommy López');
     expect(fixture.nativeElement.textContent).not.toContain('Gregorio Cruz');
     expect(fixture.nativeElement.textContent).not.toContain('Marcos Perez');
-
-    componente.cambiarAsignacion(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0], 'mperez');
-    expect(asignacionesService.guardar).not.toHaveBeenCalled();
-    componente.cambiarAsignacion(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0], 'tlopez');
-    expect(asignacionesService.guardar).toHaveBeenCalledWith(
-      { idOrigen: 'R1:F1', identificadorDetalle: '1' }, 'tlopez',
+    expect(asignacionesService.autoasignar).toHaveBeenCalledWith(
+      [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
     );
-    expect(componente.nombreAsignado(respuestaLista.datos[0], respuestaLista.datos[0].articulos[0]))
-      .toBe('Tommy López');
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
   it.each([

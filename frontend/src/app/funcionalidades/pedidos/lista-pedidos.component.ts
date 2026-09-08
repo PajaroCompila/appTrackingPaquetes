@@ -64,6 +64,7 @@ export class ListaPedidosComponent implements OnInit {
   private actualizacionManualPendiente = false;
   private filtrosAplicados: FiltrosPedidos = { pagina: 1, cantidadPorPagina: 25 };
   private versionAsignaciones = 0;
+  private usuariosAsignablesCargados = false;
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
@@ -623,24 +624,31 @@ export class ListaPedidosComponent implements OnInit {
             : datos.filter(({ usuario }) => usuario.trim().toLowerCase() === usuarioActual);
           this.usuariosAsignables.set(visibles);
           this.puedeAsignarTodos.set(asignaTodos);
-          this.puedeAsignar.set(puedeAsignar && visibles.length > 0);
+          this.puedeAsignar.set(puedeAsignar && asignaTodos && visibles.length > 0);
+          this.usuariosAsignablesCargados = true;
+          this.cargarAsignaciones(this.pedidos());
         },
         error: () => {
           this.usuariosAsignables.set([]);
           this.puedeAsignar.set(false);
           this.puedeAsignarTodos.set(false);
+          this.usuariosAsignablesCargados = false;
         },
       });
   }
 
   private cargarAsignaciones(pedidos: PedidoResumen[]): void {
+    if (!this.usuariosAsignablesCargados) return;
     const lineas = pedidos.flatMap((pedido) => pedido.articulos.flatMap((articulo) => {
       const identidad = this.identidadAsignacion(pedido, articulo);
       return identidad ? [identidad] : [];
     }));
     if (lineas.length === 0) return;
     const versionConsulta = this.versionAsignaciones;
-    this.asignacionesService.consultar(lineas)
+    const consulta = this.puedeAsignarTodos()
+      ? this.asignacionesService.consultar(lineas)
+      : this.asignacionesService.autoasignar(lineas);
+    consulta
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
         next: ({ datos }) => {

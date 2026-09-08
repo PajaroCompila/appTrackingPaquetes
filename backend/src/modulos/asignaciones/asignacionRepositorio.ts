@@ -89,4 +89,63 @@ export class AsignacionRepositorio {
     `);
     return resultado.recordset[0]!;
   }
+
+  public async asignarAutomaticamente(
+    lineas: IdentidadArticuloAsignacion[],
+    tecnico: TecnicoAsignable,
+    usuarioId: string,
+  ): Promise<AsignacionArticulo[]> {
+    const unicas = lineasUnicas(lineas);
+    if (unicas.length === 0) return [];
+    const solicitud = obtenerPoolPedidosBodega().request()
+      .input('usuarioAsignado', sql.NVarChar(100), tecnico.usuario)
+      .input('nombreAsignado', sql.NVarChar(150), tecnico.nombre)
+      .input('usuarioId', sql.UniqueIdentifier, usuarioId);
+    const valores = agregarLineas(solicitud, unicas);
+    const resultado = await solicitud.query<FilaAsignacion>(`
+      SET XACT_ABORT ON;
+      BEGIN TRANSACTION;
+
+      DECLARE @lineas TABLE (
+        idOrigen nvarchar(150) NOT NULL,
+        identificadorDetalle nvarchar(150) NOT NULL,
+        PRIMARY KEY (idOrigen, identificadorDetalle)
+      );
+      INSERT @lineas(idOrigen, identificadorDetalle) VALUES ${valores};
+
+      UPDATE asignacion WITH (UPDLOCK, HOLDLOCK)
+        SET usuarioAsignado = @usuarioAsignado,
+            nombreAsignado = @nombreAsignado,
+            asignadoPor = @usuarioId,
+            actualizadoEn = SYSUTCDATETIME()
+      FROM dbo.AsignacionArticuloPedido asignacion
+      INNER JOIN @lineas linea
+        ON linea.idOrigen = asignacion.idOrigen
+       AND linea.identificadorDetalle = asignacion.identificadorDetalle
+      WHERE asignacion.usuarioAsignado IS NULL;
+
+      INSERT dbo.AsignacionArticuloPedido(
+        idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, asignadoPor
+      )
+      SELECT linea.idOrigen, linea.identificadorDetalle,
+        @usuarioAsignado, @nombreAsignado, @usuarioId
+      FROM @lineas linea
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM dbo.AsignacionArticuloPedido asignacion WITH (UPDLOCK, HOLDLOCK)
+        WHERE asignacion.idOrigen = linea.idOrigen
+          AND asignacion.identificadorDetalle = linea.identificadorDetalle
+      );
+
+      SELECT linea.idOrigen, linea.identificadorDetalle,
+        asignacion.usuarioAsignado, asignacion.nombreAsignado, asignacion.actualizadoEn
+      FROM @lineas linea
+      INNER JOIN dbo.AsignacionArticuloPedido asignacion
+        ON asignacion.idOrigen = linea.idOrigen
+       AND asignacion.identificadorDetalle = linea.identificadorDetalle;
+
+      COMMIT TRANSACTION;
+    `);
+    return resultado.recordset;
+  }
 }

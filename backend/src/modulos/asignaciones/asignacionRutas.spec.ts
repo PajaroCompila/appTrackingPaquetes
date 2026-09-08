@@ -1,6 +1,6 @@
 import express from 'express';
 import solicitud from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   crearAsignacionRutas,
   esquemaConsultaAsignaciones,
@@ -45,17 +45,16 @@ describe('asignaciones de artículos', () => {
     })).toEqual(tecnicosAsignables);
   });
 
-  it('permite al usuario normal asignarse a sí mismo y rechaza cualquier otra cuenta', () => {
-    expect(resolverTecnicoAsignable(usuarioNormal, 'TLOPEZ')).toEqual({
-      usuario: 'tlopez', nombre: 'Tommy López',
-    });
+  it('impide la asignación manual a los usuarios normales', () => {
+    expect(() => resolverTecnicoAsignable(usuarioNormal, 'TLOPEZ'))
+      .toThrow('La asignación para este usuario se realiza automáticamente.');
     expect(() => resolverTecnicoAsignable(usuarioNormal, 'gcruz'))
-      .toThrow('No tiene permisos para asignar pedidos a otros usuarios.');
+      .toThrow('La asignación para este usuario se realiza automáticamente.');
     expect(() => resolverTecnicoAsignable(usuarioNormal, null))
-      .toThrow('No tiene permisos para asignar pedidos a otros usuarios.');
+      .toThrow('La asignación para este usuario se realiza automáticamente.');
   });
 
-  it('responde 403 con el mensaje acordado si un usuario normal elige a otra persona', async () => {
+  it('responde 403 si un usuario normal intenta utilizar la asignación manual', async () => {
     const aplicacion = express();
     aplicacion.use(express.json());
     aplicacion.use((peticion, _respuesta, siguiente) => {
@@ -79,8 +78,43 @@ describe('asignaciones de artículos', () => {
     expect(respuesta.status).toBe(403);
     expect(respuesta.body).toEqual({
       exito: false,
-      mensaje: 'No tiene permisos para asignar pedidos a otros usuarios.',
+      mensaje: 'La asignación para este usuario se realiza automáticamente.',
     });
+  });
+
+  it('autoasigna líneas libres al usuario normal de la sesión', async () => {
+    const asignarAutomaticamente = vi.fn().mockResolvedValue([{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'tlopez', nombreAsignado: 'Tommy López', actualizadoEn: new Date(),
+    }]);
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use((peticion, _respuesta, siguiente) => {
+      peticion.user = {
+        usuarioId: '00000000-0000-0000-0000-000000000001',
+        nombreUsuario: usuarioNormal.nombreUsuario,
+        nombreVisible: usuarioNormal.nombreVisible,
+        codigoRol: usuarioNormal.codigoRol,
+        codigoAlmacen: null,
+        sesionId: 'sesion-prueba',
+        debeCambiarContrasena: false,
+      };
+      siguiente();
+    });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
+      asignarAutomaticamente,
+    } as unknown as AsignacionRepositorio));
+
+    const respuesta = await solicitud(aplicacion)
+      .post('/api/pedidos/asignaciones/autoasignar')
+      .send({ lineas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }] });
+
+    expect(respuesta.status).toBe(200);
+    expect(asignarAutomaticamente).toHaveBeenCalledWith(
+      [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
+      { usuario: 'tlopez', nombre: 'Tommy López' },
+      '00000000-0000-0000-0000-000000000001',
+    );
   });
 
   it('valida identidades estables y permite quitar una asignación', () => {

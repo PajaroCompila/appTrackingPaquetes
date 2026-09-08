@@ -52,11 +52,8 @@ export function resolverTecnicoAsignable(
     return tecnico;
   }
 
-  if (usuarioAsignado?.trim().toLowerCase() !== usuario.nombreUsuario.trim().toLowerCase()) {
-    throw new ErrorAplicacion(403, 'ASIGNACION_OTRO_USUARIO_NO_PERMITIDA',
-      'No tiene permisos para asignar pedidos a otros usuarios.');
-  }
-  return { usuario: usuario.nombreUsuario, nombre: usuario.nombreVisible };
+  throw new ErrorAplicacion(403, 'ASIGNACION_MANUAL_NO_PERMITIDA',
+    'La asignación para este usuario se realiza automáticamente.');
 }
 
 export function crearAsignacionRutas(
@@ -66,10 +63,11 @@ export function crearAsignacionRutas(
 
   rutas.get('/usuarios', (solicitud, respuesta) => {
     const usuario = solicitud.user!;
+    const puedeAsignarTodos = puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario);
     respuesta.json({
       datos: usuariosAsignablesParaSesion(usuario),
-      puedeAsignar: true,
-      puedeAsignarTodos: puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario),
+      puedeAsignar: puedeAsignarTodos,
+      puedeAsignarTodos,
     });
   });
 
@@ -77,6 +75,23 @@ export function crearAsignacionRutas(
     try {
       const { lineas } = esquemaConsultaAsignaciones.parse(solicitud.body);
       respuesta.json({ datos: await repositorio.consultar(lineas) });
+    } catch (error) {
+      siguiente(error);
+    }
+  });
+
+  rutas.post('/autoasignar', async (solicitud, respuesta, siguiente) => {
+    try {
+      const usuario = solicitud.user!;
+      if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) {
+        throw new ErrorAplicacion(403, 'AUTOASIGNACION_NO_APLICA',
+          'Este usuario debe seleccionar la asignación manualmente.');
+      }
+      const { lineas } = esquemaConsultaAsignaciones.parse(solicitud.body);
+      const tecnico = { usuario: usuario.nombreUsuario, nombre: usuario.nombreVisible };
+      respuesta.json({
+        datos: await repositorio.asignarAutomaticamente(lineas, tecnico, usuario.usuarioId),
+      });
     } catch (error) {
       siguiente(error);
     }
@@ -90,7 +105,7 @@ export function crearAsignacionRutas(
       respuesta.json({ datos: await repositorio.guardar(datos, tecnico, usuario.usuarioId) });
     } catch (error) {
       if (error instanceof ErrorAplicacion
-        && error.codigo === 'ASIGNACION_OTRO_USUARIO_NO_PERMITIDA') {
+        && error.codigo === 'ASIGNACION_MANUAL_NO_PERMITIDA') {
         respuesta.status(error.estadoHttp).json({ exito: false, mensaje: error.message });
         return;
       }
