@@ -84,10 +84,12 @@ export class ListaPedidosComponent implements OnInit {
   public readonly lineasSeleccionadasTransferencia = signal<ReadonlySet<string>>(new Set());
   public readonly usuariosAsignables = signal<readonly TecnicoAsignable[]>([]);
   public readonly asignaciones = signal<ReadonlyMap<string, AsignacionArticulo>>(new Map());
+  public readonly seleccionesAsignacion = signal<ReadonlyMap<string, string>>(new Map());
   public readonly asignacionesGuardando = signal<ReadonlySet<string>>(new Set());
   public readonly puedeAsignar = signal(false);
   public readonly puedeAsignarTodos = signal(false);
   public readonly mensajeAsignacion = signal('');
+  public readonly mensajeAsignacionEsError = signal(false);
 
   public ngOnInit(): void {
     this.cargarAlmacenes();
@@ -191,7 +193,7 @@ export class ListaPedidosComponent implements OnInit {
   public puedeAsignarPedidos(): boolean {
     const usuario = this.autenticacion.usuario();
     return usuario?.codigoRol === 'ADMINISTRADOR'
-      || usuario?.nombreUsuario.trim().toLowerCase() === 'gcruz';
+      || ['gcruz', 'acalix', 'jlara'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
   }
 
   public asignacionActual(
@@ -203,28 +205,20 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public nombreAsignado(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
-    if (this.puedeAsignarPedidos()) {
-      return this.asignacionActual(pedido, articulo)?.nombreAsignado ?? 'Sin asignar';
-    }
-    return this.autenticacion.usuario()?.nombreVisible ?? 'Sin asignar';
+    return this.asignacionActual(pedido, articulo)?.nombreAsignado ?? 'Sin asignar';
   }
 
   public valorAsignacionVisible(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
-    const usuarioAsignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado;
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    const usuarioAsignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado
+      ?? (identidad ? this.seleccionesAsignacion().get(claveArticuloAsignado(identidad)) : '');
     return usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)
       ? usuarioAsignado
       : '';
   }
 
-  public asignacionFueraDelCatalogo(
-    pedido: PedidoResumen,
-    articulo: ArticuloPedidoResumen,
-  ): AsignacionArticulo | null {
-    const asignacion = this.asignacionActual(pedido, articulo);
-    return asignacion?.usuarioAsignado
-      && !this.usuariosAsignables().some(({ usuario }) => usuario === asignacion.usuarioAsignado)
-      ? asignacion
-      : null;
+  public asignacionConfirmada(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
+    return Boolean(this.asignacionActual(pedido, articulo)?.usuarioAsignado);
   }
 
   public asignacionGuardando(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
@@ -232,47 +226,75 @@ export class ListaPedidosComponent implements OnInit {
     return Boolean(identidad && this.asignacionesGuardando().has(claveArticuloAsignado(identidad)));
   }
 
-  public cambiarAsignacion(
+  public cambiarSeleccionAsignacion(
     pedido: PedidoResumen,
     articulo: ArticuloPedidoResumen,
     usuarioAsignado: string,
   ): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    if (!identidad || !this.puedeAsignar() || this.asignacionGuardando(pedido, articulo)) return;
-    const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
-    if (!this.puedeAsignarTodos()
-      && usuarioAsignado.trim().toLowerCase() !== usuarioActual) return;
-    const tecnico = this.usuariosAsignables().find(({ usuario }) => usuario === usuarioAsignado);
-    if (usuarioAsignado && !tecnico) return;
+    if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
+      || this.asignacionGuardando(pedido, articulo)) return;
+    if (usuarioAsignado
+      && !this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)) return;
     const clave = claveArticuloAsignado(identidad);
-    const anterior = this.asignaciones().get(clave);
-    const nuevas = new Map(this.asignaciones());
-    nuevas.set(clave, {
-      ...identidad,
-      usuarioAsignado: tecnico?.usuario ?? null,
-      nombreAsignado: tecnico?.nombre ?? null,
-      actualizadoEn: anterior?.actualizadoEn ?? null,
-    });
-    this.asignaciones.set(nuevas);
+    const selecciones = new Map(this.seleccionesAsignacion());
+    if (usuarioAsignado) selecciones.set(clave, usuarioAsignado); else selecciones.delete(clave);
+    this.seleccionesAsignacion.set(selecciones);
+    this.mensajeAsignacion.set('');
+  }
+
+  public puedeConfirmarAsignacion(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+  ): boolean {
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
+      || this.asignacionGuardando(pedido, articulo)) return false;
+    const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
+    return Boolean(seleccion
+      && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
+  }
+
+  public confirmarAsignacion(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+  ): void {
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    if (!identidad || !this.puedeConfirmarAsignacion(pedido, articulo)) return;
+    const clave = claveArticuloAsignado(identidad);
+    const usuarioAsignado = this.seleccionesAsignacion().get(clave);
+    if (!usuarioAsignado) return;
     this.asignacionesGuardando.update((actuales) => new Set([...actuales, clave]));
     this.mensajeAsignacion.set('');
+    this.mensajeAsignacionEsError.set(false);
     this.versionAsignaciones += 1;
 
-    this.asignacionesService.guardar(identidad, tecnico?.usuario ?? null)
+    this.asignacionesService.guardar(identidad, usuarioAsignado)
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
         next: ({ datos }) => {
           const guardadas = new Map(this.asignaciones());
           guardadas.set(clave, datos);
           this.asignaciones.set(guardadas);
+          this.eliminarSeleccionAsignacion(clave);
           this.finalizarGuardadoAsignacion(clave);
+          this.mensajeAsignacion.set('Asignación guardada.');
         },
-        error: () => {
-          const restauradas = new Map(this.asignaciones());
-          if (anterior) restauradas.set(clave, anterior); else restauradas.delete(clave);
-          this.asignaciones.set(restauradas);
+        error: (error: unknown) => {
+          const asignacionGanadora = this.obtenerAsignacionDesdeError(error, identidad);
+          if (asignacionGanadora) {
+            const actuales = new Map(this.asignaciones());
+            actuales.set(clave, asignacionGanadora);
+            this.asignaciones.set(actuales);
+            this.eliminarSeleccionAsignacion(clave);
+            this.mensajeAsignacion.set(
+              `Esta partida ya fue asignada a ${asignacionGanadora.nombreAsignado}.`,
+            );
+          } else {
+            this.mensajeAsignacion.set('No fue posible guardar la asignación.');
+          }
           this.finalizarGuardadoAsignacion(clave);
-          this.mensajeAsignacion.set('No se pudo guardar la asignación. Intentá nuevamente.');
+          this.mensajeAsignacionEsError.set(true);
         },
       });
   }
@@ -622,13 +644,16 @@ export class ListaPedidosComponent implements OnInit {
       .subscribe({
         next: ({ datos, puedeAsignar, puedeAsignarTodos }) => {
           const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
-          const asignaTodos = puedeAsignarTodos && this.puedeAsignarPedidos();
+          const asignaTodos = puedeAsignarTodos
+            && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR' || usuarioActual === 'gcruz');
           const visibles = asignaTodos
             ? datos
-            : datos.filter(({ usuario }) => usuario.trim().toLowerCase() === usuarioActual);
+            : usuarioActual === 'acalix' || usuarioActual === 'jlara'
+              ? datos.filter(({ usuario }) => ['jlara', 'acalix'].includes(usuario.trim().toLowerCase()))
+              : [];
           this.usuariosAsignables.set(visibles);
           this.puedeAsignarTodos.set(asignaTodos);
-          this.puedeAsignar.set(puedeAsignar && asignaTodos && visibles.length > 0);
+          this.puedeAsignar.set(puedeAsignar && this.puedeAsignarPedidos() && visibles.length > 0);
           this.usuariosAsignablesCargados = true;
           this.cargarAsignaciones(this.pedidos());
         },
@@ -649,17 +674,21 @@ export class ListaPedidosComponent implements OnInit {
     }));
     if (lineas.length === 0) return;
     const versionConsulta = this.versionAsignaciones;
-    const consulta = this.puedeAsignarTodos()
-      ? this.asignacionesService.consultar(lineas)
-      : this.asignacionesService.autoasignar(lineas);
+    const consulta = this.asignacionesService.consultar(lineas);
     consulta
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
         next: ({ datos }) => {
           if (versionConsulta !== this.versionAsignaciones) return;
           const actuales = new Map(this.asignaciones());
-          datos.forEach((asignacion) => actuales.set(claveArticuloAsignado(asignacion), asignacion));
+          const selecciones = new Map(this.seleccionesAsignacion());
+          datos.forEach((asignacion) => {
+            const clave = claveArticuloAsignado(asignacion);
+            actuales.set(clave, asignacion);
+            if (asignacion.usuarioAsignado) selecciones.delete(clave);
+          });
           this.asignaciones.set(actuales);
+          this.seleccionesAsignacion.set(selecciones);
         },
         error: () => undefined,
       });
@@ -680,6 +709,34 @@ export class ListaPedidosComponent implements OnInit {
       nuevos.delete(clave);
       return nuevos;
     });
+  }
+
+  private eliminarSeleccionAsignacion(clave: string): void {
+    const selecciones = new Map(this.seleccionesAsignacion());
+    selecciones.delete(clave);
+    this.seleccionesAsignacion.set(selecciones);
+  }
+
+  private obtenerAsignacionDesdeError(
+    error: unknown,
+    identidad: IdentidadArticuloAsignacion,
+  ): AsignacionArticulo | null {
+    if (!error || typeof error !== 'object' || !('error' in error)) return null;
+    const cuerpo = error.error;
+    if (!cuerpo || typeof cuerpo !== 'object' || !('datos' in cuerpo)) return null;
+    const datos = cuerpo.datos;
+    if (!datos || typeof datos !== 'object') return null;
+    const posible = datos as Partial<AsignacionArticulo>;
+    if (posible.idOrigen !== identidad.idOrigen
+      || posible.identificadorDetalle !== identidad.identificadorDetalle
+      || typeof posible.usuarioAsignado !== 'string'
+      || typeof posible.nombreAsignado !== 'string') return null;
+    return {
+      ...identidad,
+      usuarioAsignado: posible.usuarioAsignado,
+      nombreAsignado: posible.nombreAsignado,
+      actualizadoEn: typeof posible.actualizadoEn === 'string' ? posible.actualizadoEn : null,
+    };
   }
 
 }

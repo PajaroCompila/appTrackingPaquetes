@@ -482,6 +482,27 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
 .seguimiento { font-family: var(--fuente-interfaz); font-size: .78rem; overflow-wrap: anywhere; }
 .cargador { width: 2rem; height: 2rem; border: 3px solid #bed0e1; border-top-color: var(--azul-700); border-radius: 50%; animation: girar .8s linear infinite; }
 .solo-lectores { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.vista-pedidos .control-asignacion { display: flex; align-items: center; gap: .4rem; }
+.vista-pedidos .boton-asignar {
+  min-height: 2.15rem;
+  flex: 0 0 auto;
+  padding: .42rem .58rem;
+  border: 1px solid var(--azul-700);
+  border-radius: .45rem;
+  background: var(--azul-700);
+  color: white;
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.vista-pedidos .boton-asignar:hover:not(:disabled),
+.vista-pedidos .boton-asignar:focus-visible:not(:disabled) { background: var(--azul-900); }
+.vista-pedidos .boton-asignar:focus-visible { outline: 3px solid rgb(29 82 137 / 13%); outline-offset: 1px; }
+.vista-pedidos .boton-asignar:disabled { border-color: #c3d0db; background: #e7edf2; color: #718397; cursor: not-allowed; }
+.vista-pedidos .grupo-pedido tr.fila-asignada { background: #eef7f3; }
+.vista-pedidos .grupo-pedido tr.fila-asignada:hover,
+.vista-pedidos .grupo-pedido tr.fila-asignada:has(:focus-visible) { background: #e5f2ec; }
+.vista-pedidos .mensaje-asignacion-exito { color: #246245; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .cargador { animation: none; }

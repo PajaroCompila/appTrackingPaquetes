@@ -15,6 +15,11 @@ export const tecnicosAsignables = [
   { usuario: 'dvelasquez', nombre: 'Daniel Velasquez' },
 ] as const;
 
+const tecnicosAsignablesAcalixJlara = [
+  { usuario: 'jlara', nombre: 'Jorge Lara' },
+  { usuario: 'acalix', nombre: 'Ana Calix' },
+] as const;
+
 const identidad = z.object({
   idOrigen: z.string().trim().min(1).max(150),
   identificadorDetalle: z.string().trim().min(1).max(150),
@@ -23,27 +28,37 @@ export const esquemaConsultaAsignaciones = z.object({
   lineas: z.array(identidad).min(1).max(100),
 }).strict();
 export const esquemaGuardarAsignacion = identidad.extend({
-  usuarioAsignado: z.string().trim().min(1).max(100).nullable(),
+  usuarioAsignado: z.string().trim().min(1).max(100),
 }).strict();
 
 export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-    || nombreUsuario.trim().toLowerCase() === 'gcruz';
+    || ['gcruz', 'acalix', 'jlara'].includes(nombreUsuario.trim().toLowerCase());
 }
 
 export function usuariosAsignablesParaSesion(
   usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
 ): readonly TecnicoAsignable[] {
+  const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+  if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') return tecnicosAsignablesAcalixJlara;
   if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) return tecnicosAsignables;
-  return [{ usuario: usuario.nombreUsuario, nombre: usuario.nombreVisible }];
+  return [];
 }
 
 export function resolverTecnicoAsignable(
   usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
-  usuarioAsignado: string | null,
-): TecnicoAsignable | null {
+  usuarioAsignado: string,
+): TecnicoAsignable {
+  const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+  if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
+    const tecnico = tecnicosAsignablesAcalixJlara.find(({ usuario: codigo }) => codigo === usuarioAsignado);
+    if (!tecnico) {
+      throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
+        'El técnico seleccionado no está disponible.');
+    }
+    return tecnico;
+  }
   if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) {
-    if (usuarioAsignado === null) return null;
     const tecnico = tecnicosAsignables.find(({ usuario: codigo }) => codigo === usuarioAsignado);
     if (!tecnico) {
       throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
@@ -53,7 +68,7 @@ export function resolverTecnicoAsignable(
   }
 
   throw new ErrorAplicacion(403, 'ASIGNACION_MANUAL_NO_PERMITIDA',
-    'La asignación para este usuario se realiza automáticamente.');
+    'No tiene permisos para asignar pedidos.');
 }
 
 export function crearAsignacionRutas(
@@ -63,10 +78,13 @@ export function crearAsignacionRutas(
 
   rutas.get('/usuarios', (solicitud, respuesta) => {
     const usuario = solicitud.user!;
-    const puedeAsignarTodos = puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario);
+    const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+    const datos = usuariosAsignablesParaSesion(usuario);
+    const puedeAsignarTodos = usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
+      || nombreUsuario === 'gcruz';
     respuesta.json({
-      datos: usuariosAsignablesParaSesion(usuario),
-      puedeAsignar: puedeAsignarTodos,
+      datos,
+      puedeAsignar: datos.length > 0,
       puedeAsignarTodos,
     });
   });
@@ -80,29 +98,21 @@ export function crearAsignacionRutas(
     }
   });
 
-  rutas.post('/autoasignar', async (solicitud, respuesta, siguiente) => {
-    try {
-      const usuario = solicitud.user!;
-      if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) {
-        throw new ErrorAplicacion(403, 'AUTOASIGNACION_NO_APLICA',
-          'Este usuario debe seleccionar la asignación manualmente.');
-      }
-      const { lineas } = esquemaConsultaAsignaciones.parse(solicitud.body);
-      const tecnico = { usuario: usuario.nombreUsuario, nombre: usuario.nombreVisible };
-      respuesta.json({
-        datos: await repositorio.asignarAutomaticamente(lineas, tecnico, usuario.usuarioId),
-      });
-    } catch (error) {
-      siguiente(error);
-    }
-  });
-
   rutas.patch('/', async (solicitud, respuesta, siguiente) => {
     try {
       const usuario = solicitud.user!;
       const datos = esquemaGuardarAsignacion.parse(solicitud.body);
       const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
-      respuesta.json({ datos: await repositorio.guardar(datos, tecnico, usuario.usuarioId) });
+      const resultado = await repositorio.guardar(datos, tecnico, usuario.usuarioId);
+      if (!resultado.confirmada) {
+        respuesta.status(409).json({
+          exito: false,
+          mensaje: 'Este pedido/artículo ya fue asignado.',
+          datos: resultado.asignacion,
+        });
+        return;
+      }
+      respuesta.json({ datos: resultado.asignacion });
     } catch (error) {
       if (error instanceof ErrorAplicacion
         && error.codigo === 'ASIGNACION_MANUAL_NO_PERMITIDA') {

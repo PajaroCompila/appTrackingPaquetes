@@ -7,6 +7,12 @@ import type {
 } from './asignacion.interface.js';
 
 type FilaAsignacion = AsignacionArticulo;
+type FilaConfirmacionAsignacion = FilaAsignacion & { confirmada: boolean };
+
+export interface ResultadoConfirmacionAsignacion {
+  asignacion: AsignacionArticulo;
+  confirmada: boolean;
+}
 
 function lineasUnicas(lineas: IdentidadArticuloAsignacion[]): IdentidadArticuloAsignacion[] {
   const unicas = new Map<string, IdentidadArticuloAsignacion>();
@@ -54,98 +60,57 @@ export class AsignacionRepositorio {
 
   public async guardar(
     identidad: IdentidadArticuloAsignacion,
-    tecnico: TecnicoAsignable | null,
+    tecnico: TecnicoAsignable,
     usuarioId: string,
-  ): Promise<AsignacionArticulo> {
+  ): Promise<ResultadoConfirmacionAsignacion> {
     const solicitud = obtenerPoolPedidosBodega().request()
       .input('idOrigen', sql.NVarChar(150), identidad.idOrigen.trim())
       .input('identificadorDetalle', sql.NVarChar(150), identidad.identificadorDetalle.trim())
-      .input('usuarioAsignado', sql.NVarChar(100), tecnico?.usuario ?? null)
-      .input('nombreAsignado', sql.NVarChar(150), tecnico?.nombre ?? null)
+      .input('usuarioAsignado', sql.NVarChar(100), tecnico.usuario)
+      .input('nombreAsignado', sql.NVarChar(150), tecnico.nombre)
       .input('usuarioId', sql.UniqueIdentifier, usuarioId);
-    const resultado = await solicitud.query<FilaAsignacion>(`
+    const resultado = await solicitud.query<FilaConfirmacionAsignacion>(`
       SET XACT_ABORT ON;
       BEGIN TRANSACTION;
+
+      DECLARE @confirmada bit = 0;
 
       UPDATE dbo.AsignacionArticuloPedido WITH (UPDLOCK, HOLDLOCK)
         SET usuarioAsignado = @usuarioAsignado,
             nombreAsignado = @nombreAsignado,
             asignadoPor = @usuarioId,
             actualizadoEn = SYSUTCDATETIME()
-      WHERE idOrigen = @idOrigen AND identificadorDetalle = @identificadorDetalle;
+      WHERE idOrigen = @idOrigen
+        AND identificadorDetalle = @identificadorDetalle
+        AND usuarioAsignado IS NULL;
 
-      IF @@ROWCOUNT = 0
+      IF @@ROWCOUNT = 1
+        SET @confirmada = 1;
+
+      IF @confirmada = 0 AND NOT EXISTS(
+        SELECT 1
+        FROM dbo.AsignacionArticuloPedido WITH (UPDLOCK, HOLDLOCK)
+        WHERE idOrigen = @idOrigen AND identificadorDetalle = @identificadorDetalle
+      )
+      BEGIN
         INSERT dbo.AsignacionArticuloPedido(
           idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, asignadoPor
         ) VALUES(
           @idOrigen, @identificadorDetalle, @usuarioAsignado, @nombreAsignado, @usuarioId
         );
 
-      COMMIT TRANSACTION;
+        SET @confirmada = 1;
+      END;
 
-      SELECT idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, actualizadoEn
+      SELECT idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, actualizadoEn,
+        @confirmada confirmada
       FROM dbo.AsignacionArticuloPedido
       WHERE idOrigen = @idOrigen AND identificadorDetalle = @identificadorDetalle;
-    `);
-    return resultado.recordset[0]!;
-  }
-
-  public async asignarAutomaticamente(
-    lineas: IdentidadArticuloAsignacion[],
-    tecnico: TecnicoAsignable,
-    usuarioId: string,
-  ): Promise<AsignacionArticulo[]> {
-    const unicas = lineasUnicas(lineas);
-    if (unicas.length === 0) return [];
-    const solicitud = obtenerPoolPedidosBodega().request()
-      .input('usuarioAsignado', sql.NVarChar(100), tecnico.usuario)
-      .input('nombreAsignado', sql.NVarChar(150), tecnico.nombre)
-      .input('usuarioId', sql.UniqueIdentifier, usuarioId);
-    const valores = agregarLineas(solicitud, unicas);
-    const resultado = await solicitud.query<FilaAsignacion>(`
-      SET XACT_ABORT ON;
-      BEGIN TRANSACTION;
-
-      DECLARE @lineas TABLE (
-        idOrigen nvarchar(150) NOT NULL,
-        identificadorDetalle nvarchar(150) NOT NULL,
-        PRIMARY KEY (idOrigen, identificadorDetalle)
-      );
-      INSERT @lineas(idOrigen, identificadorDetalle) VALUES ${valores};
-
-      UPDATE asignacion WITH (UPDLOCK, HOLDLOCK)
-        SET usuarioAsignado = @usuarioAsignado,
-            nombreAsignado = @nombreAsignado,
-            asignadoPor = @usuarioId,
-            actualizadoEn = SYSUTCDATETIME()
-      FROM dbo.AsignacionArticuloPedido asignacion
-      INNER JOIN @lineas linea
-        ON linea.idOrigen = asignacion.idOrigen
-       AND linea.identificadorDetalle = asignacion.identificadorDetalle
-      WHERE asignacion.usuarioAsignado IS NULL;
-
-      INSERT dbo.AsignacionArticuloPedido(
-        idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, asignadoPor
-      )
-      SELECT linea.idOrigen, linea.identificadorDetalle,
-        @usuarioAsignado, @nombreAsignado, @usuarioId
-      FROM @lineas linea
-      WHERE NOT EXISTS (
-        SELECT 1
-        FROM dbo.AsignacionArticuloPedido asignacion WITH (UPDLOCK, HOLDLOCK)
-        WHERE asignacion.idOrigen = linea.idOrigen
-          AND asignacion.identificadorDetalle = linea.identificadorDetalle
-      );
-
-      SELECT linea.idOrigen, linea.identificadorDetalle,
-        asignacion.usuarioAsignado, asignacion.nombreAsignado, asignacion.actualizadoEn
-      FROM @lineas linea
-      INNER JOIN dbo.AsignacionArticuloPedido asignacion
-        ON asignacion.idOrigen = linea.idOrigen
-       AND asignacion.identificadorDetalle = linea.identificadorDetalle;
 
       COMMIT TRANSACTION;
     `);
-    return resultado.recordset;
+    const { confirmada, ...asignacion } = resultado.recordset[0]!;
+    return { asignacion, confirmada };
   }
+
 }

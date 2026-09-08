@@ -164,9 +164,10 @@
 .columna-fecha { width: 8.75rem; }
 .columna-vendedor { width: 12%; }
 .columna-detalle { width: 6.75rem; white-space: nowrap; }
-.columna-asignado { width: 12rem; min-width: 12rem; }
+.columna-asignado { width: 16rem; min-width: 16rem; }
 .selector-asignacion {
-  width: 100%;
+  width: auto;
+  flex: 1 1 auto;
   min-width: 0;
   padding: .45rem 1.8rem .45rem .55rem;
   border: 1px solid #a8bbcd;
@@ -176,7 +177,7 @@
   font-size: .78rem;
 }
 .selector-asignacion:focus-visible { border-color: var(--azul-700); outline: 3px solid rgb(29 82 137 / 13%); outline-offset: 1px; }
-.selector-asignacion:disabled { background: #f3f6f9; color: var(--gris-600); cursor: wait; }
+.selector-asignacion:disabled { background: #eef3f7; color: var(--azul-900); cursor: default; opacity: 1; }
 .asignacion-lectura { display: inline-block; color: var(--azul-900); font-size: .8rem; font-weight: 600; line-height: 1.3; }
 .asignacion-lectura.sin-asignar { color: var(--gris-600); font-weight: 400; }
 .mensaje-asignacion { margin: -.35rem 0 .75rem; color: #8a4b08; font-size: .82rem; font-weight: 600; text-align: right; }

@@ -122,7 +122,13 @@
       >Transferir a despachados ({{ lineasSeleccionadasTransferencia().size }})</button>
     </div>
     @if (mensajeTransferencia()) { <p class="mensaje-transferencia" role="status">{{ mensajeTransferencia() }}</p> }
-    @if (mensajeAsignacion()) { <p class="mensaje-asignacion" role="alert">{{ mensajeAsignacion() }}</p> }
+    @if (mensajeAsignacion()) {
+      <p
+        class="mensaje-asignacion"
+        [class.mensaje-asignacion-exito]="!mensajeAsignacionEsError()"
+        [attr.role]="mensajeAsignacionEsError() ? 'alert' : 'status'"
+      >{{ mensajeAsignacion() }}</p>
+    }
     <div class="panel tabla-contenedor">
       <table>
         <caption class="solo-lectores">Listado de pedidos encontrados</caption>
@@ -143,7 +149,7 @@
         @for (pedido of pedidos(); track pedido.idOrigen) {
           <tbody class="grupo-pedido">
             @for (articulo of pedido.articulos; track claveArticulo(articulo, $index)) {
-              <tr>
+              <tr [class.fila-asignada]="asignacionConfirmada(pedido, articulo)">
                 <td class="columna-seleccion" data-label="Seleccionar">
                   <label class="selector-linea selector-transferencia" title="Seleccionar para transferir">
                     <input
@@ -187,28 +193,39 @@
                 </td>
                 <td class="columna-asignado" data-label="Asignado a">
                   @if (puedeAsignar()) {
-                    <select
-                      class="selector-asignacion"
-                      [ngModel]="valorAsignacionVisible(pedido, articulo)"
-                      [ngModelOptions]="{ standalone: true }"
-                      [disabled]="asignacionGuardando(pedido, articulo) || !articulo.identificadorDetalle"
-                      [attr.aria-label]="'Asignar técnico al artículo ' + marcador(articulo.codigoArticulo)"
-                      (ngModelChange)="cambiarAsignacion(pedido, articulo, $event)"
-                    >
-                      @if (puedeAsignarTodos()) {
-                        <option value="">Sin asignar</option>
-                        @if (asignacionFueraDelCatalogo(pedido, articulo); as asignacionExterna) {
-                          <option [value]="asignacionExterna.usuarioAsignado" disabled>
-                            {{ asignacionExterna.nombreAsignado }}
-                          </option>
+                    <div class="control-asignacion">
+                      @if (asignacionConfirmada(pedido, articulo)) {
+                        @if (asignacionActual(pedido, articulo); as confirmada) {
+                          <select
+                            class="selector-asignacion"
+                            disabled
+                            [attr.aria-label]="'Técnico asignado al artículo ' + marcador(articulo.codigoArticulo)"
+                          >
+                            <option [value]="confirmada.usuarioAsignado">{{ confirmada.nombreAsignado }}</option>
+                          </select>
                         }
                       } @else {
-                        <option value="" disabled>Asignarme</option>
+                        <select
+                          class="selector-asignacion"
+                          [ngModel]="valorAsignacionVisible(pedido, articulo)"
+                          [ngModelOptions]="{ standalone: true }"
+                          [disabled]="asignacionGuardando(pedido, articulo) || !articulo.identificadorDetalle"
+                          [attr.aria-label]="'Seleccionar técnico para el artículo ' + marcador(articulo.codigoArticulo)"
+                          (ngModelChange)="cambiarSeleccionAsignacion(pedido, articulo, $event)"
+                        >
+                          <option value="">Sin asignar</option>
+                          @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
+                            <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
+                          }
+                        </select>
                       }
-                      @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
-                        <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
-                      }
-                    </select>
+                      <button
+                        class="boton-asignar"
+                        type="button"
+                        [disabled]="!puedeConfirmarAsignacion(pedido, articulo)"
+                        (click)="confirmarAsignacion(pedido, articulo)"
+                      >Asignar</button>
+                    </div>
                   } @else {
                     <span class="asignacion-lectura" [class.sin-asignar]="!asignacionActual(pedido, articulo)?.nombreAsignado">
                       {{ nombreAsignado(pedido, articulo) }}

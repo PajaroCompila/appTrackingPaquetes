@@ -40,7 +40,6 @@ describe('ListaPedidosComponent', () => {
   let asignacionesService: {
     obtenerUsuarios: ReturnType<typeof vi.fn>;
     consultar: ReturnType<typeof vi.fn>;
-    autoasignar: ReturnType<typeof vi.fn>;
     guardar: ReturnType<typeof vi.fn>;
   };
   const usuarioSesion = signal<UsuarioSesion>({
@@ -112,11 +111,6 @@ describe('ListaPedidosComponent', () => {
         usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
         actualizadoEn: '2026-08-03T12:00:00',
       }] })),
-      autoasignar: vi.fn().mockReturnValue(of({ datos: [{
-        idOrigen: 'R1:F1', identificadorDetalle: '1',
-        usuarioAsignado: 'tlopez', nombreAsignado: 'Tommy López',
-        actualizadoEn: '2026-08-03T12:00:00',
-      }] })),
       guardar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
         ...linea,
         usuarioAsignado,
@@ -179,7 +173,8 @@ describe('ListaPedidosComponent', () => {
       .map((encabezado) => encabezado.textContent.trim());
     expect(encabezados).not.toContain('Estado');
     expect(encabezados).not.toContain('Creado en R1');
-    expect(encabezados).toContain('Asignado a');
+    expect(encabezados.some((encabezado) => encabezado.includes('Asignado a'))).toBe(true);
+    expect(fixture.nativeElement.querySelector('.boton-asignar-todos')).toBeNull();
     expect(encabezados).not.toContain('Imprimir');
     expect(encabezados).toHaveLength(10);
     expect(componente.filtrosFormulario.fechaDesde).toBe('2026-08-03');
@@ -550,36 +545,116 @@ describe('ListaPedidosComponent', () => {
     expect(consultaInventario.estado()).toBe('error');
   });
 
-  it('muestra los siete técnicos, guarda por línea y conserva la asignación durante el refresco', async () => {
+  it('mantiene bloqueada y sombreada una asignación confirmada durante el refresco', async () => {
     const pedido = respuestaLista.datos[0];
     fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    const boton = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    expect(componente.asignacionActual(pedido, pedido.articulos[0])).toMatchObject({
+      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+    });
     expect(selector).toBeTruthy();
-    expect(selector.options).toHaveLength(8);
+    expect(selector.options).toHaveLength(1);
+    expect(selector.disabled).toBe(true);
+    expect(boton.disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
     expect(asignacionesService.consultar).toHaveBeenCalledWith([
       { idOrigen: 'R1:F1', identificadorDetalle: '1' },
     ]);
     expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Gregorio Cruz');
 
+    await vi.advanceTimersByTimeAsync(15000);
+    fixture.detectChanges();
+    expect(selector.disabled).toBe(true);
+    expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Gregorio Cruz');
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+  });
+
+  it('selecciona libremente y solo confirma al pulsar Asignar', () => {
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    const boton = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('tbody tr').classList).not.toContain('fila-asignada');
+
     selector.value = 'mperez';
     selector.dispatchEvent(new Event('change'));
     fixture.detectChanges();
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+    expect(boton.disabled).toBe(false);
+
+    boton.click();
+    fixture.detectChanges();
+    expect(asignacionesService.guardar).toHaveBeenCalledTimes(1);
     expect(asignacionesService.guardar).toHaveBeenCalledWith(
       { idOrigen: 'R1:F1', identificadorDetalle: '1' }, 'mperez',
     );
-    expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Marcos Perez');
-
-    asignacionesService.consultar.mockReturnValue(of({ datos: [{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez',
-      actualizadoEn: '2026-08-03T12:01:00',
-    }] }));
-    await vi.advanceTimersByTimeAsync(15000);
-    expect(componente.nombreAsignado(pedido, pedido.articulos[0])).toBe('Marcos Perez');
+    const selectorConfirmado = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect(selectorConfirmado.disabled).toBe(true);
+    expect(boton.disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
+    expect(fixture.nativeElement.textContent).toContain('Asignación guardada.');
   });
 
-  it('autoasigna al usuario normal sin mostrarle un selector', () => {
+  it('muestra y bloquea la asignación que ganó una confirmación simultánea', () => {
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    asignacionesService.guardar.mockReturnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { datos: {
+        idOrigen: 'R1:F1', identificadorDetalle: '1',
+        usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+        actualizadoEn: '2026-08-03T12:01:00',
+      } },
+    })));
+    fixture.detectChanges();
+    fixture.detectChanges();
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    selector.value = 'mperez';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const selectorBloqueado = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect(selectorBloqueado.disabled).toBe(true);
+    expect(selectorBloqueado.value).toBe('gcruz');
+    expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
+    expect(fixture.nativeElement.textContent).toContain('Esta partida ya fue asignada a Gregorio Cruz.');
+  });
+
+  it('mantiene editable la asignación cuando no fue posible guardarla', () => {
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    asignacionesService.guardar.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    fixture.detectChanges();
+    fixture.detectChanges();
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    selector.value = 'mperez';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(selector.disabled).toBe(false);
+    expect(fixture.nativeElement.querySelector('tbody tr').classList).not.toContain('fila-asignada');
+    expect(fixture.nativeElement.textContent).toContain('No fue posible guardar la asignación.');
+  });
+
+  it('no autoasigna al usuario normal sin mostrarle un selector', () => {
     usuarioSesion.set({
       usuarioId: '2', nombreUsuario: 'tlopez', nombreVisible: 'Tommy López',
       codigoRol: 'CONSULTA', codigoAlmacen: null, debeCambiarContrasena: false,
@@ -587,19 +662,134 @@ describe('ListaPedidosComponent', () => {
     asignacionesService.obtenerUsuarios.mockReturnValue(of({
       puedeAsignar: false,
       puedeAsignarTodos: false,
-      datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
+      datos: [],
     }));
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
     fixture.detectChanges();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.selector-asignacion')).toBeNull();
     expect(fixture.nativeElement.querySelector('.asignacion-lectura')?.textContent)
-      .toContain('Tommy López');
+      .toContain('Sin asignar');
     expect(fixture.nativeElement.textContent).not.toContain('Gregorio Cruz');
     expect(fixture.nativeElement.textContent).not.toContain('Marcos Perez');
-    expect(asignacionesService.autoasignar).toHaveBeenCalledWith(
+    expect(asignacionesService.consultar).toHaveBeenCalledWith(
       [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
     );
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['acalix', 'Ana Calix'],
+    ['jlara', 'Jorge Lara'],
+  ])('%s inicia sin asignación y solo ve a Jorge Lara y Ana Calix', async (nombreUsuario, nombreVisible) => {
+    usuarioSesion.set({
+      usuarioId: '2', nombreUsuario, nombreVisible,
+      codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null, debeCambiarContrasena: false,
+    });
+    asignacionesService.obtenerUsuarios.mockReturnValue(of({
+      puedeAsignar: true,
+      puedeAsignarTodos: false,
+      datos: [
+        { usuario: 'jlara', nombre: 'Jorge Lara' },
+        { usuario: 'acalix', nombre: 'Ana Calix' },
+      ],
+    }));
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect(componente.puedeAsignar()).toBe(true);
+    expect(componente.puedeAsignarTodos()).toBe(false);
+    expect([...selector.options].map(({ value, text }) => ({ value, text }))).toEqual([
+      { value: '', text: 'Sin asignar' },
+      { value: 'jlara', text: 'Jorge Lara' },
+      { value: 'acalix', text: 'Ana Calix' },
+    ]);
+    expect(selector.value).toBe('');
+
+    selector.value = 'acalix';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    selector.value = 'jlara';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(30000);
+    fixture.detectChanges();
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+    expect((fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement).disabled)
+      .toBe(false);
+  });
+
+  it.each([
+    ['admin', 'ADMINISTRADOR' as const],
+    ['gcruz', 'OPERADOR_BODEGA' as const],
+  ])('%s conserva la lista completa sin guardar al cambiar el selector', (nombreUsuario, codigoRol) => {
+    usuarioSesion.set({
+      usuarioId: '2', nombreUsuario, nombreVisible: nombreUsuario,
+      codigoRol, codigoAlmacen: null, debeCambiarContrasena: false,
+    });
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect([...selector.options].map(({ value }) => value)).toEqual([
+      '', 'mperez', 'gcruz', 'operdomo', 'omencia', 'maperdomo', 'osmith', 'dvelasquez',
+    ]);
+    selector.value = 'mperez';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+  });
+
+  it('descarta una selección temporal al salir y regresar sin confirmar', () => {
+    usuarioSesion.set({
+      usuarioId: '2', nombreUsuario: 'acalix', nombreVisible: 'Ana Calix',
+      codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null, debeCambiarContrasena: false,
+    });
+    asignacionesService.obtenerUsuarios.mockReturnValue(of({
+      puedeAsignar: true,
+      puedeAsignarTodos: false,
+      datos: [
+        { usuario: 'jlara', nombre: 'Jorge Lara' },
+        { usuario: 'acalix', nombre: 'Ana Calix' },
+      ],
+    }));
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    selector.value = 'jlara';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(selector.value).toBe('jlara');
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+
+    fixture.destroy();
+    fixture = TestBed.createComponent(ListaPedidosComponent);
+    componente = fixture.componentInstance;
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement).value)
+      .toBe('');
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 

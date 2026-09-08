@@ -19,9 +19,11 @@ const usuarioNormal = {
 };
 
 describe('asignaciones de artículos', () => {
-  it('permite asignar solamente a administradores y a gcruz', () => {
+  it('permite asignar a administradores, gcruz, acalix y jlara', () => {
     expect(puedeAsignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'GCRUZ')).toBe(true);
+    expect(puedeAsignarPedidos('CONSULTA', 'ACALIX')).toBe(true);
+    expect(puedeAsignarPedidos('CONSULTA', 'JLARA')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'otro')).toBe(false);
     expect(puedeAsignarPedidos('CONSULTA', 'otro')).toBe(false);
   });
@@ -33,10 +35,8 @@ describe('asignaciones de artículos', () => {
     ]);
   });
 
-  it('devuelve solamente la cuenta de la sesión para un usuario normal', () => {
-    expect(usuariosAsignablesParaSesion(usuarioNormal)).toEqual([
-      { usuario: 'tlopez', nombre: 'Tommy López' },
-    ]);
+  it('no ofrece asignación manual a un usuario normal y conserva la lista completa privilegiada', () => {
+    expect(usuariosAsignablesParaSesion(usuarioNormal)).toEqual([]);
     expect(usuariosAsignablesParaSesion({
       ...usuarioNormal, codigoRol: 'ADMINISTRADOR',
     })).toEqual(tecnicosAsignables);
@@ -45,13 +45,85 @@ describe('asignaciones de artículos', () => {
     })).toEqual(tecnicosAsignables);
   });
 
+  it('limita ACALIX y JLARA a Jorge Lara y Ana Calix', () => {
+    const opcionesEsperadas = [
+      { usuario: 'jlara', nombre: 'Jorge Lara' },
+      { usuario: 'acalix', nombre: 'Ana Calix' },
+    ];
+    expect(usuariosAsignablesParaSesion({
+      ...usuarioNormal, nombreUsuario: 'ACALIX', nombreVisible: 'Ana Calix',
+    })).toEqual(opcionesEsperadas);
+    expect(usuariosAsignablesParaSesion({
+      ...usuarioNormal, nombreUsuario: 'JLARA', nombreVisible: 'Jorge Lara',
+    })).toEqual(opcionesEsperadas);
+    expect(resolverTecnicoAsignable({
+      ...usuarioNormal, nombreUsuario: 'ACALIX', nombreVisible: 'Ana Calix',
+    }, 'jlara')).toEqual({ usuario: 'jlara', nombre: 'Jorge Lara' });
+  });
+
   it('impide la asignación manual a los usuarios normales', () => {
     expect(() => resolverTecnicoAsignable(usuarioNormal, 'TLOPEZ'))
-      .toThrow('La asignación para este usuario se realiza automáticamente.');
+      .toThrow('No tiene permisos para asignar pedidos.');
     expect(() => resolverTecnicoAsignable(usuarioNormal, 'gcruz'))
-      .toThrow('La asignación para este usuario se realiza automáticamente.');
-    expect(() => resolverTecnicoAsignable(usuarioNormal, null))
-      .toThrow('La asignación para este usuario se realiza automáticamente.');
+      .toThrow('No tiene permisos para asignar pedidos.');
+  });
+
+  it.each(['acalix', 'jlara'])('expone solamente las dos opciones permitidas para %s', async (nombreUsuario) => {
+    const aplicacion = express();
+    aplicacion.use((peticion, _respuesta, siguiente) => {
+      peticion.user = {
+        usuarioId: '00000000-0000-0000-0000-000000000001',
+        nombreUsuario,
+        nombreVisible: nombreUsuario === 'acalix' ? 'Ana Calix' : 'Jorge Lara',
+        codigoRol: 'OPERADOR_BODEGA',
+        codigoAlmacen: null,
+        sesionId: 'sesion-prueba',
+        debeCambiarContrasena: false,
+      };
+      siguiente();
+    });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({} as AsignacionRepositorio));
+
+    const respuesta = await solicitud(aplicacion).get('/api/pedidos/asignaciones/usuarios');
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({
+      datos: [
+        { usuario: 'jlara', nombre: 'Jorge Lara' },
+        { usuario: 'acalix', nombre: 'Ana Calix' },
+      ],
+      puedeAsignar: true,
+      puedeAsignarTodos: false,
+    });
+  });
+
+  it.each([
+    ['sistemas', 'ADMINISTRADOR'],
+    ['gcruz', 'OPERADOR_BODEGA'],
+  ])('conserva la lista completa para %s', async (nombreUsuario, codigoRol) => {
+    const aplicacion = express();
+    aplicacion.use((peticion, _respuesta, siguiente) => {
+      peticion.user = {
+        usuarioId: '00000000-0000-0000-0000-000000000001',
+        nombreUsuario,
+        nombreVisible: nombreUsuario,
+        codigoRol,
+        codigoAlmacen: null,
+        sesionId: 'sesion-prueba',
+        debeCambiarContrasena: false,
+      };
+      siguiente();
+    });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({} as AsignacionRepositorio));
+
+    const respuesta = await solicitud(aplicacion).get('/api/pedidos/asignaciones/usuarios');
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({
+      datos: tecnicosAsignables,
+      puedeAsignar: true,
+      puedeAsignarTodos: true,
+    });
   });
 
   it('responde 403 si un usuario normal intenta utilizar la asignación manual', async () => {
@@ -78,15 +150,11 @@ describe('asignaciones de artículos', () => {
     expect(respuesta.status).toBe(403);
     expect(respuesta.body).toEqual({
       exito: false,
-      mensaje: 'La asignación para este usuario se realiza automáticamente.',
+      mensaje: 'No tiene permisos para asignar pedidos.',
     });
   });
 
-  it('autoasigna líneas libres al usuario normal de la sesión', async () => {
-    const asignarAutomaticamente = vi.fn().mockResolvedValue([{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'tlopez', nombreAsignado: 'Tommy López', actualizadoEn: new Date(),
-    }]);
+  it('ya no expone el endpoint de autoasignación', async () => {
     const aplicacion = express();
     aplicacion.use(express.json());
     aplicacion.use((peticion, _respuesta, siguiente) => {
@@ -101,29 +169,82 @@ describe('asignaciones de artículos', () => {
       };
       siguiente();
     });
-    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
-      asignarAutomaticamente,
-    } as unknown as AsignacionRepositorio));
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({} as AsignacionRepositorio));
 
     const respuesta = await solicitud(aplicacion)
       .post('/api/pedidos/asignaciones/autoasignar')
       .send({ lineas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }] });
 
-    expect(respuesta.status).toBe(200);
-    expect(asignarAutomaticamente).toHaveBeenCalledWith(
-      [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
-      { usuario: 'tlopez', nombre: 'Tommy López' },
-      '00000000-0000-0000-0000-000000000001',
-    );
+    expect(respuesta.status).toBe(404);
   });
 
-  it('valida identidades estables y permite quitar una asignación', () => {
+  it('confirma una asignación disponible para un administrador', async () => {
+    const asignacion = {
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez', actualizadoEn: new Date(),
+    };
+    const guardar = vi.fn().mockResolvedValue({ asignacion, confirmada: true });
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use((peticion, _respuesta, siguiente) => {
+      peticion.user = {
+        usuarioId: '00000000-0000-0000-0000-000000000001',
+        nombreUsuario: 'sistemas', nombreVisible: 'Sistemas', codigoRol: 'ADMINISTRADOR',
+        codigoAlmacen: null, sesionId: 'sesion-prueba', debeCambiarContrasena: false,
+      };
+      siguiente();
+    });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
+      guardar,
+    } as unknown as AsignacionRepositorio));
+
+    const respuesta = await solicitud(aplicacion)
+      .patch('/api/pedidos/asignaciones')
+      .send({ idOrigen: 'R1:F1', identificadorDetalle: '1', usuarioAsignado: 'mperez' });
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.datos).toMatchObject({ usuarioAsignado: 'mperez' });
+  });
+
+  it('devuelve la asignación ganadora cuando otra persona ya confirmó la partida', async () => {
+    const asignacion = {
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez', actualizadoEn: new Date(),
+    };
+    const guardar = vi.fn().mockResolvedValue({ asignacion, confirmada: false });
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use((peticion, _respuesta, siguiente) => {
+      peticion.user = {
+        usuarioId: '00000000-0000-0000-0000-000000000002',
+        nombreUsuario: 'gcruz', nombreVisible: 'Gregorio Cruz', codigoRol: 'OPERADOR_BODEGA',
+        codigoAlmacen: null, sesionId: 'otra-sesion', debeCambiarContrasena: false,
+      };
+      siguiente();
+    });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
+      guardar,
+    } as unknown as AsignacionRepositorio));
+
+    const respuesta = await solicitud(aplicacion)
+      .patch('/api/pedidos/asignaciones')
+      .send({ idOrigen: 'R1:F1', identificadorDetalle: '1', usuarioAsignado: 'gcruz' });
+
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body).toMatchObject({
+      exito: false,
+      mensaje: 'Este pedido/artículo ya fue asignado.',
+      datos: { usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez' },
+    });
+  });
+
+  it('valida identidades estables y exige un técnico para confirmar', () => {
     expect(esquemaConsultaAsignaciones.safeParse({
       lineas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
     }).success).toBe(true);
     expect(esquemaGuardarAsignacion.safeParse({
       idOrigen: 'R1:F1', identificadorDetalle: '1', usuarioAsignado: null,
-    }).success).toBe(true);
+    }).success).toBe(false);
     expect(esquemaGuardarAsignacion.safeParse({
       idOrigen: '', identificadorDetalle: '1', usuarioAsignado: 'gcruz',
     }).success).toBe(false);
