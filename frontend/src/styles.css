@@ -499,9 +499,9 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
 .vista-pedidos .boton-asignar:focus-visible:not(:disabled) { background: var(--azul-900); }
 .vista-pedidos .boton-asignar:focus-visible { outline: 3px solid rgb(29 82 137 / 13%); outline-offset: 1px; }
 .vista-pedidos .boton-asignar:disabled { border-color: #c3d0db; background: #e7edf2; color: #718397; cursor: not-allowed; }
-.vista-pedidos .grupo-pedido tr.fila-asignada { background: #eef7f3; }
+.vista-pedidos .grupo-pedido tr.fila-asignada { background: #c8daec; }
 .vista-pedidos .grupo-pedido tr.fila-asignada:hover,
-.vista-pedidos .grupo-pedido tr.fila-asignada:has(:focus-visible) { background: #e5f2ec; }
+.vista-pedidos .grupo-pedido tr.fila-asignada:has(:focus-visible) { background: #b7cfe6; }
 .vista-pedidos .mensaje-asignacion-exito { color: #246245; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
