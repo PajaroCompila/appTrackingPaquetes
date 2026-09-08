@@ -302,6 +302,75 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   text-align: right;
   vertical-align: middle;
 }
+
+/* Matriz uniforme para los tres listados operativos. */
+@media (min-width: 681px) {
+  .vista-pedidos:not(.pagina-detalle) .bloque-superior-operativo,
+  .vista-pedidos:not(.pagina-detalle) .encabezado-pagina,
+  .vista-pedidos:not(.pagina-detalle) .filtros,
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor,
+  .vista-pedidos:not(.pagina-detalle) .pestanas-historial {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .filtros {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .filtros :is(input, select, .selector-multiple summary),
+  .vista-pedidos:not(.pagina-detalle) .acciones-filtros .boton {
+    min-height: 2.65rem;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .acciones-filtros .boton-primario {
+    min-width: 5.5rem;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .acciones-filtros .boton-secundario {
+    min-width: 8.5rem;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor table {
+    width: 100%;
+    min-width: 1400px;
+    table-layout: fixed;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor th {
+    height: 3.25rem;
+    padding: .75rem .6rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor tbody tr {
+    height: 4.5rem;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor td {
+    padding: .75rem .6rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor :is(.accion-tabla, .columna-seleccion),
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor .control-impresion {
+    text-align: center;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor :is(.texto-maximo-dos-lineas, .texto-dos-lineas),
+  .vista-pedidos:not(.pagina-detalle) .tabla-contenedor .columna-codigo-contenido {
+    margin-right: auto;
+    margin-left: auto;
+    text-align: center;
+  }
+
+  .vista-pedidos:not(.pagina-detalle) .selector-asignacion {
+    text-align: center;
+    text-align-last: center;
+  }
+}
 .etiqueta-estado {
   display: inline-flex;
   min-height: 1.75rem;
