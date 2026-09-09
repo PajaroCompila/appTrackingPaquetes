@@ -21,3 +21,5 @@ export const esquemaRestablecer = z.object({ contrasena: z.string().min(1).max(1
   .refine((valor) => valor.contrasena === valor.confirmarContrasena,
     { path: ['confirmarContrasena'], message: 'Las contraseñas no coinciden.' });
 export const esquemaIdUsuario = z.string().uuid();
+export const esquemaAlmacenesUsuario = z.object({ codigosAlmacen: z.array(z.string().trim().min(1).max(16)
+  .regex(/^[A-Za-z0-9_-]+$/)).max(100).transform((codigos) => [...new Set(codigos)]) }).strict();

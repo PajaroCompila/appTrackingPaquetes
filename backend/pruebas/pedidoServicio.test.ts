@@ -147,4 +147,34 @@ describe('PedidoServicio', () => {
       .toEqual(['2']);
     expect(resultado.totalRegistros).toBe(1);
   });
+
+  it('pagina partidas en Articulos y cabeceras en Pedido', async () => {
+    const pedido = crearPedido('R1', 'F1', '100');
+    pedido.articulos = Array.from({ length: 30 }, (_, indice) => ({
+      identificadorDetalle: String(indice + 1),
+      codigoArticulo: `A${indice + 1}`,
+      descripcion: `Articulo ${indice + 1}`,
+      cantidad: 1,
+      codigoAlmacen: 'B1',
+      nombreAlmacen: 'Bodega',
+    }));
+    const r1 = crearRepositorio();
+    vi.mocked(r1.buscarPedidos).mockResolvedValue({
+      ...paginaVacia, pedidos: [pedido], totalRegistros: 1,
+    });
+    const servicio = new PedidoServicio(r1, crearRepositorioSap());
+
+    const articulos = await servicio.buscarPedidos({
+      pagina: 1, cantidadPorPagina: 25, vista: 'articulos',
+    });
+    const pedidos = await servicio.buscarPedidos({
+      pagina: 1, cantidadPorPagina: 25, vista: 'pedido',
+    });
+
+    expect(articulos.pedidos).toHaveLength(25);
+    expect(articulos.pedidos.every((registro) => registro.articulos.length === 1)).toBe(true);
+    expect(articulos.hayMas).toBe(true);
+    expect(pedidos.pedidos).toHaveLength(1);
+    expect(pedidos.pedidos[0]?.articulos).toHaveLength(30);
+  });
 });

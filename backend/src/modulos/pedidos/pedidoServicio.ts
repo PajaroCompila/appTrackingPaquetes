@@ -60,11 +60,20 @@ export class PedidoServicio {
         }) }))
         .filter((pedido) => pedido.articulos.length > 0).sort((a, b) =>
         (a.fechaHoraPedido ?? '\uffff').localeCompare(b.fechaHoraPedido ?? '\uffff') || a.idOrigen.localeCompare(b.idOrigen));
+      const registros = filtros.vista === 'pedido'
+        ? unificados
+        : unificados.flatMap((pedido) => pedido.articulos.map((articulo) => ({
+          ...pedido,
+          codigosAlmacen: articulo.codigoAlmacen ? [articulo.codigoAlmacen] : [],
+          nombresBodega: articulo.nombreAlmacen,
+          articulos: [articulo],
+        })));
       const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
-      const pedidos = unificados.slice(inicio, inicio + filtros.cantidadPorPagina);
-      const totalRegistros = unificados.length;
+      const pedidos = registros.slice(inicio, inicio + filtros.cantidadPorPagina);
+      const totalRegistros = registros.length;
       return { pedidos, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
-        totalRegistros, hayMas: inicio + pedidos.length < totalRegistros,
+        totalRegistros, hayMas: Boolean(retailOne?.hayMas || sap?.hayMas
+          || inicio + pedidos.length < totalRegistros),
         fuentes: {
           retailOne: retailOne ? 'disponible' : 'no_disponible',
           sap: sap ? 'disponible' : 'no_disponible',
@@ -82,6 +91,7 @@ export class PedidoServicio {
       codigosAlmacen: [...(filtros.codigosAlmacen ?? [])].sort(),
       codigoEstadoVenta: filtros.codigoEstadoVenta ?? null,
       codigoSincronizacion: filtros.codigoSincronizacion ?? null,
+      vista: filtros.vista ?? 'articulos',
       pagina: filtros.pagina,
       cantidadPorPagina: filtros.cantidadPorPagina,
     });

@@ -21,12 +21,14 @@ export interface FiltrosDespachados {
   codigosAlmacen: string[];
   pagina: number;
   cantidadPorPagina: number;
+  vista?: 'articulos' | 'pedido';
 }
 
 export interface IDespachoRepositorio {
   identidadesLineas(): Promise<Set<string>>;
   guardarLineas(lineas: LineaDespachoValidada[], usuarioId: string): Promise<ResultadoPersistenciaDespacho>;
   listar(filtros: FiltrosDespachados): Promise<{ pedidos: PedidoDespachado[]; total: number }>;
+  listarArticulos?(filtros: FiltrosDespachados): Promise<{ pedidos: PedidoDespachado[]; total: number }>;
   obtener(id: string): Promise<PedidoDespachado | null>;
 }
 
@@ -155,11 +157,15 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
         detalle.codigoAlmacen detalleCodigoAlmacen,
         detalle.nombreAlmacen detalleNombreAlmacen,
-        detalle.transferidoEn, usuarioDetalle.nombreVisible usuarioLinea
+        detalle.transferidoEn, usuarioDetalle.nombreVisible usuarioLinea,
+        asignacion.nombreAsignado usuarioAsignado
       FROM Pedidos pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
       JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
+      LEFT JOIN dbo.AsignacionArticuloPedido asignacion
+        ON asignacion.idOrigen = detalle.idOrigen
+       AND asignacion.identificadorDetalle = detalle.identificadorDetalle
       ${filtroDetalleAlmacenes}
       ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
         pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
@@ -183,15 +189,88 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         identificadorDetalle: fila.identificadorDetalle,
         transferidoEn: fila.transferidoEn.toISOString(),
         usuarioTransferencia: fila.usuarioLinea,
+        usuarioAsignado: fila.usuarioAsignado,
         codigoArticulo: fila.codigoArticulo, descripcion: fila.descripcion,
         cantidad: Number(fila.cantidad), codigoAlmacen: fila.detalleCodigoAlmacen,
         nombreAlmacen: fila.detalleNombreAlmacen,
       });
     }
+    for (const pedido of mapa.values()) {
+      pedido.responsablesAsignados = [...new Set(pedido.articulos
+        .map(({ usuarioAsignado }) => usuarioAsignado).filter((nombre): nombre is string => Boolean(nombre)))];
+    }
     return { pedidos: [...mapa.values()], total: Number(resultado.recordset[0]?.total ?? 0) };
   }
 
   public listar(filtros: FiltrosDespachados) { return this.consultar(null, filtros); }
+
+  public async listarArticulos(
+    filtros: FiltrosDespachados,
+  ): Promise<{ pedidos: PedidoDespachado[]; total: number }> {
+    const parametrosAlmacen = filtros.codigosAlmacen.map((_, indice) => `@codigoAlmacen${indice}`);
+    const solicitud = obtenerPoolPedidosBodega().request()
+      .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
+      .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null)
+      .input('fechaHasta', sql.Date, filtros.fechaHasta ?? null)
+      .input('inicio', sql.Int, (filtros.pagina - 1) * filtros.cantidadPorPagina)
+      .input('cantidad', sql.Int, filtros.cantidadPorPagina);
+    filtros.codigosAlmacen.forEach((codigo, indice) =>
+      solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
+    const filtroAlmacenes = parametrosAlmacen.length > 0
+      ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
+    const resultado = await solicitud.query(`WITH Lineas AS (
+      SELECT pedido.*, usuarioCabecera.nombreVisible usuarioDespacho,
+        detalle.identificadorDetalle, detalle.numeroLinea, detalle.codigoArticulo,
+        detalle.descripcion, detalle.cantidad, detalle.codigoAlmacen detalleCodigoAlmacen,
+        detalle.nombreAlmacen detalleNombreAlmacen, detalle.transferidoEn,
+        usuarioDetalle.nombreVisible usuarioLinea, asignacion.nombreAsignado usuarioAsignado,
+        COUNT(*) OVER() total
+      FROM dbo.PedidoDespachado pedido
+      JOIN dbo.PedidoDespachadoDetalle detalle
+        ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
+      JOIN dbo.UsuarioAplicacion usuarioCabecera ON usuarioCabecera.idUsuario = pedido.idUsuario
+      JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
+      LEFT JOIN dbo.AsignacionArticuloPedido asignacion
+        ON asignacion.idOrigen = detalle.idOrigen
+       AND asignacion.identificadorDetalle = detalle.identificadorDetalle
+      WHERE pedido.estadoLocal = 'DESPACHADO'
+        AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
+        AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
+        AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
+        ${filtroAlmacenes}
+      ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
+        pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
+        TRY_CONVERT(bigint, detalle.identificadorDetalle), detalle.identificadorDetalle,
+        detalle.numeroLinea
+      OFFSET @inicio ROWS FETCH NEXT @cantidad ROWS ONLY
+    ) SELECT * FROM Lineas
+      ORDER BY CASE WHEN fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
+        fechaHoraPedido ASC, despachadoEn ASC, idPedidoDespachado ASC,
+        TRY_CONVERT(bigint, identificadorDetalle), identificadorDetalle, numeroLinea;`);
+    const pedidos = resultado.recordset.map((fila): PedidoDespachado => ({
+      idOrigen: fila.idOrigen, origenPedido: fila.origenPedido, creadoEnR1: fila.creadoEnR1,
+      sapDocEntry: fila.sapDocEntry, folioPedido: fila.folioPedido ?? '',
+      numeroPedido: fila.numeroPedido, codigoVenta: null, codigoVendedor: null,
+      nombreVendedor: fila.nombreVendedor,
+      codigosAlmacen: fila.detalleCodigoAlmacen ? [fila.detalleCodigoAlmacen] : [],
+      nombresBodega: fila.detalleNombreAlmacen,
+      fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
+      codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null,
+      estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
+      usuarioDespacho: fila.usuarioDespacho,
+      responsablesAsignados: fila.usuarioAsignado ? [fila.usuarioAsignado] : [],
+      articulos: [{
+        identificadorDetalle: fila.identificadorDetalle,
+        transferidoEn: fila.transferidoEn.toISOString(),
+        usuarioTransferencia: fila.usuarioLinea,
+        usuarioAsignado: fila.usuarioAsignado,
+        codigoArticulo: fila.codigoArticulo, descripcion: fila.descripcion,
+        cantidad: Number(fila.cantidad), codigoAlmacen: fila.detalleCodigoAlmacen,
+        nombreAlmacen: fila.detalleNombreAlmacen,
+      }],
+    }));
+    return { pedidos, total: Number(resultado.recordset[0]?.total ?? 0) };
+  }
 
   public async obtener(idOrigen: string): Promise<PedidoDespachado | null> {
     const pool = obtenerPoolPedidosBodega();
@@ -208,9 +287,13 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       .query(`SELECT detalle.identificadorDetalle, detalle.numeroLinea,
           detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
           detalle.codigoAlmacen, detalle.nombreAlmacen,
-          detalle.transferidoEn, usuario.nombreVisible usuarioTransferencia
+          detalle.transferidoEn, usuario.nombreVisible usuarioTransferencia,
+          asignacion.nombreAsignado usuarioAsignado
         FROM dbo.PedidoDespachadoDetalle detalle
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = detalle.idUsuario
+        LEFT JOIN dbo.AsignacionArticuloPedido asignacion
+          ON asignacion.idOrigen = detalle.idOrigen
+         AND asignacion.identificadorDetalle = detalle.identificadorDetalle
         WHERE detalle.idPedidoDespachado = @idPedidoDespachado
         ORDER BY TRY_CONVERT(bigint, detalle.identificadorDetalle),
           detalle.identificadorDetalle, detalle.numeroLinea;`)).recordset;
@@ -234,10 +317,13 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       estadoLocal: 'DESPACHADO',
       despachadoEn: cabecera.despachadoEn.toISOString(),
       usuarioDespacho: cabecera.usuarioDespacho,
+      responsablesAsignados: [...new Set(detalles.map((detalle) => detalle.usuarioAsignado)
+        .filter((nombre): nombre is string => Boolean(nombre)))],
       articulos: detalles.map((detalle) => ({
         identificadorDetalle: detalle.identificadorDetalle,
         transferidoEn: detalle.transferidoEn.toISOString(),
         usuarioTransferencia: detalle.usuarioTransferencia,
+        usuarioAsignado: detalle.usuarioAsignado,
         codigoArticulo: detalle.codigoArticulo,
         descripcion: detalle.descripcion,
         cantidad: Number(detalle.cantidad),

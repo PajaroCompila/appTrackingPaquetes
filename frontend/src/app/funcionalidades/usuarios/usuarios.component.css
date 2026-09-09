@@ -32,6 +32,12 @@
 }
 .modal h2 { margin: 0; }
 .acciones-modal { display: flex; justify-content: flex-end; gap: .75rem; }
+.ayuda-almacenes { margin: 0; color: var(--gris-600); }
+.lista-almacenes { display: grid; gap: .4rem; max-height: 20rem; margin: 0; padding: .5rem; overflow-y: auto; border: 1px solid var(--gris-300); border-radius: .5rem; }
+.lista-almacenes label { display: flex; align-items: center; gap: .7rem; padding: .55rem; border-radius: .4rem; cursor: pointer; }
+.lista-almacenes label:hover { background: var(--azul-100); }
+.lista-almacenes span { display: grid; gap: .1rem; }
+.lista-almacenes small { color: var(--gris-600); }
 @keyframes aparecer-fondo { from { opacity: 0; } }
 @keyframes aparecer-modal { from { opacity: 0; transform: translateY(5px); } }
 @media (max-width: 700px) { .filtros { grid-template-columns: 1fr; } .acciones { display: grid; } .modal { width: 100%; } }

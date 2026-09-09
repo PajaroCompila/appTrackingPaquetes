@@ -34,6 +34,16 @@ describe('HistorialComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const componente = fixture.componentInstance;
+    const pestanas = [...fixture.nativeElement.querySelectorAll('.pestanas-vistas button')]
+      .map((elemento: HTMLButtonElement) => ({
+        texto: elemento.textContent?.trim(),
+        activa: elemento.getAttribute('aria-selected'),
+      }));
+    expect(pestanas).toEqual([
+      { texto: 'Artículos', activa: 'true' },
+      { texto: 'Pedido', activa: 'false' },
+    ]);
+    expect(fixture.nativeElement.textContent).not.toContain('Imprimir');
     componente.alternarAlmacen('BSPS03', true);
     expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({ codigosAlmacen: ['BSPS03'] }));
     componente.alternarAlmacen('BSPS04', true);

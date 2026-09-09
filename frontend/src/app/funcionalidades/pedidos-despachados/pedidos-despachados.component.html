@@ -83,6 +83,13 @@
       <p class="estado-actualizacion">Última actualización: {{ fecha(ultimaActualizacion()) }}</p>
     }
 
+    <div class="pestanas-vistas" role="tablist" aria-label="Forma de ver los pedidos despachados">
+      <button type="button" role="tab" [attr.aria-selected]="vista() === 'articulos'"
+        [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+      <button type="button" role="tab" [attr.aria-selected]="vista() === 'pedido'"
+        [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+    </div>
+
     @if (cargando()) {
       <div class="estado-interfaz"><p>Cargando pedidos…</p></div>
     } @else if (error()) {
@@ -90,16 +97,16 @@
     } @else if (!pedidos().length) {
       <div class="estado-interfaz"><p>No hay pedidos despachados.</p></div>
     } @else {
-      <div class="acciones-transferencia acciones-solo-impresion">
+      @if (vista() === 'articulos') { <div class="acciones-transferencia acciones-solo-impresion">
         <button
           class="boton boton-secundario boton-imprimir-seleccionados"
           type="button"
           [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion()"
           (click)="imprimirSeleccionados()"
         >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
-      </div>
+      </div> }
       @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
-      <div class="panel tabla-contenedor">
+      @if (vista() === 'articulos') { <div class="panel tabla-contenedor" role="tabpanel">
         <table>
           <colgroup>
             <col class="ancho-pedido" />
@@ -116,7 +123,7 @@
             <col class="ancho-imprimir" />
           </colgroup>
           <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Imprimir</th></tr></thead>
-          @for (pedido of pedidos(); track pedido.idOrigen) {
+          @for (pedido of pedidos(); track pedido.idOrigen + ':' + pedido.articulos[0]?.identificadorDetalle) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
                 <tr>
@@ -128,7 +135,7 @@
                   <td data-label="Bodega">{{ articulo.codigoAlmacen || '—' }}</td><td data-label="Fecha y hora" [title]="fecha(pedido.fechaHoraPedido)"><span class="texto-dos-lineas">{{ fecha(pedido.fechaHoraPedido) }}</span></td>
                   <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td><td data-label="Vendedor" [title]="pedido.nombreVendedor || '—'"><span class="texto-dos-lineas">{{ pedido.nombreVendedor || '—' }}</span></td>
                   <td data-label="Despachado" [title]="fecha(articulo.transferidoEn || pedido.despachadoEn)"><span class="texto-dos-lineas">{{ fecha(articulo.transferidoEn || pedido.despachadoEn) }}</span></td>
-                  <td data-label="Usuario" [title]="articulo.usuarioTransferencia || pedido.usuarioDespacho"><span class="texto-dos-lineas">{{ articulo.usuarioTransferencia || pedido.usuarioDespacho }}</span></td>
+                  <td data-label="Usuario" [title]="articulo.usuarioAsignado || '—'"><span class="texto-dos-lineas">{{ articulo.usuarioAsignado || '—' }}</span></td>
                   <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
                   <td class="columna-seleccion columna-imprimir" data-label="Imprimir">
                     <div class="control-impresion">
@@ -152,10 +159,32 @@
             </tbody>
           }
         </table>
-      </div>
+      </div> } @else {
+        <div class="panel tabla-contenedor tabla-pedidos-agrupados" role="tabpanel">
+          <table>
+            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+            <tbody>
+              @for (pedido of pedidos(); track pedido.idOrigen) {
+                <tr>
+                  <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+                  <td data-label="Artículos">{{ pedido.articulos.length }}</td>
+                  <td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td>
+                  <td data-label="Fecha y hora">{{ fecha(pedido.fechaHoraPedido) }}</td>
+                  <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td>
+                  <td data-label="Vendedor">{{ pedido.nombreVendedor || '—' }}</td>
+                  <td data-label="Usuario">{{ responsablesPedido(pedido) }}</td>
+                  <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle"
+                    [routerLink]="['/pedidos-despachados', pedido.idOrigen]"
+                    [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
       <nav class="paginacion" aria-label="Paginación de pedidos despachados">
         <button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button>
-        <span>Página {{ pagina() }} · {{ totalRegistros() }} pedidos</span>
+        <span>Página {{ pagina() }} · {{ totalRegistros() }} {{ vista() === 'articulos' ? 'partidas' : 'pedidos' }}</span>
         <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button>
       </nav>
     }

@@ -50,7 +50,7 @@ aplicacion.use(
         !origen || origen === configuracion.origenCors || esOrigenLocalPermitido(origen);
       continuar(null, permitido);
     },
-    methods: ['GET', 'POST', 'PATCH'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT'],
     credentials: true,
   }),
 );

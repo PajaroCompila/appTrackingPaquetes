@@ -26,6 +26,7 @@ export const esquemaFiltrosPedidos = z
     codigoSincronizacion: textoOpcional(1),
     pagina: enteroConsulta(1),
     cantidadPorPagina: enteroConsulta(25, 100),
+    vista: z.enum(['articulos', 'pedido']).default('articulos'),
   })
   .strict()
   .refine(

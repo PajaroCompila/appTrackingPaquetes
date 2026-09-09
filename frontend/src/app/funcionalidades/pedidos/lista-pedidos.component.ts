@@ -43,6 +43,7 @@ const formularioInicial = (fechaActual = ''): FormularioFiltros => ({
 });
 const claveFiltrosPedidos = 'pedidos';
 const intervaloActualizacionPedidosMs = 15000;
+type VistaPedidos = 'articulos' | 'pedido';
 
 @Component({
   selector: 'app-lista-pedidos',
@@ -70,6 +71,7 @@ export class ListaPedidosComponent implements OnInit {
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
+  public readonly vista = signal<VistaPedidos>('articulos');
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
@@ -88,6 +90,8 @@ export class ListaPedidosComponent implements OnInit {
   public readonly asignacionesGuardando = signal<ReadonlySet<string>>(new Set());
   public readonly puedeAsignar = signal(false);
   public readonly puedeAsignarTodos = signal(false);
+  public readonly puedeReasignar = signal(false);
+  public readonly asignacionesDesbloqueadas = signal<ReadonlySet<string>>(new Set());
   public readonly mensajeAsignacion = signal('');
   public readonly mensajeAsignacionEsError = signal(false);
 
@@ -128,6 +132,13 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public cambiarCantidadPorPagina(): void {
+    void this.actualizarRuta(1);
+  }
+
+  public cambiarVista(vista: VistaPedidos): void {
+    if (this.vista() === vista) return;
+    this.vista.set(vista);
+    this.limpiarSeleccionTransferencia();
     void this.actualizarRuta(1);
   }
 
@@ -193,7 +204,7 @@ export class ListaPedidosComponent implements OnInit {
   public puedeAsignarPedidos(): boolean {
     const usuario = this.autenticacion.usuario();
     return usuario?.codigoRol === 'ADMINISTRADOR'
-      || ['gcruz', 'acalix', 'jlara'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
+      || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
   }
 
   public asignacionActual(
@@ -210,8 +221,12 @@ export class ListaPedidosComponent implements OnInit {
 
   public valorAsignacionVisible(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    const usuarioAsignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado
-      ?? (identidad ? this.seleccionesAsignacion().get(claveArticuloAsignado(identidad)) : '');
+    const clave = identidad ? claveArticuloAsignado(identidad) : '';
+    const usuarioAsignado = (clave && this.asignacionesDesbloqueadas().has(clave)
+      ? this.seleccionesAsignacion().get(clave)
+      : this.asignacionActual(pedido, articulo)?.usuarioAsignado)
+      ?? (identidad ? this.seleccionesAsignacion().get(clave) : '')
+      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     return usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)
       ? usuarioAsignado
       : '';
@@ -219,6 +234,15 @@ export class ListaPedidosComponent implements OnInit {
 
   public asignacionConfirmada(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
     return Boolean(this.asignacionActual(pedido, articulo)?.usuarioAsignado);
+  }
+
+  public puedeOperarArticulo(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
+    const asignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado?.trim().toLowerCase();
+    if (!asignado) return true;
+    const usuario = this.autenticacion.usuario();
+    const nombreUsuario = usuario?.nombreUsuario.trim().toLowerCase();
+    return usuario?.codigoRol === 'ADMINISTRADOR' || nombreUsuario === 'gcruz'
+      || nombreUsuario === asignado;
   }
 
   public asignacionGuardando(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
@@ -232,7 +256,8 @@ export class ListaPedidosComponent implements OnInit {
     usuarioAsignado: string,
   ): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
+    if (!identidad || !this.puedeAsignar()
+      || (this.asignacionConfirmada(pedido, articulo) && !this.asignacionDesbloqueada(pedido, articulo))
       || this.asignacionGuardando(pedido, articulo)) return;
     if (usuarioAsignado
       && !this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)) return;
@@ -243,6 +268,76 @@ export class ListaPedidosComponent implements OnInit {
     this.mensajeAsignacion.set('');
   }
 
+  public responsablesPedido(pedido: PedidoResumen): string {
+    const responsables = [...new Set(pedido.articulos.flatMap((articulo) => {
+      const nombre = this.asignacionActual(pedido, articulo)?.nombreAsignado;
+      return nombre ? [nombre] : [];
+    }))];
+    if (responsables.length === 0) return 'Sin asignar';
+    return responsables.join(', ');
+  }
+
+  public asignacionDesbloqueada(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    return Boolean(identidad
+      && this.asignacionesDesbloqueadas().has(claveArticuloAsignado(identidad)));
+  }
+
+  public desbloquearAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    const actual = this.asignacionActual(pedido, articulo);
+    if (!identidad || !actual?.usuarioAsignado || !actual.actualizadoEn || !this.puedeReasignar()) return;
+    const clave = claveArticuloAsignado(identidad);
+    this.seleccionesAsignacion.update((selecciones) =>
+      new Map(selecciones).set(clave, actual.usuarioAsignado!));
+    this.asignacionesDesbloqueadas.update((actuales) => new Set([...actuales, clave]));
+    this.mensajeAsignacion.set('');
+  }
+
+  public puedeConfirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    const actual = this.asignacionActual(pedido, articulo);
+    if (!identidad || !actual?.actualizadoEn || !this.asignacionDesbloqueada(pedido, articulo)
+      || this.asignacionGuardando(pedido, articulo)) return false;
+    const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
+    return Boolean(seleccion && seleccion !== actual.usuarioAsignado
+      && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
+  }
+
+  public confirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
+    const identidad = this.identidadAsignacion(pedido, articulo);
+    const actual = this.asignacionActual(pedido, articulo);
+    if (!identidad || !actual?.actualizadoEn || !this.puedeConfirmarReasignacion(pedido, articulo)) return;
+    const clave = claveArticuloAsignado(identidad);
+    const usuarioAsignado = this.seleccionesAsignacion().get(clave)!;
+    this.asignacionesGuardando.update((actuales) => new Set([...actuales, clave]));
+    this.versionAsignaciones += 1;
+    this.asignacionesService.reasignar(identidad, usuarioAsignado, actual.actualizadoEn)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe({
+        next: ({ datos }) => {
+          this.asignaciones.update((asignaciones) => new Map(asignaciones).set(clave, datos));
+          this.bloquearAsignacion(clave);
+          this.finalizarGuardadoAsignacion(clave);
+          this.mensajeAsignacionEsError.set(false);
+          this.mensajeAsignacion.set('Reasignación guardada.');
+        },
+        error: (error: unknown) => {
+          const asignacionActual = this.obtenerAsignacionDesdeError(error, identidad);
+          if (asignacionActual?.actualizadoEn) {
+            this.asignaciones.update((asignaciones) =>
+              new Map(asignaciones).set(clave, asignacionActual));
+            this.bloquearAsignacion(clave);
+            this.mensajeAsignacion.set('La asignación cambió. Revise el responsable actual.');
+          } else {
+            this.mensajeAsignacion.set('No fue posible guardar la reasignación.');
+          }
+          this.mensajeAsignacionEsError.set(true);
+          this.finalizarGuardadoAsignacion(clave);
+        },
+      });
+  }
+
   public puedeConfirmarAsignacion(
     pedido: PedidoResumen,
     articulo: ArticuloPedidoResumen,
@@ -250,7 +345,8 @@ export class ListaPedidosComponent implements OnInit {
     const identidad = this.identidadAsignacion(pedido, articulo);
     if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
       || this.asignacionGuardando(pedido, articulo)) return false;
-    const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
+    const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad))
+      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     return Boolean(seleccion
       && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
   }
@@ -262,7 +358,8 @@ export class ListaPedidosComponent implements OnInit {
     const identidad = this.identidadAsignacion(pedido, articulo);
     if (!identidad || !this.puedeConfirmarAsignacion(pedido, articulo)) return;
     const clave = claveArticuloAsignado(identidad);
-    const usuarioAsignado = this.seleccionesAsignacion().get(clave);
+    const usuarioAsignado = this.seleccionesAsignacion().get(clave)
+      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     if (!usuarioAsignado) return;
     this.asignacionesGuardando.update((actuales) => new Set([...actuales, clave]));
     this.mensajeAsignacion.set('');
@@ -502,6 +599,7 @@ export class ListaPedidosComponent implements OnInit {
     const filtros: FiltrosPedidos = {
       pagina: this.pagina(),
       cantidadPorPagina: this.filtrosFormulario.cantidadPorPagina,
+      vista: this.vista(),
     };
     const opcionales = {
       numeroPedido: this.filtrosFormulario.numeroPedido.trim(),
@@ -557,6 +655,7 @@ export class ListaPedidosComponent implements OnInit {
         ? cantidadSolicitada
         : 25,
     };
+    this.vista.set(parametros.get('vista') === 'pedido' ? 'pedido' : 'articulos');
     this.pagina.set(
       Number.isInteger(paginaSolicitada) && paginaSolicitada > 0 ? paginaSolicitada : 1,
     );
@@ -642,17 +741,20 @@ export class ListaPedidosComponent implements OnInit {
     this.asignacionesService.obtenerUsuarios()
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
-        next: ({ datos, puedeAsignar, puedeAsignarTodos }) => {
+        next: ({ datos, puedeAsignar, puedeAsignarTodos, puedeReasignar }) => {
           const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
           const asignaTodos = puedeAsignarTodos
             && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR' || usuarioActual === 'gcruz');
           const visibles = asignaTodos
             ? datos
-            : usuarioActual === 'acalix' || usuarioActual === 'jlara'
-              ? datos.filter(({ usuario }) => ['jlara', 'acalix'].includes(usuario.trim().toLowerCase()))
+            : usuarioActual === 'acalix' || usuarioActual === 'jlara' || usuarioActual === 'tlopez'
+              ? datos.filter(({ usuario }) => usuarioActual === 'tlopez'
+                ? usuario.trim().toLowerCase() === 'tlopez'
+                : ['jlara', 'acalix'].includes(usuario.trim().toLowerCase()))
               : [];
           this.usuariosAsignables.set(visibles);
           this.puedeAsignarTodos.set(asignaTodos);
+          this.puedeReasignar.set(Boolean(puedeReasignar && asignaTodos));
           this.puedeAsignar.set(puedeAsignar && this.puedeAsignarPedidos() && visibles.length > 0);
           this.usuariosAsignablesCargados = true;
           this.cargarAsignaciones(this.pedidos());
@@ -661,6 +763,7 @@ export class ListaPedidosComponent implements OnInit {
           this.usuariosAsignables.set([]);
           this.puedeAsignar.set(false);
           this.puedeAsignarTodos.set(false);
+          this.puedeReasignar.set(false);
           this.usuariosAsignablesCargados = false;
         },
       });
@@ -686,6 +789,10 @@ export class ListaPedidosComponent implements OnInit {
             const clave = claveArticuloAsignado(asignacion);
             actuales.set(clave, asignacion);
             if (asignacion.usuarioAsignado) selecciones.delete(clave);
+            else if (this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
+              && asignacion.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
+              selecciones.set(clave, 'tlopez');
+            }
           });
           this.asignaciones.set(actuales);
           this.seleccionesAsignacion.set(selecciones);
@@ -703,6 +810,17 @@ export class ListaPedidosComponent implements OnInit {
     return idOrigen && identificadorDetalle ? { idOrigen, identificadorDetalle } : null;
   }
 
+  private esTommyCircunvalacion(pedido: PedidoResumen): boolean {
+    return this.esUsuarioTommy()
+      && pedido.idOrigen.toUpperCase().startsWith('R1:TCIR01:');
+  }
+
+  private esUsuarioTommy(): boolean {
+    return this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
+      || (this.usuariosAsignables().length === 1
+        && this.usuariosAsignables()[0]?.usuario.trim().toLowerCase() === 'tlopez');
+  }
+
   private finalizarGuardadoAsignacion(clave: string): void {
     this.asignacionesGuardando.update((actuales) => {
       const nuevos = new Set(actuales);
@@ -715,6 +833,15 @@ export class ListaPedidosComponent implements OnInit {
     const selecciones = new Map(this.seleccionesAsignacion());
     selecciones.delete(clave);
     this.seleccionesAsignacion.set(selecciones);
+  }
+
+  private bloquearAsignacion(clave: string): void {
+    this.eliminarSeleccionAsignacion(clave);
+    this.asignacionesDesbloqueadas.update((actuales) => {
+      const nuevos = new Set(actuales);
+      nuevos.delete(clave);
+      return nuevos;
+    });
   }
 
   private obtenerAsignacionDesdeError(

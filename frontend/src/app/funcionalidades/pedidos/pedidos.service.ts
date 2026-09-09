@@ -16,7 +16,8 @@ export class PedidosService {
   public obtenerPedidos(filtros: FiltrosPedidos): Observable<RespuestaListaPedidos> {
     let parametros = new HttpParams()
       .set('pagina', filtros.pagina)
-      .set('cantidadPorPagina', filtros.cantidadPorPagina);
+      .set('cantidadPorPagina', filtros.cantidadPorPagina)
+      .set('vista', filtros.vista ?? 'articulos');
 
     const filtrosOpcionales: [string, string | undefined][] = [
       ['numeroPedido', filtros.numeroPedido],

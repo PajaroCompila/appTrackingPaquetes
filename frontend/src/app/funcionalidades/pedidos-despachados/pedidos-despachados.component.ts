@@ -50,6 +50,7 @@ interface RespuestaListadoDespachados {
 
 const claveFiltrosDespachados = 'pedidosDespachados';
 const intervaloActualizacionDespachadosMs = 15000;
+type VistaDespachados = 'articulos' | 'pedido';
 const filtrosIniciales = (): FiltrosDespachados => ({
   numeroPedido: '', fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
   codigosAlmacen: [], cantidadPorPagina: 25,
@@ -81,6 +82,7 @@ export class PedidosDespachadosComponent implements OnInit {
   public readonly totalRegistros = signal(0);
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly pedidos = signal<Despachado[]>([]);
+  public readonly vista = signal<VistaDespachados>('articulos');
   public readonly idOrigen = signal<string | null>(null);
   public readonly cargando = signal(true);
   public readonly actualizando = signal(false);
@@ -138,7 +140,7 @@ export class PedidosDespachadosComponent implements OnInit {
         codigoAlmacen: articulo.codigoAlmacen,
         nombreAlmacen: articulo.nombreAlmacen,
         fechaDespacho: articulo.transferidoEn ?? pedido.despachadoEn,
-        usuario: articulo.usuarioTransferencia ?? pedido.usuarioDespacho,
+        usuario: articulo.usuarioAsignado ?? null,
       })),
     };
   });
@@ -162,7 +164,8 @@ export class PedidosDespachadosComponent implements OnInit {
       .set('pagina', this.pagina())
       .set('cantidadPorPagina', this.filtros.cantidadPorPagina)
       .set('fechaDesde', this.filtros.fechaDesde)
-      .set('fechaHasta', this.filtros.fechaHasta);
+      .set('fechaHasta', this.filtros.fechaHasta)
+      .set('vista', this.vista());
     if (this.filtros.numeroPedido.trim()) {
       parametros = parametros.set('numeroPedido', this.filtros.numeroPedido.trim());
     }
@@ -223,6 +226,12 @@ export class PedidosDespachadosComponent implements OnInit {
   public buscar(): void { this.guardarFiltros(); this.actualizarListado(1); }
   public limpiarFiltros(): void { this.filtros = filtrosIniciales(); this.actualizarListado(1); }
   public cambiarCantidadPorPagina(): void { this.actualizarListado(1); }
+  public cambiarVista(vista: VistaDespachados): void {
+    if (this.vista() === vista) return;
+    this.vista.set(vista);
+    this.lineasSeleccionadasImpresion.set(new Set());
+    this.actualizarListado(1);
+  }
   public estaSeleccionado(codigo: string): boolean { return this.filtros.codigosAlmacen.includes(codigo); }
   public alternarAlmacen(codigo: string, seleccionado: boolean): void {
     this.filtros.codigosAlmacen = seleccionado
@@ -253,6 +262,11 @@ export class PedidosDespachadosComponent implements OnInit {
       idOrigen: pedido.idOrigen,
       identificadorDetalle: identificadorDetalle?.trim() ?? '',
     });
+  }
+  public responsablesPedido(pedido: Despachado): string {
+    const responsables = pedido.responsablesAsignados ?? [...new Set(pedido.articulos
+      .flatMap(({ usuarioAsignado }) => usuarioAsignado ? [usuarioAsignado] : []))];
+    return responsables.length > 0 ? responsables.join(', ') : '—';
   }
 
   public estaSeleccionadoParaImpresion(
@@ -326,6 +340,7 @@ export class PedidosDespachadosComponent implements OnInit {
     const queryParams: Record<string, string | number | string[]> = {
       pagina: this.pagina(), cantidadPorPagina: this.filtros.cantidadPorPagina,
       fechaDesde: this.filtros.fechaDesde, fechaHasta: this.filtros.fechaHasta,
+      vista: this.vista(),
     };
     if (this.filtros.numeroPedido.trim()) queryParams['numeroPedido'] = this.filtros.numeroPedido.trim();
     if (this.filtros.codigosAlmacen.length) queryParams['codigoAlmacen'] = this.filtros.codigosAlmacen;
@@ -345,6 +360,7 @@ export class PedidosDespachadosComponent implements OnInit {
       codigosAlmacen: [...new Set(codigosUrl.length ? codigosUrl : globales.codigosAlmacen)],
       cantidadPorPagina: cantidad === 50 || cantidad === 100 ? cantidad : 25,
     };
+    this.vista.set(parametros.get('vista') === 'pedido' ? 'pedido' : 'articulos');
     this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados['pagina']) || 1));
     this.guardarFiltros(); this.actualizarUrl();
   }

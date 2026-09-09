@@ -13,8 +13,8 @@ const pedido = {
   fechaHoraPedido: '2026-08-03T10:00:00Z',
   nombreVendedor: 'Vendedor',
   articulos: [
-    { identificadorDetalle: '1', codigoArticulo: 'A1', descripcion: 'Artículo uno', cantidad: 1, codigoAlmacen: 'B1' },
-    { identificadorDetalle: '2', codigoArticulo: 'A2', descripcion: 'Artículo dos', cantidad: 2, codigoAlmacen: 'B2' },
+    { identificadorDetalle: '1', codigoArticulo: 'A1', descripcion: 'Artículo uno', cantidad: 1, codigoAlmacen: 'B1', usuarioAsignado: 'Jorge Lara' },
+    { identificadorDetalle: '2', codigoArticulo: 'A2', descripcion: 'Artículo dos', cantidad: 2, codigoAlmacen: 'B2', usuarioAsignado: 'Ana Calix' },
   ],
 };
 
@@ -50,8 +50,18 @@ describe('PedidosDespachadosComponent', () => {
     fixture.detectChanges();
 
     const texto = fixture.nativeElement.textContent as string;
+    const pestanas = [...fixture.nativeElement.querySelectorAll('.pestanas-vistas button')]
+      .map((elemento: HTMLButtonElement) => ({
+        texto: elemento.textContent?.trim(), activa: elemento.getAttribute('aria-selected'),
+      }));
     const enlaces = [...fixture.nativeElement.querySelectorAll('.enlace-detalle')] as HTMLAnchorElement[];
     expect(texto).not.toContain('CREADO EN R1');
+    expect(texto).toContain('Jorge Lara');
+    expect(texto).toContain('Ana Calix');
+    expect(pestanas).toEqual([
+      { texto: 'Artículos', activa: 'true' },
+      { texto: 'Pedido', activa: 'false' },
+    ]);
     expect(enlaces).toHaveLength(2);
     expect(enlaces[0].getAttribute('href')).toBe(enlaces[1].getAttribute('href'));
   });

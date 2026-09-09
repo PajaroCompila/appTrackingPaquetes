@@ -92,6 +92,31 @@
   grid-column: span 1;
 }
 
+.pestanas-vistas {
+  display: flex;
+  min-height: 3rem;
+  align-items: end;
+  gap: .25rem;
+  margin-top: .75rem;
+  border-bottom: 1px solid #aec2d4;
+}
+.pestanas-vistas button {
+  min-width: 7.25rem;
+  padding: .75rem 1rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--gris-600);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pestanas-vistas button:hover { background: rgb(29 82 137 / 6%); color: var(--azul-900); }
+.pestanas-vistas button.activa { border-bottom-color: var(--azul-700); color: var(--azul-900); }
+.pestanas-vistas button:focus-visible { outline: 3px solid rgb(29 82 137 / 18%); outline-offset: -3px; }
+
+.tabla-pedidos-agrupados table { min-width: 900px; }
+
 .tabla-contenedor { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
 .tabla-contenedor table { width: 100%; max-width: 100%; table-layout: fixed; }
 .aviso-fuente { padding: .65rem .8rem; border-radius: .5rem; background: #fff4d6; color: #6a4a00; }

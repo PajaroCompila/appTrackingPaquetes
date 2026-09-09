@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import type { CodigoRol, RolLocal, UsuarioLocal } from './usuario.interface';
 import { UsuarioService } from './usuario.service';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
+import type { Almacen } from '../pedidos/almacen.interface';
 
 const claveFiltrosUsuarios = 'pedidosBodega.usuarios.filtros';
 
@@ -21,19 +22,23 @@ export class UsuariosComponent implements OnInit {
   public readonly roles = signal<RolLocal[]>([]);
   public readonly cargando = signal(false);
   public readonly error = signal('');
-  public readonly modal = signal<'crear' | 'editar' | 'restablecer' | null>(null);
+  public readonly modal = signal<'crear' | 'editar' | 'restablecer' | 'almacenes' | null>(null);
   public readonly seleccionado = signal<UsuarioLocal | null>(null);
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
+  public readonly almacenes = signal<Almacen[]>([]);
   public busqueda = '';
   public rol = '';
   public activo = '';
   public form = { nombreCompleto: '', nombreUsuario: '', correo: '', codigoRol: 'CONSULTA' as CodigoRol,
     contrasena: '', confirmarContrasena: '', activo: true };
+  public codigosAlmacenFormulario: string[] = [];
 
   public ngOnInit(): void {
     this.restaurarFiltros();
     this.servicio.roles().subscribe(({ datos }) => this.roles.set(datos));
+    this.servicio.almacenes().subscribe({ next: ({ datos }) => this.almacenes.set(datos),
+      error: () => this.error.set('No pudimos cargar las bodegas.') });
     this.cargar();
   }
   public cargar(): void {
@@ -64,6 +69,27 @@ export class UsuariosComponent implements OnInit {
   public restablecer(usuario: UsuarioLocal): void {
     this.seleccionado.set(usuario); this.form.contrasena = ''; this.form.confirmarContrasena = '';
     this.modal.set('restablecer');
+  }
+  public configurarAlmacenes(usuario: UsuarioLocal): void {
+    this.seleccionado.set(usuario);
+    this.codigosAlmacenFormulario = [...usuario.codigosAlmacenVisibles];
+    this.modal.set('almacenes');
+  }
+  public alternarAlmacen(codigo: string, seleccionado: boolean): void {
+    this.codigosAlmacenFormulario = seleccionado
+      ? [...new Set([...this.codigosAlmacenFormulario, codigo])]
+      : this.codigosAlmacenFormulario.filter((actual) => actual !== codigo);
+  }
+  public almacenSeleccionado(codigo: string): boolean {
+    return this.codigosAlmacenFormulario.includes(codigo);
+  }
+  public guardarAlmacenes(): void {
+    const usuario = this.seleccionado();
+    if (!usuario) return;
+    this.servicio.guardarAlmacenes(usuario.usuarioId, this.codigosAlmacenFormulario).subscribe({
+      next: () => { this.cerrar(); this.cargar(); },
+      error: () => this.error.set('No pudimos guardar las bodegas del usuario.'),
+    });
   }
   public cerrar(): void { this.modal.set(null); this.error.set(''); }
   public guardar(): void {

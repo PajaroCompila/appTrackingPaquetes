@@ -28,6 +28,7 @@ export interface ArticuloHistorial {
   nombreAlmacen: string | null;
   fechaHoraPedido: string | null;
   nombreVendedor: string | null;
+  usuarioAsignado?: string | null;
 }
 
 export interface RespuestaArticulosHistorial {

@@ -13,6 +13,7 @@ export interface PedidoResumen {
   fechaHoraPedido: string | null;
   codigoEstadoVenta: string | null;
   codigoSincronizacion: string | null;
+  responsablesAsignados?: string[];
   articulos: ArticuloPedidoResumen[];
 }
 
@@ -20,6 +21,7 @@ export interface ArticuloPedidoResumen {
   identificadorDetalle?: string | null;
   transferidoEn?: string | null;
   usuarioTransferencia?: string | null;
+  usuarioAsignado?: string | null;
   codigoArticulo: string | null;
   descripcion: string | null;
   cantidad: number | null;
@@ -51,6 +53,7 @@ export interface FiltrosPedidos {
   codigoSincronizacion?: string;
   pagina: number;
   cantidadPorPagina: number;
+  vista?: 'articulos' | 'pedido';
 }
 
 export interface PaginaPedidos {

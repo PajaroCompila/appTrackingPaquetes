@@ -7,13 +7,13 @@
     <button class="boton boton-primario">Buscar</button>
   </form>
   @if(error()){<p class="texto-error" role="alert">{{error()}}</p>}
-  <div class="panel tabla-contenedor"><table><thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>@for(u of usuarios();track u.usuarioId){<tr><td>{{u.nombreCompleto}}</td><td>{{u.nombreUsuario}}</td><td>{{u.nombreRol}}</td><td>{{u.activo?'Activo':'Inactivo'}}</td><td>{{fecha(u.ultimoAcceso)}}</td><td class="acciones"><button (click)="editar(u)">Editar</button><button (click)="cambiarEstado(u)">{{u.activo?'Desactivar':'Activar'}}</button><button (click)="restablecer(u)">Restablecer contraseña</button></td></tr>}</tbody></table></div>
+  <div class="panel tabla-contenedor"><table><thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Bodegas visibles</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>@for(u of usuarios();track u.usuarioId){<tr><td>{{u.nombreCompleto}}</td><td>{{u.nombreUsuario}}</td><td>{{u.nombreRol}}</td><td>{{u.codigosAlmacenVisibles.length?u.codigosAlmacenVisibles.join(', '):'Todas'}}</td><td>{{u.activo?'Activo':'Inactivo'}}</td><td>{{fecha(u.ultimoAcceso)}}</td><td class="acciones"><button (click)="editar(u)">Editar</button><button (click)="configurarAlmacenes(u)">Bodegas</button><button (click)="cambiarEstado(u)">{{u.activo?'Desactivar':'Activar'}}</button><button (click)="restablecer(u)">Restablecer contraseña</button></td></tr>}</tbody></table></div>
   <nav class="paginacion"><button class="boton boton-secundario" (click)="anterior()" [disabled]="pagina()===1">Anterior</button><span>Página {{pagina()}}</span><button class="boton boton-secundario" (click)="siguiente()" [disabled]="!hayMas()">Siguiente</button></nav>
   @if(modal()){
     <div class="fondo-modal">
-      <form class="panel modal" (ngSubmit)="modal()==='restablecer'?guardarContrasena():guardar()">
-        <h2>{{modal()==='crear'?'Crear usuario':modal()==='editar'?'Editar usuario':'Restablecer contraseña'}}</h2>
-        @if(modal()!=='restablecer'){
+      <form class="panel modal" (ngSubmit)="modal()==='restablecer'?guardarContrasena():modal()==='almacenes'?guardarAlmacenes():guardar()">
+        <h2>{{modal()==='crear'?'Crear usuario':modal()==='editar'?'Editar usuario':modal()==='almacenes'?'Bodegas de '+seleccionado()?.nombreCompleto:'Restablecer contraseña'}}</h2>
+        @if(modal()!=='restablecer'&&modal()!=='almacenes'){
           <div class="campo"><label for="formNombre">Nombre completo</label><input id="formNombre" name="nombreCompleto" required [(ngModel)]="form.nombreCompleto"></div>
           <div class="campo"><label for="formUsuario">Usuario</label><input id="formUsuario" name="nombreUsuario" required [(ngModel)]="form.nombreUsuario"></div>
           <div class="campo"><label for="formRol">Rol</label><select id="formRol" name="codigoRol" [(ngModel)]="form.codigoRol">@for(r of roles();track r.rolId){<option [value]="r.codigo">{{r.nombre}}</option>}</select></div>
@@ -21,6 +21,12 @@
         @if(modal()==='crear'||modal()==='restablecer'){
           <div class="campo"><label for="formContrasena">Contraseña</label><input id="formContrasena" name="contrasena" type="password" maxlength="128" required [(ngModel)]="form.contrasena"></div>
           <div class="campo"><label for="formConfirmar">Confirmar contraseña</label><input id="formConfirmar" name="confirmar" type="password" maxlength="128" required [(ngModel)]="form.confirmarContrasena"></div>
+        }
+        @if(modal()==='almacenes'){
+          <p class="ayuda-almacenes">Seleccione las bodegas que este usuario podrá consultar. Sin selección podrá ver todas.</p>
+          <fieldset class="lista-almacenes"><legend class="solo-lectores">Bodegas visibles</legend>
+            @for(almacen of almacenes();track almacen.codigoAlmacen){<label><input type="checkbox" [checked]="almacenSeleccionado(almacen.codigoAlmacen)" (change)="alternarAlmacen(almacen.codigoAlmacen,$any($event.target).checked)"><span><strong>{{almacen.codigoAlmacen}}</strong><small>{{almacen.nombreAlmacen}} · {{almacen.nombreSucursal}}</small></span></label>}
+          </fieldset>
         }
         <div class="acciones-modal"><button type="button" class="boton boton-secundario" (click)="cerrar()">Cancelar</button><button class="boton boton-primario">Guardar</button></div>
       </form>

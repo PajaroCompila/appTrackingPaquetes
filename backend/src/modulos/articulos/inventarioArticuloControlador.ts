@@ -3,6 +3,7 @@ import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { InventarioArticulo } from './inventarioArticulo.interface.js';
 import type { InventarioArticuloRepositorio } from './inventarioArticuloRepositorio.js';
 import { esquemaCodigoArticulo, esquemaConsultaInventario } from './inventarioArticuloValidacion.js';
+import { puedeVerAlmacen } from '../usuarios/accesoAlmacenes.js';
 
 export class InventarioArticuloControlador {
   public constructor(private readonly repositorio: InventarioArticuloRepositorio) {}
@@ -20,13 +21,25 @@ export class InventarioArticuloControlador {
     }
 
     try {
+      if (!puedeVerAlmacen(solicitud.user!, consulta.data.codigoAlmacen)) {
+        siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
+        return;
+      }
       const inventario = await this.repositorio.obtener(articulo.data, consulta.data.codigoAlmacen);
       if (!inventario) {
         siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
         return;
       }
+      if (Array.isArray(inventario.existencias)) {
+        inventario.existencias = inventario.existencias.filter(({ codigoAlmacen }) =>
+          puedeVerAlmacen(solicitud.user!, codigoAlmacen));
+      }
       respuesta.json(inventario);
-    } catch {
+    } catch (error) {
+      if (error instanceof ErrorAplicacion) {
+        siguiente(error);
+        return;
+      }
       siguiente(new ErrorAplicacion(500, 'ERROR_CONSULTA_INVENTARIO', 'No fue posible consultar la existencia del artículo en SAP.'));
     }
   };

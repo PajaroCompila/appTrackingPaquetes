@@ -9,6 +9,7 @@ describe('esquemaFiltrosDespachados', () => {
     })).toEqual({
       numeroPedido: '101469987', fechaDesde: '2026-08-15', fechaHasta: '2026-08-19',
       codigosAlmacen: ['BSPS01', 'BSPS02'], pagina: 2, cantidadPorPagina: 50,
+      vista: 'articulos',
     });
   });
 

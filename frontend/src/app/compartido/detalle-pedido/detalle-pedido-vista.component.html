@@ -112,12 +112,12 @@
         </div>
         <div class="acciones-articulos-detalle">
           <span class="contador-articulos">{{ textoArticulos(detalle.articulos.length) }}</span>
-          <button
+          @if (configuracion.permitirImpresion !== false) { <button
             class="boton boton-secundario boton-imprimir-detalle"
             type="button"
             [disabled]="lineasSeleccionadas().size === 0 || preparandoImpresion()"
             (click)="imprimirSeleccionados()"
-          >Imprimir seleccionados ({{ lineasSeleccionadas().size }})</button>
+          >Imprimir seleccionados ({{ lineasSeleccionadas().size }})</button> }
         </div>
       </div>
 
@@ -141,10 +141,13 @@
                 <th scope="col" class="columna-cantidad">Cantidad</th>
                 <th scope="col">Bodega</th>
                 @if (tieneEstadoEntrega(detalle.articulos)) { <th scope="col">Estado</th> }
+                @if (tieneResponsable(detalle.articulos)) { <th scope="col">Asignado a</th> }
                 @if (tieneDatosDespacho(detalle.articulos)) {
                   <th scope="col">Despachado</th><th scope="col">Usuario</th>
                 }
-                <th scope="col" class="columna-imprimir-detalle">Imprimir</th>
+                @if (configuracion.permitirImpresion !== false) {
+                  <th scope="col" class="columna-imprimir-detalle">Imprimir</th>
+                }
               </tr>
             </thead>
             <tbody>
@@ -168,10 +171,13 @@
                   @if (tieneEstadoEntrega(detalle.articulos)) {
                     <td>{{ valor(articulo.estadoEntrega) }}</td>
                   }
+                  @if (tieneResponsable(detalle.articulos)) {
+                    <td>{{ valor(articulo.responsable) }}</td>
+                  }
                   @if (tieneDatosDespacho(detalle.articulos)) {
                     <td>{{ fecha(articulo.fechaDespacho) }}</td><td>{{ valor(articulo.usuario) }}</td>
                   }
-                  <td class="columna-imprimir-detalle">
+                  @if (configuracion.permitirImpresion !== false) { <td class="columna-imprimir-detalle">
                     <div class="control-impresion-detalle">
                       <label class="selector-impresion-detalle" title="Seleccionar para impresión">
                         <input
@@ -189,7 +195,7 @@
                         </span>
                       }
                     </div>
-                  </td>
+                  </td> }
                 </tr>
               }
             </tbody>

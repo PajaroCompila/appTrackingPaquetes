@@ -92,8 +92,12 @@ export class DetallePedidoVistaComponent implements OnChanges {
       this.tieneValor(fechaDespacho) || this.tieneValor(usuario));
   }
 
+  public tieneResponsable(articulos: ArticuloDetalleVisual[]): boolean {
+    return articulos.some(({ responsable }) => this.tieneValor(responsable));
+  }
+
   public puedeImprimir(articulo: ArticuloDetalleVisual): boolean {
-    return Boolean(this.identidad(articulo));
+    return articulo.operacionPermitida !== false && Boolean(this.identidad(articulo));
   }
 
   public estaSeleccionado(articulo: ArticuloDetalleVisual): boolean {

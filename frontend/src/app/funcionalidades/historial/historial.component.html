@@ -73,24 +73,12 @@
       </form>
     </div>
 
-    <div class="pestanas-historial" role="tablist" aria-label="Forma de ver el historial">
-      <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
-        [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+    <div class="pestanas-vistas" role="tablist" aria-label="Forma de ver el historial">
       <button type="button" role="tab" id="pestana-articulos" [attr.aria-selected]="vista() === 'articulos'"
         [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+      <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
+        [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
     </div>
-
-    @if (vista() === 'articulos' && articulos().length > 0 && !cargando()) {
-      <div class="acciones-transferencia acciones-solo-impresion acciones-impresion-historial">
-        <button
-          class="boton boton-secundario boton-imprimir-seleccionados"
-          type="button"
-          [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion()"
-          (click)="imprimirSeleccionados()"
-        >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
-      </div>
-      @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
-    }
 
     @if (cargando()) {
       <div class="estado-interfaz" role="status"><p>Cargando historial…</p></div>
@@ -103,13 +91,13 @@
       <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
         <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (pedido of registros(); track pedido.idOrigen) {
-            <tr><td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Entregado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ marcador(pedido.usuarioDespacho) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
+            <tr><td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Facturado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
           }</tbody>
         </table>
       </div>
       } @else {
       <div class="panel tabla-contenedor tabla-articulos" role="tabpanel" aria-labelledby="pestana-articulos">
-        <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Ver detalle</th><th>Imprimir</th></tr></thead>
+        <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (articulo of articulos(); track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
             <tr><td data-label="Pedido"><strong>{{ articulo.numeroPedido }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
@@ -123,26 +111,11 @@
               <td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
               <td data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
               <td data-label="Fecha y hora"><span class="texto-dos-lineas">{{ fechaHora(articulo.fechaHoraPedido, true) }}</span></td>
-              <td data-label="Estado"><span class="etiqueta-estado">Entregado</span></td>
+              <td data-label="Estado"><span class="etiqueta-estado">Facturado</span></td>
               <td data-label="Vendedor"><span class="texto-dos-lineas">{{ marcador(articulo.nombreVendedor) }}</span></td>
+              <td data-label="Usuario"><span class="texto-dos-lineas">{{ marcador(articulo.usuarioAsignado ?? null) }}</span></td>
               <td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', articulo.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
-              <td class="columna-seleccion columna-imprimir" data-label="Imprimir">
-                <div class="control-impresion">
-                  <label class="selector-linea selector-impresion" title="Seleccionar para impresión">
-                    <input type="checkbox"
-                      [disabled]="!articulo.identificadorDetalle"
-                      [checked]="estaSeleccionadoParaImpresion(articulo)"
-                      [attr.aria-label]="'Seleccionar ' + marcador(articulo.codigoArticulo) + ' para impresión'"
-                      (change)="alternarSeleccionImpresion(articulo, $any($event.target).checked)" />
-                    <span aria-hidden="true">✓</span>
-                  </label>
-                  @if (estaImpreso(articulo)) {
-                    <span class="indicador-impreso" title="Este artículo ya fue impreso">
-                      <i class="pi pi-check-circle" aria-hidden="true"></i> Impreso
-                    </span>
-                  }
-                </div>
-              </td></tr>
+            </tr>
           }</tbody>
         </table>
       </div>
@@ -150,11 +123,5 @@
     }
 
     <nav class="paginacion" aria-label="Paginación del historial"><button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button><span>Página {{ pagina() }}</span><button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button></nav>
-  }
-  @if (!idOrigen()) {
-    <app-vista-impresion-pedido
-      [articulos]="articulosImpresion()"
-      [fechaHora]="fechaHoraImpresion()"
-    />
   }
 </section>

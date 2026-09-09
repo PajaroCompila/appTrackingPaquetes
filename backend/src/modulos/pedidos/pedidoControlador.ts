@@ -10,6 +10,7 @@ import {
   esquemaFiltrosPedidos,
   esquemaFolioPedido,
 } from './pedidoValidacion.js';
+import { restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
 
 export class PedidoControlador {
   public constructor(private readonly pedidoServicio: PedidoServicio) {}
@@ -26,7 +27,9 @@ export class PedidoControlador {
     }
 
     try {
-      const paginaPedidos = await this.pedidoServicio.buscarPedidos(resultadoValidacion.data);
+      const filtros = { ...resultadoValidacion.data, codigosAlmacen: restringirCodigosAlmacen(
+        solicitud.user!, resultadoValidacion.data.codigosAlmacen) };
+      const paginaPedidos = await this.pedidoServicio.buscarPedidos(filtros);
       respuesta.json({
         datos: paginaPedidos.pedidos,
         paginacion: {
@@ -58,7 +61,7 @@ export class PedidoControlador {
     try {
       const pedido = await this.pedidoServicio.obtenerDetallePedido(
         resultadoValidacion.data,
-        resultadoFiltros.data.codigosAlmacen,
+        restringirCodigosAlmacen(solicitud.user!, resultadoFiltros.data.codigosAlmacen),
       );
       respuesta.json({ datos: pedido });
     } catch (error) {

@@ -7,6 +7,8 @@ import type {
 } from './historial.interface.js';
 import { HistorialRepositorio } from './historialRepositorio.js';
 import { HistorialR1Repositorio } from './historialR1Repositorio.js';
+import { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
+import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 
 let conciliacionEnCurso: Promise<number> | null = null;
 
@@ -14,6 +16,7 @@ export class HistorialServicio {
   public constructor(
     private readonly repositorio = new HistorialRepositorio(),
     private readonly repositorioConsulta?: HistorialR1Repositorio,
+    private readonly asignacionRepositorio = new AsignacionRepositorio(),
   ) {}
 
   public async sincronizar(): Promise<number> {
@@ -36,10 +39,7 @@ export class HistorialServicio {
     const cerradosSap = await this.repositorio.obtenerCerradosSap(candidatosSap);
     const cerrados = candidatos.filter(({ idOrigen }) =>
       estados.get(idOrigen)?.codigoEstadoVenta === 'C' && !estados.get(idOrigen)?.verificado);
-    const validados = candidatos.filter(({ idOrigen }) => {
-      const estado = estados.get(idOrigen);
-      return estado?.verificado;
-    });
+    const validados = candidatos.filter(({ idOrigen }) => estados.get(idOrigen)?.verificado);
     const cantidadCerrados = await this.repositorio.marcarCerrados(
       cerrados.map(({ idOrigen }) => idOrigen),
     );
@@ -70,14 +70,18 @@ export class HistorialServicio {
         || a.idOrigen.localeCompare(b.idOrigen));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
+    await this.agregarResponsablesPedidos(registros);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
   }
 
   public async obtener(idOrigen: string): Promise<PedidoHistorial | null> {
-    return idOrigen.startsWith('SAP:')
+    const consulta = idOrigen.startsWith('SAP:')
       ? this.repositorio.obtenerHistorial(idOrigen)
       : (this.repositorioConsulta ?? new HistorialR1Repositorio()).obtener(idOrigen);
+    const pedido = await consulta;
+    if (pedido) await this.agregarResponsablesPedidos([pedido]);
+    return pedido;
   }
 
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
@@ -99,7 +103,62 @@ export class HistorialServicio {
         || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
+    await this.agregarResponsablesArticulos(registros);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
+  }
+
+  private async agregarResponsablesPedidos(pedidos: PedidoHistorial[]): Promise<void> {
+    const lineas = pedidos.flatMap((pedido) => pedido.articulos.flatMap((articulo) => {
+      const identificadorDetalle = articulo.identificadorDetalle?.trim();
+      return identificadorDetalle ? [{ idOrigen: pedido.idOrigen, identificadorDetalle }] : [];
+    }));
+    if (lineas.length === 0) return;
+    let asignaciones;
+    try {
+      asignaciones = await this.asignacionRepositorio.consultar(lineas);
+    } catch {
+      return;
+    }
+    const porLinea = new Map(asignaciones.map((asignacion) => [
+      claveLineaDespachada(asignacion.idOrigen, asignacion.identificadorDetalle),
+      asignacion.nombreAsignado,
+    ]));
+    for (const pedido of pedidos) {
+      for (const articulo of pedido.articulos) {
+        const detalle = articulo.identificadorDetalle?.trim();
+        articulo.usuarioAsignado = detalle
+          ? porLinea.get(claveLineaDespachada(pedido.idOrigen, detalle)) ?? null
+          : null;
+      }
+      pedido.responsablesAsignados = [...new Set(pedido.articulos
+        .map(({ usuarioAsignado }) => usuarioAsignado)
+        .filter((nombre): nombre is string => Boolean(nombre)))];
+    }
+  }
+
+  private async agregarResponsablesArticulos(
+    articulos: PaginaArticulosHistorial['registros'],
+  ): Promise<void> {
+    const lineas = articulos.flatMap((articulo) => articulo.identificadorDetalle?.trim()
+      ? [{ idOrigen: articulo.idOrigen, identificadorDetalle: articulo.identificadorDetalle.trim() }]
+      : []);
+    if (lineas.length === 0) return;
+    let asignaciones;
+    try {
+      asignaciones = await this.asignacionRepositorio.consultar(lineas);
+    } catch {
+      return;
+    }
+    const porLinea = new Map(asignaciones.map((asignacion) => [
+      claveLineaDespachada(asignacion.idOrigen, asignacion.identificadorDetalle),
+      asignacion.nombreAsignado,
+    ]));
+    for (const articulo of articulos) {
+      const detalle = articulo.identificadorDetalle?.trim();
+      articulo.usuarioAsignado = detalle
+        ? porLinea.get(claveLineaDespachada(articulo.idOrigen, detalle)) ?? null
+        : null;
+    }
   }
 }

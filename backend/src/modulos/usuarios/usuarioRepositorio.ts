@@ -3,12 +3,12 @@ import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedi
 
 export interface UsuarioAdministrable { usuarioId:string; nombreCompleto:string; nombreUsuario:string;
   correo:string|null; codigoRol:string; nombreRol:string; activo:boolean; debeCambiarContrasena:boolean;
-  ultimoAcceso:string|null; creadoEn:string; actualizadoEn:string }
+  ultimoAcceso:string|null; creadoEn:string; actualizadoEn:string; codigosAlmacenVisibles:string[] }
 export interface DatosUsuario { nombreCompleto:string; nombreUsuario:string; correo?:string;
   codigoRol:string; activo?:boolean }
 interface FilaUsuario { usuarioId:string;nombreCompleto:string;nombreUsuario:string;correo:string|null;
   codigoRol:string;nombreRol:string;activo:boolean;debeCambiarContrasena:boolean;ultimoAcceso:Date|null;
-  creadoEn:Date;actualizadoEn:Date;total?:number }
+  creadoEn:Date;actualizadoEn:Date;almacenesVisibles:string|null;total?:number }
 
 export class UsuarioRepositorio {
   public async listar(f:{busqueda?:string;rol?:string;activo?:string;pagina:number;cantidadPorPagina:number}) {
@@ -18,6 +18,8 @@ export class UsuarioRepositorio {
       .input('inicio',sql.Int,inicio).input('cantidad',sql.Int,f.cantidadPorPagina).query<FilaUsuario>(`
       SELECT u.idUsuario usuarioId,u.nombreCompleto,u.nombreUsuario,u.correo,r.codigo codigoRol,
         r.nombre nombreRol,u.activo,u.debeCambiarContrasena,u.ultimoAcceso,u.creadoEn,u.actualizadoEn,
+        (SELECT STRING_AGG(acceso.codigoAlmacen,N',') WITHIN GROUP (ORDER BY acceso.codigoAlmacen)
+          FROM dbo.UsuarioAlmacenVisible acceso WHERE acceso.idUsuario=u.idUsuario) almacenesVisibles,
         COUNT(*) OVER() total
       FROM dbo.UsuarioAplicacion u JOIN dbo.RolAplicacion r ON r.idRol=u.rolId
       WHERE (@busqueda IS NULL OR u.nombreCompleto LIKE @busqueda OR u.nombreUsuario LIKE @busqueda OR u.correo LIKE @busqueda)
@@ -27,7 +29,9 @@ export class UsuarioRepositorio {
   }
   public async obtener(id:string):Promise<UsuarioAdministrable|null>{const r=await obtenerPoolPedidosBodega().request()
     .input('id',sql.UniqueIdentifier,id).query<FilaUsuario>(`SELECT u.idUsuario usuarioId,u.nombreCompleto,u.nombreUsuario,u.correo,
-      r.codigo codigoRol,r.nombre nombreRol,u.activo,u.debeCambiarContrasena,u.ultimoAcceso,u.creadoEn,u.actualizadoEn
+      r.codigo codigoRol,r.nombre nombreRol,u.activo,u.debeCambiarContrasena,u.ultimoAcceso,u.creadoEn,u.actualizadoEn,
+      (SELECT STRING_AGG(acceso.codigoAlmacen,N',') WITHIN GROUP (ORDER BY acceso.codigoAlmacen)
+        FROM dbo.UsuarioAlmacenVisible acceso WHERE acceso.idUsuario=u.idUsuario) almacenesVisibles
       FROM dbo.UsuarioAplicacion u JOIN dbo.RolAplicacion r ON r.idRol=u.rolId WHERE u.idUsuario=@id;`);
     return r.recordset[0]?this.mapear(r.recordset[0]):null;}
   public async crear(d:DatosUsuario,hash:Buffer){const r=await obtenerPoolPedidosBodega().request()
@@ -62,7 +66,16 @@ export class UsuarioRepositorio {
       UPDATE dbo.SesionAutenticada SET revocadaEn=COALESCE(revocadaEn,SYSUTCDATETIME()) WHERE idUsuario=@id;`);}
   public async roles(){const r=await obtenerPoolPedidosBodega().request().query(`SELECT idRol rolId,codigo,nombre,descripcion,activo
     FROM dbo.RolAplicacion WHERE activo=1 ORDER BY CASE codigo WHEN 'ADMINISTRADOR' THEN 1 WHEN 'OPERADOR_BODEGA' THEN 2 ELSE 3 END;`);return r.recordset;}
+  public async guardarAlmacenes(id:string,codigos:string[]):Promise<void>{
+    const pool=obtenerPoolPedidosBodega();const transaccion=new sql.Transaction(pool);await transaccion.begin();
+    try{await new sql.Request(transaccion).input('id',sql.UniqueIdentifier,id)
+      .query('DELETE dbo.UsuarioAlmacenVisible WHERE idUsuario=@id;');
+      for(const codigo of codigos){await new sql.Request(transaccion).input('id',sql.UniqueIdentifier,id)
+        .input('codigo',sql.NVarChar(16),codigo).query(`INSERT dbo.UsuarioAlmacenVisible(idUsuario,codigoAlmacen)
+          VALUES(@id,@codigo);`);}await transaccion.commit();
+    }catch(error){await transaccion.rollback();throw error;}}
   private mapear(f:FilaUsuario):UsuarioAdministrable{return{usuarioId:f.usuarioId,nombreCompleto:f.nombreCompleto,nombreUsuario:f.nombreUsuario,
     correo:f.correo,codigoRol:f.codigoRol,nombreRol:f.nombreRol,activo:Boolean(f.activo),debeCambiarContrasena:Boolean(f.debeCambiarContrasena),
-    ultimoAcceso:f.ultimoAcceso?.toISOString()??null,creadoEn:f.creadoEn.toISOString(),actualizadoEn:f.actualizadoEn.toISOString()};}
+    ultimoAcceso:f.ultimoAcceso?.toISOString()??null,creadoEn:f.creadoEn.toISOString(),actualizadoEn:f.actualizadoEn.toISOString(),
+    codigosAlmacenVisibles:f.almacenesVisibles?.split(',').filter(Boolean)??[]};}
 }

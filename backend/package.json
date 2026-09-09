@@ -15,6 +15,7 @@
     "db:corregir-horas-pedidos": "tsx scripts/corregirHorasPedidos.ts",
     "db:migrate:impresiones": "tsx scripts/migrarRegistroImpresiones.ts",
     "db:migrate:asignaciones": "tsx scripts/migrarAsignacionesArticulos.ts",
+    "db:migrate:acceso-almacenes": "tsx scripts/migrarAccesoAlmacenesUsuarios.ts",
     "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",
     "usuario:cambiar-contrasena": "tsx scripts/cambiarContrasenaUsuario.ts",
     "dev": "tsx watch src/servidor.ts",

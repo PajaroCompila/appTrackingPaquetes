@@ -6,6 +6,7 @@ import {
   esquemaConsultaAsignaciones,
   esquemaGuardarAsignacion,
   puedeAsignarPedidos,
+  puedeReasignarPedidos,
   resolverTecnicoAsignable,
   tecnicosAsignables,
   usuariosAsignablesParaSesion,
@@ -14,18 +15,26 @@ import type { AsignacionRepositorio } from './asignacionRepositorio.js';
 
 const usuarioNormal = {
   codigoRol: 'OPERADOR_BODEGA',
-  nombreUsuario: 'tlopez',
-  nombreVisible: 'Tommy López',
+  nombreUsuario: 'otro',
+  nombreVisible: 'Otro usuario',
 };
 
 describe('asignaciones de artículos', () => {
-  it('permite asignar a administradores, gcruz, acalix y jlara', () => {
+  it('permite asignar a administradores, gcruz, acalix, jlara y Tommy', () => {
     expect(puedeAsignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'GCRUZ')).toBe(true);
     expect(puedeAsignarPedidos('CONSULTA', 'ACALIX')).toBe(true);
     expect(puedeAsignarPedidos('CONSULTA', 'JLARA')).toBe(true);
+    expect(puedeAsignarPedidos('CONSULTA', 'TLOPEZ')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'otro')).toBe(false);
     expect(puedeAsignarPedidos('CONSULTA', 'otro')).toBe(false);
+  });
+
+  it('permite reasignar solamente al administrador y a gcruz', () => {
+    expect(puedeReasignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
+    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'gcruz')).toBe(true);
+    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'acalix')).toBe(false);
+    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'jlara')).toBe(false);
   });
 
   it('mantiene el catálogo autorizado de siete técnicos', () => {
@@ -61,6 +70,40 @@ describe('asignaciones de artículos', () => {
     }, 'jlara')).toEqual({ usuario: 'jlara', nombre: 'Jorge Lara' });
   });
 
+  it('ofrece únicamente a Tommy para su asignación manual', () => {
+    const tommy = { ...usuarioNormal, nombreUsuario: 'tlopez', nombreVisible: 'Tommy López' };
+    expect(usuariosAsignablesParaSesion(tommy)).toEqual([
+      { usuario: 'tlopez', nombre: 'Tommy López' },
+    ]);
+    expect(resolverTecnicoAsignable(tommy, 'tlopez')).toEqual(
+      { usuario: 'tlopez', nombre: 'Tommy López' });
+    expect(() => resolverTecnicoAsignable(tommy, 'gcruz')).toThrow(
+      'El usuario seleccionado no está disponible.');
+  });
+
+  it('permite a Tommy confirmar solamente pedidos de Circunvalación', async () => {
+    const guardar = vi.fn().mockResolvedValue({ confirmada: true, asignacion: {
+      idOrigen: 'R1:TCIR01:F1', identificadorDetalle: '1', usuarioAsignado: 'tlopez',
+      nombreAsignado: 'Tommy López', actualizadoEn: new Date(),
+    } });
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use((peticion, _respuesta, siguiente) => { peticion.user = {
+      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'tlopez',
+      nombreVisible: 'Tommy López', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: 'TCIR01',
+      sesionId: 'sesion-prueba', debeCambiarContrasena: false,
+    }; siguiente(); });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({ guardar } as unknown as AsignacionRepositorio));
+
+    const permitido = await solicitud(aplicacion).patch('/api/pedidos/asignaciones')
+      .send({ idOrigen: 'R1:TCIR01:F1', identificadorDetalle: '1', usuarioAsignado: 'tlopez' });
+    const rechazado = await solicitud(aplicacion).patch('/api/pedidos/asignaciones')
+      .send({ idOrigen: 'R1:TSPS01:F2', identificadorDetalle: '1', usuarioAsignado: 'tlopez' });
+    expect(permitido.status).toBe(200);
+    expect(rechazado.status).toBe(403);
+    expect(guardar).toHaveBeenCalledOnce();
+  });
+
   it('impide la asignación manual a los usuarios normales', () => {
     expect(() => resolverTecnicoAsignable(usuarioNormal, 'TLOPEZ'))
       .toThrow('No tiene permisos para asignar pedidos.');
@@ -94,6 +137,7 @@ describe('asignaciones de artículos', () => {
       ],
       puedeAsignar: true,
       puedeAsignarTodos: false,
+      puedeReasignar: false,
     });
   });
 
@@ -123,6 +167,7 @@ describe('asignaciones de artículos', () => {
       datos: tecnicosAsignables,
       puedeAsignar: true,
       puedeAsignarTodos: true,
+      puedeReasignar: true,
     });
   });
 
@@ -236,6 +281,35 @@ describe('asignaciones de artículos', () => {
       mensaje: 'Este pedido/artículo ya fue asignado.',
       datos: { usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez' },
     });
+  });
+
+  it('reasigna con versión esperada y rechaza una versión que ya cambió', async () => {
+    const actualizadaEn = new Date('2026-09-09T15:00:00.000Z');
+    const asignacion = { idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz', actualizadoEn: new Date() };
+    const reasignar = vi.fn()
+      .mockResolvedValueOnce({ asignacion, actualizada: true })
+      .mockResolvedValueOnce({ asignacion, actualizada: false });
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use((peticion, _respuesta, siguiente) => { peticion.user = {
+      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'sistemas',
+      nombreVisible: 'Sistemas', codigoRol: 'ADMINISTRADOR', codigoAlmacen: null,
+      sesionId: 'sesion-prueba', debeCambiarContrasena: false,
+    }; siguiente(); });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
+      reasignar,
+    } as unknown as AsignacionRepositorio));
+    const cuerpo = { idOrigen: 'R1:F1', identificadorDetalle: '1', usuarioAsignado: 'gcruz',
+      actualizadoEn: actualizadaEn.toISOString() };
+
+    const guardada = await solicitud(aplicacion).patch('/api/pedidos/asignaciones/reasignar').send(cuerpo);
+    const conflicto = await solicitud(aplicacion).patch('/api/pedidos/asignaciones/reasignar').send(cuerpo);
+
+    expect(guardada.status).toBe(200);
+    expect(conflicto.status).toBe(409);
+    expect(reasignar).toHaveBeenCalledWith(expect.objectContaining({ idOrigen: 'R1:F1' }),
+      expect.objectContaining({ usuario: 'gcruz' }), expect.any(String), actualizadaEn);
   });
 
   it('valida identidades estables y exige un técnico para confirmar', () => {

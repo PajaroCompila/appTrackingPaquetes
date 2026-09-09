@@ -11,6 +11,7 @@ export interface ConfiguracionDetallePedido {
   etiquetaArticulos: string;
   soloConsulta: boolean;
   aviso?: string | null;
+  permitirImpresion?: boolean;
 }
 
 export interface DatoOperativoDetalle {
@@ -32,6 +33,8 @@ export interface ArticuloDetalleVisual {
   estadoEntrega?: string | null;
   fechaDespacho?: string | null;
   usuario?: string | null;
+  responsable?: string | null;
+  operacionPermitida?: boolean;
 }
 
 export interface PedidoDetalleVisual {

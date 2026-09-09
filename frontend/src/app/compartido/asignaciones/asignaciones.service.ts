@@ -18,6 +18,7 @@ export class AsignacionesService {
       datos: TecnicoAsignable[];
       puedeAsignar: boolean;
       puedeAsignarTodos: boolean;
+      puedeReasignar: boolean;
     }>(
       `${this.url}/usuarios`,
     );
@@ -37,6 +38,16 @@ export class AsignacionesService {
   public guardar(linea: IdentidadArticuloAsignacion, usuarioAsignado: string | null) {
     return this.http.patch<{ datos: AsignacionArticulo }>(
       this.url, { ...linea, usuarioAsignado },
+    );
+  }
+
+  public reasignar(
+    linea: IdentidadArticuloAsignacion,
+    usuarioAsignado: string,
+    actualizadoEn: string,
+  ) {
+    return this.http.patch<{ datos: AsignacionArticulo }>(
+      `${this.url}/reasignar`, { ...linea, usuarioAsignado, actualizadoEn },
     );
   }
 }

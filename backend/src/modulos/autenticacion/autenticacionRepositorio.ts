@@ -17,17 +17,22 @@ export class AutenticacionRepositorio implements IAutenticacionRepositorio {
   public async buscarUsuario(nombreUsuario: string): Promise<UsuarioAutenticacion | null> {
     const resultado = await obtenerPoolPedidosBodega().request()
       .input('nombreUsuario', sql.NVarChar(100), nombreUsuario)
-      .query<UsuarioAutenticacion>(`
+      .query<Omit<UsuarioAutenticacion, 'codigosAlmacenVisibles'> & { almacenesVisibles: string | null }>(`
         SELECT usuario.idUsuario AS usuarioId, usuario.nombreUsuario,
                usuario.nombreCompleto AS nombreVisible, usuario.hashContrasena,
                usuario.algoritmoContrasena, rol.codigo AS codigoRol,
                usuario.codigoAlmacen, usuario.activo, usuario.debeCambiarContrasena,
-               usuario.intentosFallidos, usuario.bloqueadoHasta
+               usuario.intentosFallidos, usuario.bloqueadoHasta,
+               (SELECT STRING_AGG(acceso.codigoAlmacen, N',') WITHIN GROUP (ORDER BY acceso.codigoAlmacen)
+                FROM dbo.UsuarioAlmacenVisible acceso WHERE acceso.idUsuario = usuario.idUsuario) almacenesVisibles
         FROM dbo.UsuarioAplicacion usuario
         JOIN dbo.RolAplicacion rol ON rol.idRol = usuario.rolId
         WHERE usuario.nombreUsuario = @nombreUsuario;
       `);
-    return resultado.recordset[0] ?? null;
+    const fila = resultado.recordset[0];
+    if (!fila) return null;
+    const { almacenesVisibles, ...usuario } = fila;
+    return { ...usuario, codigosAlmacenVisibles: almacenesVisibles?.split(',').filter(Boolean) ?? [] };
   }
 
   public async crearSesion(usuarioId: string, sesionId: string, expiraEn: Date): Promise<void> {
@@ -44,10 +49,12 @@ export class AutenticacionRepositorio implements IAutenticacionRepositorio {
   public async obtenerIdentidadSesion(sesionId: string): Promise<IdentidadAutenticada | null> {
     const resultado = await obtenerPoolPedidosBodega().request()
       .input('sesionId', sql.UniqueIdentifier, sesionId)
-      .query<IdentidadAutenticada>(`
+      .query<Omit<IdentidadAutenticada, 'codigosAlmacenVisibles'> & { almacenesVisibles: string | null }>(`
         SELECT u.idUsuario AS usuarioId, u.nombreUsuario, u.nombreCompleto AS nombreVisible,
                r.codigo AS codigoRol, u.codigoAlmacen, s.idSesion AS sesionId,
-               u.debeCambiarContrasena
+               u.debeCambiarContrasena,
+               (SELECT STRING_AGG(acceso.codigoAlmacen, N',') WITHIN GROUP (ORDER BY acceso.codigoAlmacen)
+                FROM dbo.UsuarioAlmacenVisible acceso WHERE acceso.idUsuario = u.idUsuario) almacenesVisibles
         FROM dbo.SesionAutenticada s
         JOIN dbo.UsuarioAplicacion u ON u.idUsuario = s.idUsuario
         JOIN dbo.RolAplicacion r ON r.idRol = u.rolId AND r.activo = 1
@@ -56,7 +63,10 @@ export class AutenticacionRepositorio implements IAutenticacionRepositorio {
           AND s.expiraEn > SYSUTCDATETIME()
           AND u.activo = 1;
       `);
-    return resultado.recordset[0] ?? null;
+    const fila = resultado.recordset[0];
+    if (!fila) return null;
+    const { almacenesVisibles, ...identidad } = fila;
+    return { ...identidad, codigosAlmacenVisibles: almacenesVisibles?.split(',').filter(Boolean) ?? [] };
   }
 
   public async revocarSesion(sesionId: string): Promise<void> {

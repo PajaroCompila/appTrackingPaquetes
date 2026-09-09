@@ -6,6 +6,7 @@ export interface UsuarioAutenticacion {
   algoritmoContrasena: string;
   codigoRol: string | null;
   codigoAlmacen: string | null;
+  codigosAlmacenVisibles?: string[];
   activo: boolean;
   debeCambiarContrasena: boolean;
   intentosFallidos: number;
@@ -18,6 +19,7 @@ export interface IdentidadAutenticada {
   nombreVisible: string;
   codigoRol: string | null;
   codigoAlmacen: string | null;
+  codigosAlmacenVisibles?: string[];
   sesionId: string;
   debeCambiarContrasena: boolean;
 }

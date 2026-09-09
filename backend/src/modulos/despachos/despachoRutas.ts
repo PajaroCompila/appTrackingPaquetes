@@ -5,6 +5,7 @@ import { DespachoRepositorio } from './despachoRepositorio.js';
 import { DespachoServicio } from './despachoServicio.js';
 import { LineaDespachoOrigenRepositorio } from './lineaDespachoOrigenRepositorio.js';
 import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
+import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
 
 export const despachoRutas = Router();
 const repositorio = new DespachoRepositorio();
@@ -23,6 +24,7 @@ export const esquemaFiltrosDespachados = z.object({
   codigoAlmacen: codigosAlmacen,
   pagina: z.coerce.number().int().min(1).default(1),
   cantidadPorPagina: z.coerce.number().int().min(1).max(100).default(25),
+  vista: z.enum(['articulos', 'pedido']).default('articulos'),
 }).strict().refine(({ fechaDesde, fechaHasta }) =>
   !fechaDesde || !fechaHasta || fechaDesde <= fechaHasta, {
   message: 'La fecha inicial no puede ser posterior a la fecha final.',
@@ -36,8 +38,12 @@ const transferencia = z.object({
 
 despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
   try {
-    const filtros = esquemaFiltrosDespachados.parse(solicitud.query);
-    const resultado = await repositorio.listar(filtros);
+    const originales = esquemaFiltrosDespachados.parse(solicitud.query);
+    const filtros = { ...originales, codigosAlmacen: restringirCodigosAlmacen(
+      solicitud.user!, originales.codigosAlmacen) };
+    const resultado = filtros.vista === 'articulos'
+      ? await repositorio.listarArticulos(filtros)
+      : await repositorio.listar(filtros);
     respuesta.json({ datos: resultado.pedidos, paginacion: {
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: resultado.total,
@@ -49,7 +55,9 @@ despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
 despachoRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
   try {
     const resultado = await repositorio.obtener(idOrigen.parse(solicitud.params.idOrigen));
-    if (!resultado) throw new ErrorAplicacion(404, 'DESPACHO_NO_ENCONTRADO',
+    if (resultado) resultado.articulos = resultado.articulos.filter(({ codigoAlmacen }) =>
+      puedeVerAlmacen(solicitud.user!, codigoAlmacen));
+    if (!resultado || resultado.articulos.length === 0) throw new ErrorAplicacion(404, 'DESPACHO_NO_ENCONTRADO',
       'El pedido despachado no existe.');
     respuesta.json({ datos: resultado });
   } catch (error) { siguiente(error); }
@@ -58,7 +66,7 @@ despachoRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
 despachoRutas.post('/', requerirRoles('ADMINISTRADOR', 'OPERADOR_BODEGA'), async (solicitud, respuesta, siguiente) => {
   try {
     const cuerpo = transferencia.parse(solicitud.body);
-    const resultado = await servicio.transferir(cuerpo.lineas, solicitud.user!.usuarioId);
+    const resultado = await servicio.transferir(cuerpo.lineas, solicitud.user!.usuarioId, solicitud.user!);
     respuesta.status(201).json({ datos: resultado });
   } catch (error) { siguiente(error); }
 });

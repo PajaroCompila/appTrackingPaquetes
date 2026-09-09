@@ -49,7 +49,8 @@ export class AutenticacionServicio {
       issuer: 'appPedidosBodega', audience: 'appPedidosBodega-web' });
     return { token, duracionMs, identidad: { usuarioId: usuario.usuarioId,
       nombreUsuario: usuario.nombreUsuario, nombreVisible: usuario.nombreVisible,
-      codigoRol: usuario.codigoRol, codigoAlmacen: usuario.codigoAlmacen, sesionId,
+      codigoRol: usuario.codigoRol, codigoAlmacen: usuario.codigoAlmacen,
+      codigosAlmacenVisibles: usuario.codigosAlmacenVisibles, sesionId,
       debeCambiarContrasena: usuario.debeCambiarContrasena } };
   }
 

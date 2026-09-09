@@ -8,6 +8,7 @@ declare global {
         nombreVisible: string;
         codigoRol: string | null;
         codigoAlmacen: string | null;
+        codigosAlmacenVisibles?: string[];
         sesionId: string;
         debeCambiarContrasena: boolean;
       };

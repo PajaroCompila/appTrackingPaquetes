@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DespachoServicio } from './despachoServicio.js';
 import { claveLineaDespachada, type IDespachoRepositorio } from './despachoRepositorio.js';
 import type { LineaDespachoOrigenRepositorio, LineaDespachoValidada } from './lineaDespachoOrigenRepositorio.js';
+import type { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
 
 const linea = (identificadorDetalle: string, codigoAlmacen: string): LineaDespachoValidada => ({
   idOrigen: 'SAP:10', identificadorDetalle,
@@ -60,6 +61,26 @@ describe('DespachoServicio', () => {
       codigo: 'LINEA_YA_TRANSFERIDA', estadoHttp: 409,
     });
     expect(origen.obtenerLineas).not.toHaveBeenCalled();
+    expect(despacho.guardarLineas).not.toHaveBeenCalled();
+  });
+
+  it('impide que otro usuario transfiera una partida asignada', async () => {
+    const seleccionada = linea('1', 'BSPS03');
+    const despacho = { identidadesLineas: vi.fn().mockResolvedValue(new Set()),
+      guardarLineas: vi.fn() } as unknown as IDespachoRepositorio;
+    const origen = { obtenerLineas: vi.fn().mockResolvedValue([seleccionada]) } as unknown as LineaDespachoOrigenRepositorio;
+    const asignaciones = { consultar: vi.fn().mockResolvedValue([{
+      idOrigen: 'SAP:10', identificadorDetalle: '1', usuarioAsignado: 'jlara',
+      nombreAsignado: 'Jorge Lara', actualizadoEn: new Date(),
+    }]) } as unknown as AsignacionRepositorio;
+
+    await expect(new DespachoServicio(despacho, origen, asignaciones).transferir([
+      { idOrigen: 'SAP:10', identificadorDetalle: '1' },
+    ], '00000000-0000-0000-0000-000000000001', {
+      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'acalix',
+      nombreVisible: 'Ana Calix', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+      codigosAlmacenVisibles: undefined, sesionId: 'sesion', debeCambiarContrasena: false,
+    })).rejects.toMatchObject({ codigo: 'RESPONSABLE_NO_AUTORIZADO', estadoHttp: 403 });
     expect(despacho.guardarLineas).not.toHaveBeenCalled();
   });
 });
