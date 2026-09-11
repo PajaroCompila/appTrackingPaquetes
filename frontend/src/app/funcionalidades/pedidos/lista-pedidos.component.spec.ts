@@ -597,6 +597,26 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
+  it('descarta una selección si R1 reemplaza la identidad de la partida durante el refresco', async () => {
+    pedidosService.obtenerPedidos
+      .mockReturnValueOnce(of(respuestaLista))
+      .mockReturnValueOnce(of({
+        ...respuestaLista,
+        datos: [{
+          ...respuestaLista.datos[0],
+          articulos: [{ ...respuestaLista.datos[0].articulos[0], identificadorDetalle: '2' }],
+        }],
+      }));
+    fixture.detectChanges();
+    const pedido = componente.pedidos()[0];
+    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
+
+    await vi.advanceTimersByTimeAsync(15000);
+
+    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
+    expect(componente.pedidos()[0]?.articulos[0]?.identificadorDetalle).toBe('2');
+  });
+
   it('cambia automaticamente el semaforo en 05:00 y 10:00 usando la hora del servidor', async () => {
     vi.setSystemTime(new Date('2026-08-03T12:04:59.000Z'));
     asignacionesService.consultar.mockImplementation(() => of({ datos: [{
@@ -1041,6 +1061,55 @@ describe('ListaPedidosComponent', () => {
     expect(botonTransferir.disabled).toBe(false);
     botonTransferir.click();
     expect(pedidosService.despacharLineas).toHaveBeenCalledOnce();
+  });
+
+  it('retira la partida al recibir la confirmación sin esperar el siguiente refresco', () => {
+    const respuestaTransferencia = new Subject<{
+      datos: { transferidas: { idOrigen: string; identificadorDetalle: string }[];
+        omitidas: never[]; rechazadas: never[] };
+    }>();
+    const refrescoPosterior = new Subject<typeof respuestaLista>();
+    pedidosService.obtenerPedidos
+      .mockReturnValueOnce(of(respuestaLista))
+      .mockReturnValueOnce(refrescoPosterior.asObservable());
+    pedidosService.despacharLineas.mockReturnValue(respuestaTransferencia.asObservable());
+    fixture.detectChanges();
+    const pedido = componente.pedidos()[0];
+    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
+
+    componente.transferir();
+    componente.transferir();
+    expect(pedidosService.despacharLineas).toHaveBeenCalledOnce();
+    expect(componente.transfiriendo()).toBe(true);
+    expect(componente.pedidos()).toHaveLength(1);
+
+    respuestaTransferencia.next({ datos: {
+      transferidas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
+      omitidas: [], rechazadas: [],
+    } });
+
+    expect(componente.transfiriendo()).toBe(false);
+    expect(componente.pedidos()).toEqual([]);
+    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
+    expect(componente.mensajeTransferencia()).toContain('1 artículo');
+  });
+
+  it('refresca de inmediato y explica cuando otro usuario ya transfirió la partida', () => {
+    pedidosService.despacharLineas.mockReturnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { codigo: 'LINEA_YA_TRANSFERIDA',
+        mensaje: 'Una de las partidas seleccionadas ya fue transferida por otro usuario.' },
+    })));
+    fixture.detectChanges();
+    const consultasAntes = pedidosService.obtenerPedidos.mock.calls.length;
+    const pedido = componente.pedidos()[0];
+    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
+
+    componente.transferir();
+
+    expect(componente.mensajeTransferencia()).toContain('transferida por otro usuario');
+    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
+    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(consultasAntes + 1);
   });
 
   it.each([

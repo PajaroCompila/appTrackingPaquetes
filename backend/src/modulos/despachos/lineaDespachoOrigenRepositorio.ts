@@ -106,7 +106,10 @@ export class LineaDespachoOrigenRepositorio {
       `(venta.[Name] = @pedido${indice} AND detalle.[U_SO1_NUMPARTIDA] = @linea${indice})`);
     const resultado = await consultarSistemaOrigen<FilaLineaOrigen>(`
       SELECT venta.[Name] AS idPedido,
-        CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) AS numeroPedido,
+        COALESCE(
+          NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), ''),
+          venta.[Name]
+        ) AS numeroPedido,
         detalle.[U_SO1_NUMPARTIDA] AS identificadorDetalle,
         venta.[Name] AS folioPedido,
         vendedor.[SlpName] AS nombreVendedor,
@@ -127,7 +130,6 @@ export class LineaDespachoOrigenRepositorio {
       WHERE venta.[U_SO1_STATUS] = 'A'
         AND venta.[U_SO1_TIPO] = 'PE'
         AND ISNULL(venta.[U_SO1_VERIFICADO], 'N') <> 'Y'
-        AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), '') IS NOT NULL
         AND (${condiciones.join(' OR ')});
     `, (solicitud) => {
       identidades.forEach(({ idOrigen, identificadorDetalle }, indice) => {

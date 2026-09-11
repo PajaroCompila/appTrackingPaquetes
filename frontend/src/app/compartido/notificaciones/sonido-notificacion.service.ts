@@ -11,25 +11,32 @@ export class SonidoNotificacionService {
   private readonly destruirRef = inject(DestroyRef);
   private contexto: AudioContext | null = null;
   private audioPreparado = false;
+  private preparacionEnCurso: Promise<boolean> | null = null;
+  private reproduccionPendiente = false;
+  private readonly prepararDesdeInteraccion = () => { void this.preparar(); };
 
   public constructor() {
-    const preparar = () => {
-      this.preparar();
-      this.documento.removeEventListener('pointerdown', preparar);
-      this.documento.removeEventListener('keydown', preparar);
-    };
-    this.documento.addEventListener('pointerdown', preparar, { once: true });
-    this.documento.addEventListener('keydown', preparar, { once: true });
+    this.escucharInteraccionParaPreparar();
     this.destruirRef.onDestroy(() => {
-      this.documento.removeEventListener('pointerdown', preparar);
-      this.documento.removeEventListener('keydown', preparar);
+      this.dejarDeEscucharInteraccion();
       void this.contexto?.close().catch(() => undefined);
     });
   }
 
   public reproducir(): void {
     const contexto = this.contexto;
-    if (!this.audioPreparado || !contexto || contexto.state !== 'running') return;
+    if (this.audioPreparado && contexto?.state === 'running') {
+      this.emitirSonido(contexto);
+      return;
+    }
+    if (this.reproduccionPendiente) return;
+    this.reproduccionPendiente = true;
+    void this.preparar().then((preparado) => {
+      if (preparado && this.contexto) this.emitirSonido(this.contexto);
+    }).finally(() => { this.reproduccionPendiente = false; });
+  }
+
+  private emitirSonido(contexto: AudioContext): void {
     try {
       const inicio = contexto.currentTime;
       const volumen = contexto.createGain();
@@ -57,16 +64,42 @@ export class SonidoNotificacionService {
     }
   }
 
-  private preparar(): void {
+  private escucharInteraccionParaPreparar(): void {
+    this.documento.addEventListener('pointerdown', this.prepararDesdeInteraccion);
+    this.documento.addEventListener('keydown', this.prepararDesdeInteraccion);
+  }
+
+  private dejarDeEscucharInteraccion(): void {
+    this.documento.removeEventListener('pointerdown', this.prepararDesdeInteraccion);
+    this.documento.removeEventListener('keydown', this.prepararDesdeInteraccion);
+  }
+
+  private preparar(): Promise<boolean> {
+    if (this.contexto?.state === 'running') {
+      this.audioPreparado = true;
+      this.dejarDeEscucharInteraccion();
+      return Promise.resolve(true);
+    }
+    if (this.preparacionEnCurso) return this.preparacionEnCurso;
     const ventana = this.documento.defaultView as VentanaConAudio | null;
     const ConstructorAudio = ventana?.AudioContext ?? ventana?.webkitAudioContext;
-    if (!ConstructorAudio) return;
+    if (!ConstructorAudio) return Promise.resolve(false);
     try {
       this.contexto ??= new ConstructorAudio();
-      const reanudacion = this.contexto.resume();
-      void reanudacion.then(() => { this.audioPreparado = true; }).catch(() => undefined);
+      const contexto = this.contexto;
+      this.preparacionEnCurso = contexto.resume().then(() => {
+        const preparado = contexto.state === 'running';
+        this.audioPreparado = preparado;
+        if (preparado) this.dejarDeEscucharInteraccion();
+        return preparado;
+      }).catch(() => {
+        this.audioPreparado = false;
+        return false;
+      }).finally(() => { this.preparacionEnCurso = null; });
+      return this.preparacionEnCurso;
     } catch {
       this.audioPreparado = false;
+      return Promise.resolve(false);
     }
   }
 }

@@ -26,7 +26,8 @@ export class DespachoServicio {
     const yaTransferidas = identidades.filter((identidad) =>
       existentes.has(claveLineaDespachada(identidad.idOrigen, identidad.identificadorDetalle)));
     if (yaTransferidas.length > 0) {
-      throw new ErrorAplicacion(409, 'LINEA_YA_TRANSFERIDA', 'Una o más líneas ya fueron transferidas.');
+      throw new ErrorAplicacion(409, 'LINEA_YA_TRANSFERIDA',
+        'Una de las partidas seleccionadas ya fue transferida por otro usuario.');
     }
     const lineas = await this.origenRepositorio.obtenerLineas(identidades);
     if (usuario && lineas.some(({ articulo }) => !puedeVerAlmacen(usuario, articulo.codigoAlmacen))) {
