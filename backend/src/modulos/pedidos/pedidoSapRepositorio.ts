@@ -1,6 +1,7 @@
 import sql from 'mssql';
 import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 import type { DetallePedido, FiltrosPedidos, PaginaPedidos, PedidoResumen } from './pedido.interface.js';
+import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from './gruposClienteSap.js';
 
 interface FilaSap {
   docEntry: number; docNum: number; nombreVendedor: string | null;
@@ -56,7 +57,7 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
         LEFT JOIN [dbo].[OUSR] creador ON creador.[USERID] = o.[UserSign]
         LEFT JOIN [dbo].[OUSR] modificador ON modificador.[USERID] = o.[UserSign2]
         WHERE o.[U_SO1_01RETAILONE] = @creadoRetailOne
-          AND cliente.[GroupCode] IN (@grupoMayoristaA, @grupoMayoristaB)
+          AND cliente.[GroupCode] IN (${GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL})
           AND o.[CANCELED] = @noCancelado AND o.[DocStatus] = @estadoAbierto
           AND (@numeroPedido IS NULL OR o.[DocNum] = TRY_CONVERT(int, @numeroPedido))
           AND (@fechaDesde IS NULL OR o.[DocDate] >= @fechaDesde)
@@ -66,8 +67,7 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
         ORDER BY o.[DocDate] ASC, o.[DocTime] ASC, o.[DocEntry] ASC
         OFFSET @desplazamiento ROWS FETCH NEXT @cantidadConsulta ROWS ONLY;
       `, (r) => {
-      r.input('creadoRetailOne', sql.Char(1), 'N').input('grupoMayoristaA', sql.Int, 103)
-        .input('grupoMayoristaB', sql.Int, 113).input('noCancelado', sql.Char(1), 'N')
+      r.input('creadoRetailOne', sql.Char(1), 'N').input('noCancelado', sql.Char(1), 'N')
         .input('estadoAbierto', sql.Char(1), 'O').input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
         .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null).input('fechaHasta', sql.Date, filtros.fechaHasta ?? null)
         .input('desplazamiento', sql.Int, (filtros.pagina - 1) * filtros.cantidadPorPagina)

@@ -68,6 +68,8 @@ describe('DetallePedidoComponent', () => {
 
     expect(texto).toContain('Artículo');
     expect(texto).toContain('No disponible');
+    expect(fixture.componentInstance.detalleVisual()?.articulos[0]?.responsable)
+      .toBe('Sin asignar');
     fixture.nativeElement.querySelector('.boton-regresar-detalle').click();
     expect(texto).toContain('Pedido #101468453');
     expect(texto).not.toContain('Folio F1');
