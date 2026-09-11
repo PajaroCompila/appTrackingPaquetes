@@ -15,6 +15,7 @@ import type {
   ArticuloDetalleVisual,
   ConfiguracionDetallePedido,
   ErrorDetalleVisual,
+  ModificacionPedidoVisual,
   PedidoDetalleVisual,
 } from './detalle-pedido-vista.interface';
 import { formatearFechaHoraHonduras } from '../fechas/fecha-honduras';
@@ -52,6 +53,12 @@ export class DetallePedidoVistaComponent implements OnChanges {
   public readonly fechaHoraImpresion = signal('');
   public readonly preparandoImpresion = signal(false);
   public readonly mensajeImpresion = signal('');
+  public readonly gruposCambios = [
+    { tipo: 'ELIMINADO', titulo: 'Artículos eliminados' },
+    { tipo: 'AGREGADO', titulo: 'Artículos agregados' },
+    { tipo: 'CANTIDAD', titulo: 'Cambios de cantidad' },
+    { tipo: 'BODEGA', titulo: 'Cambios de bodega' },
+  ] as const;
 
   public ngOnChanges(cambios: SimpleChanges): void {
     if (cambios['pedido']) this.cargarEstadoImpresion();
@@ -94,6 +101,28 @@ export class DetallePedidoVistaComponent implements OnChanges {
 
   public tieneResponsable(articulos: ArticuloDetalleVisual[]): boolean {
     return articulos.some(({ responsable }) => this.tieneValor(responsable));
+  }
+
+  public cambios(
+    modificaciones: ModificacionPedidoVisual[],
+    tipo: ModificacionPedidoVisual['tipo'],
+  ): ModificacionPedidoVisual[] {
+    return modificaciones.filter((cambio) => cambio.tipo === tipo);
+  }
+
+  public descripcionCambio(cambio: ModificacionPedidoVisual): string {
+    const articulo = [cambio.codigoArticulo, cambio.descripcion].filter(Boolean).join(' · ')
+      || `Partida ${cambio.identificadorDetalle}`;
+    if (cambio.tipo === 'AGREGADO') {
+      return `${articulo} · Cantidad ${this.valor(cambio.cantidadNueva)} · Bodega ${this.valor(cambio.codigoAlmacenNuevo)}`;
+    }
+    if (cambio.tipo === 'ELIMINADO') {
+      return `${articulo} · Cantidad ${this.valor(cambio.cantidadAnterior)} · Bodega ${this.valor(cambio.codigoAlmacenAnterior)}`;
+    }
+    if (cambio.tipo === 'CANTIDAD') {
+      return `${articulo} · ${this.valor(cambio.cantidadAnterior)} → ${this.valor(cambio.cantidadNueva)}`;
+    }
+    return `${articulo} · ${this.valor(cambio.codigoAlmacenAnterior)} → ${this.valor(cambio.codigoAlmacenNuevo)}`;
   }
 
   public puedeImprimir(articulo: ArticuloDetalleVisual): boolean {

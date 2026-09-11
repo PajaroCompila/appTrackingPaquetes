@@ -65,6 +65,12 @@ describe('PedidosNotificacionesService', () => {
 
     expect(servicio.procesarRespuesta([multilinea, multilinea], filtros(), false)).toBe(1);
     expect(servicio.noLeidos()).toBe(1);
+    expect(servicio.pedidosNuevos()).toEqual([expect.objectContaining({
+      idOrigen: 'R1:2',
+      numeroPedido: 'R1:2',
+      codigosAlmacen: ['BSPS03'],
+      cantidadArticulos: 3,
+    })]);
     expect(sonido.reproducir).toHaveBeenCalledOnce();
   });
 
@@ -128,7 +134,39 @@ describe('PedidosNotificacionesService', () => {
     servicio.marcarComoVistos();
 
     expect(servicio.noLeidos()).toBe(0);
+    expect(servicio.pedidosNuevos()).toEqual([]);
     expect(servicio.procesarRespuesta([pedido('R1:1', ['BSPS03'])], filtros(), false)).toBe(0);
+  });
+
+  it('limpia el panel y sigue registrando los pedidos que llegan después', () => {
+    servicio.procesarRespuesta([], filtros(), true);
+    servicio.procesarRespuesta([pedido('R1:1', ['BSPS03'])], filtros(), false);
+
+    servicio.limpiar();
+    expect(servicio.pedidosNuevos()).toEqual([]);
+
+    servicio.procesarRespuesta([
+      pedido('R1:1', ['BSPS03']),
+      pedido('R1:2', ['BSPS03']),
+    ], filtros(), false);
+    expect(servicio.noLeidos()).toBe(1);
+    expect(servicio.pedidosNuevos()[0]?.idOrigen).toBe('R1:2');
+  });
+
+  it('descarta del panel las notificaciones ajenas a la nueva selección de almacenes', () => {
+    const bodegaSps = filtros({ codigosAlmacen: ['BSPS03'] });
+    servicio.procesarRespuesta([], bodegaSps, true);
+    servicio.procesarRespuesta([pedido('R1:1', ['BSPS03'])], bodegaSps, false);
+    expect(servicio.noLeidos()).toBe(1);
+
+    servicio.procesarRespuesta(
+      [pedido('R1:2', ['TSPS01'])],
+      filtros({ codigosAlmacen: ['TSPS01'] }),
+      false,
+    );
+
+    expect(servicio.noLeidos()).toBe(0);
+    expect(servicio.pedidosNuevos()).toEqual([]);
   });
 
   it('inicia una sesión nueva sin contador ni pedidos conocidos', () => {

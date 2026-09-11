@@ -20,6 +20,31 @@ const usuarioNormal = {
 };
 
 describe('asignaciones de artículos', () => {
+  it('entrega la hora del servidor y conserva la fecha de la primera asignacion', async () => {
+    const asignadoEn = new Date('2026-09-10T15:00:00.000Z');
+    const consultar = vi.fn().mockResolvedValue([{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+      asignadoEn, actualizadoEn: new Date('2026-09-10T15:04:00.000Z'),
+    }]);
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
+      consultar,
+    } as unknown as AsignacionRepositorio));
+
+    const respuesta = await solicitud(aplicacion)
+      .post('/api/pedidos/asignaciones/consultar')
+      .send({ lineas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }] });
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.datos[0].asignadoEn).toBe(asignadoEn.toISOString());
+    expect(Number.isFinite(Date.parse(respuesta.body.horaServidor))).toBe(true);
+    expect(consultar).toHaveBeenCalledWith([
+      { idOrigen: 'R1:F1', identificadorDetalle: '1' },
+    ]);
+  });
+
   it('permite asignar a administradores, gcruz, acalix, jlara y Tommy', () => {
     expect(puedeAsignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'GCRUZ')).toBe(true);

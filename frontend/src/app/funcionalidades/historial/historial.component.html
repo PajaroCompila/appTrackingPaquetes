@@ -89,9 +89,9 @@
     } @else {
       @if (vista() === 'pedido') {
       <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
-        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (pedido of registros(); track pedido.idOrigen) {
-            <tr><td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Facturado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
+            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Facturado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
           }</tbody>
         </table>
       </div>
@@ -99,7 +99,7 @@
       <div class="panel tabla-contenedor tabla-articulos" role="tabpanel" aria-labelledby="pestana-articulos">
         <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (articulo of articulos(); track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
-            <tr><td data-label="Pedido"><strong>{{ articulo.numeroPedido }}</strong></td>
+            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="articulo.excluidoSla">{{ articulo.numeroPedido }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
                 title="Doble clic para consultar inventario"
                 [appCodigoArticuloInventario]="articulo.codigoArticulo"

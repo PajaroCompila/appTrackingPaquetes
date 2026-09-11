@@ -133,6 +133,22 @@ describe('DetallePedidoVistaComponent', () => {
     expect(fixture.nativeElement.querySelector('.tabla-detalle-articulos')).toBeNull();
   });
 
+  it('muestra los cambios reales y no atribuye una modificación sin responsable', () => {
+    fixture.componentRef.setInput('pedido', { ...pedido, modificaciones: [{
+      tipo: 'CANTIDAD', identificadorDetalle: '1', codigoArticulo: 'ARTICULO-1',
+      descripcion: 'Artículo uno', cantidadAnterior: 1, cantidadNueva: 4,
+      codigoAlmacenAnterior: 'B1', codigoAlmacenNuevo: 'B1',
+      detectadoEn: '2026-09-10T15:15:00-06:00', modificadoPor: null,
+    }] });
+    fixture.detectChanges();
+    const texto = fixture.nativeElement.textContent as string;
+
+    expect(texto).toContain('Modificaciones del pedido');
+    expect(texto).toContain('Cambios de cantidad');
+    expect(texto).toContain('1 → 4');
+    expect(texto).not.toContain('Modificado por');
+  });
+
   it('presenta un error controlado y permite reintentar', () => {
     const reintentar = vi.fn();
     fixture.componentInstance.reintentar.subscribe(reintentar);

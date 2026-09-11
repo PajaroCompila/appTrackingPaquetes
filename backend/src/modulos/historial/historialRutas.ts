@@ -4,9 +4,10 @@ import { HistorialServicio } from './historialServicio.js';
 import { esquemaFiltrosHistorial } from './historialValidacion.js';
 import { z } from 'zod';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
+import { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 
 export const historialRutas = Router();
-const servicio = new HistorialServicio();
+const servicio = new HistorialServicio(undefined, undefined, undefined, new SeguimientoPedidoRepositorio());
 const idOrigen = z.string().regex(/^(R1|SAP):.{1,140}$/);
 
 historialRutas.get('/', async (solicitud, respuesta, siguiente) => {

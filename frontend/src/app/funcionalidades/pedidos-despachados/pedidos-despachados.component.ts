@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -18,12 +18,6 @@ import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obten
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
-import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from '../pedidos/vista-impresion-pedido.component';
-import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
-import {
-  claveArticuloImpreso,
-  type IdentidadArticuloImpresion,
-} from '../../compartido/impresiones/impresion.interface';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -58,8 +52,7 @@ const filtrosIniciales = (): FiltrosDespachados => ({
 
 @Component({
   selector: 'app-pedidos-despachados',
-  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent, CodigoArticuloInventarioDirective,
-    VistaImpresionPedidoComponent],
+  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent, CodigoArticuloInventarioDirective],
   templateUrl: './pedidos-despachados.component.html',
   styleUrl: '../pedidos/lista-pedidos.component.css',
 })
@@ -70,12 +63,10 @@ export class PedidosDespachadosComponent implements OnInit {
   private readonly enrutador = inject(Router);
   private readonly destruirRef = inject(DestroyRef);
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
-  private readonly impresionesService = inject(ImpresionesService);
   private readonly actualizarAhora = new Subject<boolean>();
   private haCargado = false;
   private consultaEnCurso = false;
   private actualizacionManualPendiente = false;
-  private lineasPendientesRegistroImpresion: IdentidadArticuloImpresion[] = [];
   public filtros = filtrosIniciales();
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
@@ -88,12 +79,6 @@ export class PedidosDespachadosComponent implements OnInit {
   public readonly actualizando = signal(false);
   public readonly ultimaActualizacion = signal<Date | null>(null);
   public readonly error = signal(false);
-  public readonly articulosImpresion = signal<readonly ArticuloImpresionPedido[]>([]);
-  public readonly fechaHoraImpresion = signal('');
-  public readonly preparandoImpresion = signal(false);
-  public readonly lineasSeleccionadasImpresion = signal<ReadonlySet<string>>(new Set());
-  public readonly lineasImpresas = signal<ReadonlySet<string>>(new Set());
-  public readonly mensajeImpresion = signal('');
   public readonly configuracionDetalle = computed<ConfiguracionDetallePedido>(() => {
     const pedido = this.pedidos()[0];
     return {
@@ -106,6 +91,7 @@ export class PedidosDespachadosComponent implements OnInit {
       tituloInformacion: 'Información de entrega',
       etiquetaArticulos: 'Artículos despachados del pedido',
       soloConsulta: true,
+      permitirImpresion: false,
       aviso: pedido?.esParcial === true
         ? 'Despacho parcial: este pedido todavía conserva líneas pendientes.'
         : null,
@@ -130,7 +116,9 @@ export class PedidosDespachadosComponent implements OnInit {
         { etiqueta: 'Usuario que despachó', valor: pedido.usuarioDespacho, icono: 'pi pi-user' },
         { etiqueta: 'Bodegas', valor: pedido.codigosAlmacen?.join(', ') || null, icono: 'pi pi-map-marker' },
         { etiqueta: 'Tipo de despacho', valor: pedido.esParcial === true ? 'Parcial' : 'Completo', icono: 'pi pi-check-circle' },
+        { etiqueta: 'Tiempo total de despacho', valor: this.tiempoTotalDespacho(pedido), icono: 'pi pi-stopwatch' },
       ],
+      modificaciones: pedido.modificaciones ?? [],
       articulos: pedido.articulos.map((articulo, indice) => ({
         clave: articulo.identificadorDetalle ?? `${articulo.codigoArticulo ?? 'articulo'}-${indice}`,
         identificadorDetalle: articulo.identificadorDetalle,
@@ -229,7 +217,6 @@ export class PedidosDespachadosComponent implements OnInit {
   public cambiarVista(vista: VistaDespachados): void {
     if (this.vista() === vista) return;
     this.vista.set(vista);
-    this.lineasSeleccionadasImpresion.set(new Set());
     this.actualizarListado(1);
   }
   public estaSeleccionado(codigo: string): boolean { return this.filtros.codigosAlmacen.includes(codigo); }
@@ -257,78 +244,28 @@ export class PedidosDespachadosComponent implements OnInit {
   public paginaAnterior(): void { if (this.pagina() > 1 && !this.cargando()) this.actualizarListado(this.pagina() - 1); }
   public paginaSiguiente(): void { if (this.hayMas() && !this.cargando()) this.actualizarListado(this.pagina() + 1); }
 
-  public claveLineaImpresion(pedido: Despachado, identificadorDetalle: string | null | undefined): string {
-    return claveArticuloImpreso({
-      idOrigen: pedido.idOrigen,
-      identificadorDetalle: identificadorDetalle?.trim() ?? '',
-    });
-  }
   public responsablesPedido(pedido: Despachado): string {
     const responsables = pedido.responsablesAsignados ?? [...new Set(pedido.articulos
       .flatMap(({ usuarioAsignado }) => usuarioAsignado ? [usuarioAsignado] : []))];
     return responsables.length > 0 ? responsables.join(', ') : '—';
   }
 
-  public estaSeleccionadoParaImpresion(
-    pedido: Despachado,
-    identificadorDetalle: string | null | undefined,
-  ): boolean {
-    return this.lineasSeleccionadasImpresion().has(
-      this.claveLineaImpresion(pedido, identificadorDetalle),
-    );
+  public tiempoTotalDespacho(pedido: Despachado, fin?: string | null): string {
+    if (pedido.excluidoSla) return 'Excluido';
+    const inicio = this.fechaComoInstante(pedido.fechaEntradaCola ?? pedido.fechaEntradaOrigen
+      ?? pedido.fechaHoraPedido);
+    const terminado = this.fechaComoInstante(fin ?? pedido.despachadoEn);
+    if (inicio === null || terminado === null || terminado < inicio) return 'No disponible';
+    const segundos = Math.floor((terminado - inicio) / 1000);
+    const horas = Math.floor(segundos / 3600);
+    const minutos = Math.floor((segundos % 3600) / 60);
+    const resto = segundos % 60;
+    const dos = (valor: number): string => valor.toString().padStart(2, '0');
+    return horas > 0 ? `${dos(horas)}:${dos(minutos)}:${dos(resto)}` : `${dos(minutos)}:${dos(resto)}`;
   }
 
-  public alternarSeleccionImpresion(
-    pedido: Despachado,
-    identificadorDetalle: string | null | undefined,
-    seleccionado: boolean,
-  ): void {
-    if (!identificadorDetalle?.trim()) return;
-    const nuevas = new Set(this.lineasSeleccionadasImpresion());
-    const clave = this.claveLineaImpresion(pedido, identificadorDetalle);
-    if (seleccionado) nuevas.add(clave); else nuevas.delete(clave);
-    this.lineasSeleccionadasImpresion.set(nuevas);
-    this.mensajeImpresion.set('');
-  }
-
-  public estaImpreso(pedido: Despachado, identificadorDetalle: string | null | undefined): boolean {
-    return Boolean(identificadorDetalle?.trim()
-      && this.lineasImpresas().has(this.claveLineaImpresion(pedido, identificadorDetalle)));
-  }
-
-  public imprimirSeleccionados(): void {
-    if (this.preparandoImpresion() || this.lineasSeleccionadasImpresion().size === 0) return;
-    const seleccionadas = this.lineasSeleccionadasImpresion();
-    const articulos: ArticuloImpresionPedido[] = [];
-    const identidades: IdentidadArticuloImpresion[] = [];
-    for (const pedido of this.pedidos()) {
-      for (const articulo of pedido.articulos) {
-        const identificadorDetalle = articulo.identificadorDetalle?.trim();
-        if (!identificadorDetalle
-          || !seleccionadas.has(this.claveLineaImpresion(pedido, identificadorDetalle))) continue;
-        identidades.push({ idOrigen: pedido.idOrigen, identificadorDetalle });
-        articulos.push({
-          codigo: articulo.codigoArticulo?.trim() || '—',
-          descripcion: articulo.descripcion?.trim() || '—',
-          cantidad: articulo.cantidad,
-          bodega: articulo.codigoAlmacen?.trim() || '—',
-        });
-      }
-    }
-    if (articulos.length === 0) return;
-    this.preparandoImpresion.set(true);
-    this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
-    this.articulosImpresion.set(articulos);
-    this.lineasPendientesRegistroImpresion = identidades;
-    setTimeout(() => {
-      window.print();
-      this.confirmarImpresion();
-    });
-  }
-
-  @HostListener('window:afterprint')
-  public finalizarImpresion(): void {
-    this.confirmarImpresion();
+  public modificadoPor(pedido: Despachado): string {
+    return pedido.modificado ? pedido.modificadoPor?.trim() || 'No disponible' : '—';
   }
 
   private actualizarListado(pagina: number): void {
@@ -414,60 +351,15 @@ export class PedidosDespachadosComponent implements OnInit {
 
   private finalizarCarga(pedidos: Despachado[]): void {
     this.pedidos.set(pedidos);
-    if (!this.idOrigen()) this.cargarEstadoImpresion(pedidos);
     this.cargando.set(false);
   }
 
-  private cargarEstadoImpresion(pedidos: Despachado[]): void {
-    const lineas = pedidos.flatMap((pedido) => pedido.articulos.flatMap((articulo) => {
-      const identificadorDetalle = articulo.identificadorDetalle?.trim();
-      return identificadorDetalle ? [{ idOrigen: pedido.idOrigen, identificadorDetalle }] : [];
-    }));
-    this.reconciliarSeleccion(lineas);
-    if (lineas.length === 0) {
-      this.lineasImpresas.set(new Set());
-      return;
-    }
-    this.impresionesService.consultar(lineas)
-      .pipe(takeUntilDestroyed(this.destruirRef))
-      .subscribe({
-        next: ({ datos }) => {
-          const impresas = new Set(this.lineasImpresas());
-          datos.forEach((linea) => impresas.add(claveArticuloImpreso(linea)));
-          this.lineasImpresas.set(impresas);
-        },
-        error: () => undefined,
-      });
-  }
-
-  private reconciliarSeleccion(lineas: IdentidadArticuloImpresion[]): void {
-    const visibles = new Set(lineas.map(claveArticuloImpreso));
-    this.lineasSeleccionadasImpresion.set(new Set(
-      [...this.lineasSeleccionadasImpresion()].filter((clave) => visibles.has(clave)),
-    ));
-  }
-
-  private confirmarImpresion(): void {
-    const lineas = this.lineasPendientesRegistroImpresion;
-    if (lineas.length === 0) {
-      this.preparandoImpresion.set(false);
-      return;
-    }
-    this.lineasPendientesRegistroImpresion = [];
-    this.preparandoImpresion.set(false);
-    this.lineasSeleccionadasImpresion.set(new Set());
-    this.impresionesService.registrar(lineas)
-      .pipe(takeUntilDestroyed(this.destruirRef))
-      .subscribe({
-        next: ({ datos }) => {
-          const impresas = new Set(this.lineasImpresas());
-          datos.forEach((linea) => impresas.add(claveArticuloImpreso(linea)));
-          this.lineasImpresas.set(impresas);
-        },
-        error: () => this.mensajeImpresion.set(
-          'La impresión se abrió, pero no pudimos guardar el indicativo. Probá nuevamente.',
-        ),
-      });
+  private fechaComoInstante(valor: string | null | undefined): number | null {
+    if (!valor) return null;
+    const normalizada = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(valor)
+      ? `${valor}-06:00` : valor;
+    const instante = new Date(normalizada).getTime();
+    return Number.isFinite(instante) ? instante : null;
   }
 
   private marcarError(): void {

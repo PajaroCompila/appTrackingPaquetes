@@ -25,14 +25,22 @@ export class AsignacionesService {
   }
 
   public consultar(lineas: readonly IdentidadArticuloAsignacion[]) {
-    if (lineas.length === 0) return of({ datos: [] as AsignacionArticulo[] });
+    if (lineas.length === 0) {
+      return of({ datos: [] as AsignacionArticulo[], horaServidor: null as string | null });
+    }
     const grupos: IdentidadArticuloAsignacion[][] = [];
     for (let inicio = 0; inicio < lineas.length; inicio += 100) {
       grupos.push(lineas.slice(inicio, inicio + 100));
     }
-    return forkJoin(grupos.map((grupo) => this.http.post<{ datos: AsignacionArticulo[] }>(
+    return forkJoin(grupos.map((grupo) => this.http.post<{
+      datos: AsignacionArticulo[];
+      horaServidor: string;
+    }>(
       `${this.url}/consultar`, { lineas: grupo },
-    ))).pipe(map((respuestas) => ({ datos: respuestas.flatMap(({ datos }) => datos) })));
+    ))).pipe(map((respuestas) => ({
+      datos: respuestas.flatMap(({ datos }) => datos),
+      horaServidor: respuestas.at(-1)?.horaServidor ?? null,
+    })));
   }
 
   public guardar(linea: IdentidadArticuloAsignacion, usuarioAsignado: string | null) {

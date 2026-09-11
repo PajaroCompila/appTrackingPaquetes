@@ -22,18 +22,79 @@
         <div class="marca"><strong>Pedidos Bodega</strong><span>Control de pedidos</span></div>
         <div class="controles-superiores">
           @if (usuario(); as sesion) { <div class="sesion-actual"><strong>{{ sesion.nombreVisible }}</strong><span>{{ sesion.codigoRol }}</span></div> }
-          <button
-            class="campana-notificaciones"
-            type="button"
-            [class.animando]="notificaciones.animando()"
-            [attr.aria-label]="textoCampana()"
-            (click)="notificaciones.marcarComoVistos()">
-            <i class="pi pi-bell" aria-hidden="true"></i>
-            @if (notificaciones.noLeidos() > 0) {
-              <span class="contador-notificaciones" aria-hidden="true">{{ contadorCampana() }}</span>
-            }
-            <span class="tooltip-campana" aria-hidden="true">{{ textoCampana() }}</span>
-          </button>
+          <div
+            class="contenedor-notificaciones"
+            [class.panel-abierto]="panelNotificacionesAbierto()">
+            <button
+              class="campana-notificaciones"
+              type="button"
+              [class.animando]="notificaciones.animando()"
+              [attr.aria-label]="textoCampana()"
+              [attr.aria-expanded]="panelNotificacionesAbierto()"
+              aria-controls="panel-notificaciones"
+              (click)="alternarPanelNotificaciones()">
+              <i class="pi pi-bell" aria-hidden="true"></i>
+              @if (notificaciones.noLeidos() > 0) {
+                <span class="contador-notificaciones" aria-hidden="true">{{ contadorCampana() }}</span>
+              }
+              <span class="tooltip-campana" aria-hidden="true">{{ textoCampana() }}</span>
+            </button>
+
+            <section
+              id="panel-notificaciones"
+              class="panel-notificaciones"
+              [class.abierto]="panelNotificacionesAbierto()"
+              [attr.aria-hidden]="!panelNotificacionesAbierto()"
+              [attr.inert]="panelNotificacionesAbierto() ? null : ''"
+              aria-label="Notificaciones de pedidos">
+              <header class="encabezado-notificaciones">
+                <div>
+                  <strong>Notificaciones</strong>
+                  <span>{{ textoCampana() }}</span>
+                </div>
+                <button
+                  class="limpiar-notificaciones"
+                  type="button"
+                  [disabled]="notificaciones.noLeidos() === 0"
+                  (click)="limpiarNotificaciones()">
+                  Limpiar
+                </button>
+              </header>
+
+              @if (notificaciones.pedidosNuevos().length > 0) {
+                <div class="lista-notificaciones">
+                  @for (notificacion of notificaciones.pedidosNuevos(); track notificacion.idOrigen) {
+                    <button
+                      class="notificacion-pedido"
+                      type="button"
+                      [attr.aria-label]="'Ver pedido ' + notificacion.numeroPedido"
+                      (click)="abrirDetalleNotificacion(notificacion)">
+                      <span class="icono-notificacion" aria-hidden="true"><i class="pi pi-box"></i></span>
+                      <span class="contenido-notificacion">
+                        <span class="titulo-notificacion">
+                          <strong>Nuevo pedido recibido</strong>
+                          <span>Pedido {{ notificacion.numeroPedido }}</span>
+                        </span>
+                        <span class="datos-notificacion">
+                          <span><i class="pi pi-map-marker" aria-hidden="true"></i>{{ almacenesNotificacion(notificacion.codigosAlmacen) }}</span>
+                          <span><i class="pi pi-user" aria-hidden="true"></i>{{ notificacion.nombreVendedor || 'Sin vendedor' }}</span>
+                          <span><i class="pi pi-clock" aria-hidden="true"></i>{{ fechaHoraNotificacion(notificacion.fechaHoraPedido) }}</span>
+                          <span><i class="pi pi-list" aria-hidden="true"></i>{{ cantidadArticulosNotificacion(notificacion.cantidadArticulos) }}</span>
+                        </span>
+                      </span>
+                      <i class="pi pi-chevron-right flecha-notificacion" aria-hidden="true"></i>
+                    </button>
+                  }
+                </div>
+              } @else {
+                <div class="notificaciones-vacias">
+                  <i class="pi pi-bell" aria-hidden="true"></i>
+                  <strong>No hay notificaciones nuevas</strong>
+                  <span>Los pedidos nuevos aparecerán aquí.</span>
+                </div>
+              }
+            </section>
+          </div>
           <span class="solo-lectores" aria-live="polite">{{ textoCampana() }}</span>
         </div>
       </header>

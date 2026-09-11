@@ -97,15 +97,6 @@
     } @else if (!pedidos().length) {
       <div class="estado-interfaz"><p>No hay pedidos despachados.</p></div>
     } @else {
-      @if (vista() === 'articulos') { <div class="acciones-transferencia acciones-solo-impresion">
-        <button
-          class="boton boton-secundario boton-imprimir-seleccionados"
-          type="button"
-          [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion()"
-          (click)="imprimirSeleccionados()"
-        >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
-      </div> }
-      @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
       @if (vista() === 'articulos') { <div class="panel tabla-contenedor" role="tabpanel">
         <table>
           <colgroup>
@@ -120,14 +111,14 @@
             <col class="ancho-despachado" />
             <col class="ancho-usuario" />
             <col class="ancho-detalle" />
-            <col class="ancho-imprimir" />
+            <col class="ancho-tiempo-total" />
           </colgroup>
-          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Imprimir</th></tr></thead>
+          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th></tr></thead>
           @for (pedido of pedidos(); track pedido.idOrigen + ':' + pedido.articulos[0]?.identificadorDetalle) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
                 <tr>
-                  <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td><td class="codigo-articulo-en-linea" data-label="Código"
+                  <td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td><td class="codigo-articulo-en-linea" data-label="Código"
                     [title]="(articulo.codigoArticulo || '—') + ' — Doble clic para consultar inventario'"
                     [appCodigoArticuloInventario]="articulo.codigoArticulo"
                     [codigoAlmacenInventario]="articulo.codigoAlmacen">{{ articulo.codigoArticulo || '—' }}</td>
@@ -137,23 +128,7 @@
                   <td data-label="Despachado" [title]="fecha(articulo.transferidoEn || pedido.despachadoEn)"><span class="texto-dos-lineas">{{ fecha(articulo.transferidoEn || pedido.despachadoEn) }}</span></td>
                   <td data-label="Usuario" [title]="articulo.usuarioAsignado || '—'"><span class="texto-dos-lineas">{{ articulo.usuarioAsignado || '—' }}</span></td>
                   <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
-                  <td class="columna-seleccion columna-imprimir" data-label="Imprimir">
-                    <div class="control-impresion">
-                      <label class="selector-linea selector-impresion" title="Seleccionar para impresión">
-                        <input type="checkbox"
-                          [disabled]="!articulo.identificadorDetalle"
-                          [checked]="estaSeleccionadoParaImpresion(pedido, articulo.identificadorDetalle)"
-                          [attr.aria-label]="'Seleccionar ' + (articulo.codigoArticulo || 'artículo') + ' para impresión'"
-                          (change)="alternarSeleccionImpresion(pedido, articulo.identificadorDetalle, $any($event.target).checked)" />
-                        <span aria-hidden="true">✓</span>
-                      </label>
-                      @if (estaImpreso(pedido, articulo.identificadorDetalle)) {
-                        <span class="indicador-impreso" title="Este artículo ya fue impreso">
-                          <i class="pi pi-check-circle" aria-hidden="true"></i> Impreso
-                        </span>
-                      }
-                    </div>
-                  </td>
+                  <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalDespacho(pedido, articulo.transferidoEn || pedido.despachadoEn) }}</strong></td>
                 </tr>
               }
             </tbody>
@@ -162,17 +137,19 @@
       </div> } @else {
         <div class="panel tabla-contenedor tabla-pedidos-agrupados" role="tabpanel">
           <table>
-            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
             <tbody>
               @for (pedido of pedidos(); track pedido.idOrigen) {
                 <tr>
-                  <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+                  <td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td>
                   <td data-label="Artículos">{{ pedido.articulos.length }}</td>
                   <td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td>
                   <td data-label="Fecha y hora">{{ fecha(pedido.fechaHoraPedido) }}</td>
                   <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td>
                   <td data-label="Vendedor">{{ pedido.nombreVendedor || '—' }}</td>
                   <td data-label="Usuario">{{ responsablesPedido(pedido) }}</td>
+                  <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalDespacho(pedido) }}</strong></td>
+                  <td data-label="Modificado por">{{ modificadoPor(pedido) }}</td>
                   <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle"
                     [routerLink]="['/pedidos-despachados', pedido.idOrigen]"
                     [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
@@ -188,11 +165,5 @@
         <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button>
       </nav>
     }
-  }
-  @if (!idOrigen()) {
-    <app-vista-impresion-pedido
-      [articulos]="articulosImpresion()"
-      [fechaHora]="fechaHoraImpresion()"
-    />
   }
 </section>

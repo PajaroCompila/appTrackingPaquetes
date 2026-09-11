@@ -11,6 +11,7 @@ export interface TecnicoAsignable {
 export interface AsignacionArticulo extends IdentidadArticuloAsignacion {
   usuarioAsignado: string | null;
   nombreAsignado: string | null;
+  asignadoEn: string | null;
   actualizadoEn: string | null;
 }
 

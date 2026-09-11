@@ -11,6 +11,16 @@ export interface PedidoResumen {
   codigosAlmacen: string[];
   nombresBodega: string | null;
   fechaHoraPedido: string | null;
+  fechaEntradaOrigen?: string | null;
+  fechaEntradaCola?: string | null;
+  codigoUsuarioOrigen?: string | null;
+  usuarioUltimaModificacion?: string | null;
+  fechaUltimaModificacion?: string | null;
+  excluidoSla?: boolean;
+  modificado?: boolean;
+  modificadoPor?: string | null;
+  modificadoEn?: string | null;
+  modificaciones?: CambioPedido[];
   codigoEstadoVenta: string | null;
   codigoSincronizacion: string | null;
   responsablesAsignados?: string[];
@@ -56,6 +66,21 @@ export interface FiltrosPedidos {
   vista?: 'articulos' | 'pedido';
 }
 
+export type TipoCambioPedido = 'AGREGADO' | 'ELIMINADO' | 'CANTIDAD' | 'BODEGA';
+
+export interface CambioPedido {
+  tipo: TipoCambioPedido;
+  identificadorDetalle: string;
+  codigoArticulo: string | null;
+  descripcion: string | null;
+  cantidadAnterior: number | null;
+  cantidadNueva: number | null;
+  codigoAlmacenAnterior: string | null;
+  codigoAlmacenNuevo: string | null;
+  detectadoEn: string;
+  modificadoPor: string | null;
+}
+
 export interface RespuestaListaPedidos {
   datos: PedidoResumen[];
   paginacion: {
@@ -66,6 +91,7 @@ export interface RespuestaListaPedidos {
     hayMas: boolean;
   };
   fuentes?: { retailOne: 'disponible' | 'no_disponible'; sap: 'disponible' | 'no_disponible' };
+  horaServidor?: string;
 }
 
 export interface RespuestaDetallePedido {

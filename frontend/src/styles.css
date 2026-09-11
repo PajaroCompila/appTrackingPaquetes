@@ -482,26 +482,111 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
 .seguimiento { font-family: var(--fuente-interfaz); font-size: .78rem; overflow-wrap: anywhere; }
 .cargador { width: 2rem; height: 2rem; border: 3px solid #bed0e1; border-top-color: var(--azul-700); border-radius: 50%; animation: girar .8s linear infinite; }
 .solo-lectores { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.vista-pedidos .control-asignacion { display: flex; align-items: center; gap: .4rem; }
+.vista-pedidos .control-asignacion {
+  --control-borde: #aebdca;
+  --control-texto: var(--gris-900);
+  --control-foco: rgb(29 82 137 / 16%);
+  --control-deshabilitado-fondo: #f1f4f7;
+  --control-deshabilitado-borde: #ccd6df;
+  --control-deshabilitado-texto: #718397;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: .35rem .4rem;
+  border-radius: .5rem;
+}
+.vista-pedidos .control-asignacion .selector-asignacion {
+  grid-column: 1 / -1;
+  width: 100%;
+  border-color: var(--control-borde);
+  background: #fff;
+  color: var(--control-texto);
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.vista-pedidos .control-asignacion .selector-asignacion:hover:not(:disabled) {
+  border-color: var(--azul-700);
+  background: #fff;
+}
+.vista-pedidos .control-asignacion .selector-asignacion:focus-visible {
+  border-color: var(--azul-700);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--control-foco);
+}
+.vista-pedidos .control-asignacion .selector-asignacion option {
+  background: #fff;
+  color: var(--gris-900);
+}
+.vista-pedidos .control-asignacion .selector-asignacion option:hover,
+.vista-pedidos .control-asignacion .selector-asignacion option:focus {
+  background: var(--azul-100);
+  color: var(--azul-900);
+}
+.vista-pedidos .control-asignacion .selector-asignacion option:checked {
+  background: var(--azul-700);
+  color: #fff;
+}
+.vista-pedidos .control-asignacion .selector-asignacion:disabled {
+  border-color: var(--control-deshabilitado-borde);
+  background: var(--control-deshabilitado-fondo);
+  color: var(--control-deshabilitado-texto);
+}
+.vista-pedidos .tiempo-sla {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
+  color: var(--azul-900);
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.vista-pedidos .tiempo-sla .pi { font-size: .7rem; }
+.vista-pedidos .tiempo-excluido, .vista-pedidos .pedido-excluido { color: #a65f00; }
+.vista-pedidos .tiempo-total-despacho { white-space: nowrap; color: var(--azul-900); }
+.vista-pedidos .ancho-tiempo-total { width: 7.5rem; }
 .vista-pedidos .boton-asignar {
   min-height: 2.15rem;
   flex: 0 0 auto;
+  width: 100%;
   padding: .42rem .58rem;
   border: 1px solid var(--azul-700);
   border-radius: .45rem;
   background: var(--azul-700);
-  color: white;
+  color: #fff;
   font-size: .72rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
+.vista-pedidos .control-asignacion .boton-asignar:only-of-type { grid-column: 1 / -1; }
 .vista-pedidos .boton-asignar:hover:not(:disabled),
-.vista-pedidos .boton-asignar:focus-visible:not(:disabled) { background: var(--azul-900); }
-.vista-pedidos .boton-asignar:focus-visible { outline: 3px solid rgb(29 82 137 / 13%); outline-offset: 1px; }
-.vista-pedidos .boton-asignar:disabled { border-color: #c3d0db; background: #e7edf2; color: #718397; cursor: not-allowed; }
-.vista-pedidos .grupo-pedido tr.fila-asignada { background: #c8daec; }
-.vista-pedidos .grupo-pedido tr.fila-asignada:hover,
-.vista-pedidos .grupo-pedido tr.fila-asignada:has(:focus-visible) { background: #b7cfe6; }
+.vista-pedidos .boton-asignar:focus-visible:not(:disabled) { border-color: var(--azul-900); background: var(--azul-900); }
+.vista-pedidos .boton-asignar:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--control-foco); }
+.vista-pedidos .boton-asignar:disabled { border-color: var(--control-deshabilitado-borde); background: var(--control-deshabilitado-fondo); color: var(--control-deshabilitado-texto); cursor: not-allowed; }
+.vista-pedidos .boton-reasignar { border-color: var(--azul-700); background: #fff; color: var(--azul-700); }
+.vista-pedidos .boton-reasignar:hover:not(:disabled),
+.vista-pedidos .boton-reasignar:focus-visible:not(:disabled) { border-color: var(--azul-900); background: var(--azul-100); color: var(--azul-900); }
+.vista-pedidos tr.fila-sla-ok {
+  background: #dcebe1;
+  transition: background-color 250ms ease;
+}
+.vista-pedidos tr.fila-sla-ok:hover,
+.vista-pedidos tr.fila-sla-ok:has(:focus-visible) { background: #d3e5d9; }
+.vista-pedidos tr.fila-sla-advertencia {
+  background: #f8f0d9;
+  transition: background-color 250ms ease;
+}
+.vista-pedidos tr.fila-sla-advertencia:hover,
+.vista-pedidos tr.fila-sla-advertencia:has(:focus-visible) { background: #f3e8c9; }
+.vista-pedidos tr.fila-sla-critica {
+  background: #f2dcde;
+  transition: background-color 250ms ease;
+}
+.vista-pedidos tr.fila-sla-critica:hover,
+.vista-pedidos tr.fila-sla-critica:has(:focus-visible) { background: #ecd2d5; }
 .vista-pedidos .mensaje-asignacion-exito { color: #246245; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
@@ -509,6 +594,9 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   .boton, .campo input, .campo select, tbody tr, .enlace-detalle,
   .selector-multiple summary, .opcion-almacen, .limpiar-seleccion, .etiqueta-almacen button,
   .codigo-consultable, .descripcion-consultable, .dato-consultable, .selector-linea span,
+  .vista-pedidos .grupo-pedido tr.fila-asignada,
+  .vista-pedidos tr.fila-sla-ok, .vista-pedidos tr.fila-sla-advertencia,
+  .vista-pedidos tr.fila-sla-critica,
   .dashboard .tarjeta, .dashboard .tarjeta > .pi, .dashboard .tarjeta-sucursal,
   .dashboard .icono-sucursal, .detalle-pedido-compartido .boton-regresar-detalle,
   .detalle-pedido-compartido .boton-reintentar,

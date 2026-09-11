@@ -1,16 +1,28 @@
-import { DestroyRef, Injectable, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import type { FiltrosPedidos, PedidoResumen } from '../../funcionalidades/pedidos/pedido.interface';
 import { SonidoNotificacionService } from './sonido-notificacion.service';
+
+export interface NotificacionPedido {
+  idOrigen: string;
+  numeroPedido: string;
+  codigosAlmacen: string[];
+  nombreVendedor: string | null;
+  fechaHoraPedido: string | null;
+  cantidadArticulos: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class PedidosNotificacionesService {
   private readonly destruirRef = inject(DestroyRef);
   private readonly sonido = inject(SonidoNotificacionService);
   private readonly conocidosDuranteSesion = new Set<string>();
+  private readonly notificacionesActuales = signal<NotificacionPedido[]>([]);
   private firmaConsulta: string | null = null;
+  private firmaAlmacenes: string | null = null;
   private temporizadorAnimacion: ReturnType<typeof setTimeout> | null = null;
 
-  public readonly noLeidos = signal(0);
+  public readonly pedidosNuevos = this.notificacionesActuales.asReadonly();
+  public readonly noLeidos = computed(() => this.notificacionesActuales().length);
   public readonly animando = signal(false);
 
   public constructor() {
@@ -24,6 +36,7 @@ export class PedidosNotificacionesService {
     filtros: FiltrosPedidos,
     establecerBaseline: boolean,
   ): number {
+    this.actualizarAlmacenesSeleccionados(filtros);
     const firmaActual = this.crearFirmaConsulta(filtros);
     const identidades = new Map<string, PedidoResumen>();
     for (const pedido of pedidos) {
@@ -41,26 +54,31 @@ export class PedidosNotificacionesService {
     }
 
     const almacenes = new Set((filtros.codigosAlmacen ?? []).map((codigo) => codigo.trim()));
-    let nuevos = 0;
+    const nuevos: NotificacionPedido[] = [];
     for (const [identidad, pedido] of identidades) {
       if (!this.conocidosDuranteSesion.has(identidad)
         && this.perteneceASeleccion(pedido, almacenes)) {
-        nuevos += 1;
+        nuevos.push(this.crearNotificacion(pedido));
       }
       this.conocidosDuranteSesion.add(identidad);
     }
-    if (nuevos > 0) this.notificar(nuevos);
-    return nuevos;
+    if (nuevos.length > 0) this.notificar(nuevos);
+    return nuevos.length;
   }
 
   public marcarComoVistos(): void {
-    this.noLeidos.set(0);
+    this.limpiar();
+  }
+
+  public limpiar(): void {
+    this.notificacionesActuales.set([]);
   }
 
   public reiniciarSesion(): void {
     this.conocidosDuranteSesion.clear();
     this.firmaConsulta = null;
-    this.noLeidos.set(0);
+    this.firmaAlmacenes = null;
+    this.notificacionesActuales.set([]);
     this.animando.set(false);
     if (this.temporizadorAnimacion) clearTimeout(this.temporizadorAnimacion);
     this.temporizadorAnimacion = null;
@@ -86,8 +104,37 @@ export class PedidosNotificacionesService {
     });
   }
 
-  private notificar(cantidad: number): void {
-    this.noLeidos.update((actual) => actual + cantidad);
+  private actualizarAlmacenesSeleccionados(filtros: FiltrosPedidos): void {
+    const codigos = [...new Set((filtros.codigosAlmacen ?? [])
+      .map((codigo) => codigo.trim()).filter(Boolean))].sort();
+    const firmaActual = JSON.stringify(codigos);
+    if (this.firmaAlmacenes !== null && this.firmaAlmacenes !== firmaActual) {
+      const seleccion = new Set(codigos);
+      this.notificacionesActuales.update((actuales) => actuales.filter((notificacion) =>
+        seleccion.size === 0
+        || notificacion.codigosAlmacen.some((codigo) => seleccion.has(codigo)),
+      ));
+    }
+    this.firmaAlmacenes = firmaActual;
+  }
+
+  private crearNotificacion(pedido: PedidoResumen): NotificacionPedido {
+    const codigosAlmacen = [...new Set([
+      ...pedido.codigosAlmacen,
+      ...pedido.articulos.flatMap(({ codigoAlmacen }) => codigoAlmacen ? [codigoAlmacen] : []),
+    ].map((codigo) => codigo.trim()).filter(Boolean))];
+    return {
+      idOrigen: pedido.idOrigen,
+      numeroPedido: pedido.numeroPedido,
+      codigosAlmacen,
+      nombreVendedor: pedido.nombreVendedor,
+      fechaHoraPedido: pedido.fechaHoraPedido,
+      cantidadArticulos: pedido.articulos.length,
+    };
+  }
+
+  private notificar(nuevos: readonly NotificacionPedido[]): void {
+    this.notificacionesActuales.update((actuales) => [...nuevos, ...actuales]);
     this.animando.set(false);
     if (this.temporizadorAnimacion) clearTimeout(this.temporizadorAnimacion);
     queueMicrotask(() => {

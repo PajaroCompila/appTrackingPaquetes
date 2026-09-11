@@ -156,7 +156,13 @@
         @for (pedido of pedidos(); track pedido.idOrigen + ':' + (pedido.articulos[0]?.identificadorDetalle ?? $index)) {
           <tbody class="grupo-pedido">
             @for (articulo of pedido.articulos; track claveArticulo(articulo, $index)) {
-              <tr [class.fila-asignada]="asignacionConfirmada(pedido, articulo)">
+              @let estadoSla = estadoTiempoSla(pedido);
+              <tr
+                [class.fila-asignada]="asignacionConfirmada(pedido, articulo)"
+                [class.fila-sla-ok]="estadoSla === 'ok'"
+                [class.fila-sla-advertencia]="estadoSla === 'advertencia'"
+                [class.fila-sla-critica]="estadoSla === 'critica'"
+              >
                 <td class="columna-seleccion" data-label="Seleccionar">
                   <label class="selector-linea selector-transferencia" title="Seleccionar para transferir">
                     <input
@@ -170,7 +176,7 @@
                     <span aria-hidden="true">✓</span>
                   </label>
                 </td>
-                <td class="columna-pedido" data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+                <td class="columna-pedido" data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td>
                 <td
                   class="codigo-consultable codigo-articulo-en-linea columna-codigo"
                   data-label="Código"
@@ -219,17 +225,6 @@
                               }
                             }
                           </select>
-                          @if (puedeReasignar()) {
-                            @if (asignacionDesbloqueada(pedido, articulo)) {
-                              <button class="boton-asignar" type="button"
-                                [disabled]="!puedeConfirmarReasignacion(pedido, articulo)"
-                                (click)="confirmarReasignacion(pedido, articulo)">Reasignar</button>
-                            } @else {
-                              <button class="boton-asignar" type="button"
-                                [disabled]="asignacionGuardando(pedido, articulo)"
-                                (click)="desbloquearAsignacion(pedido, articulo)">Desbloquear</button>
-                            }
-                          }
                         }
                       } @else {
                         <select
@@ -245,13 +240,19 @@
                           }
                         </select>
                       }
-                      @if (!asignacionConfirmada(pedido, articulo)) {
+                      <button
+                        class="boton-asignar"
+                        type="button"
+                        [disabled]="!puedeGuardarAsignacion(pedido, articulo)"
+                        (click)="guardarAsignacion(pedido, articulo)"
+                      >Asignar</button>
+                      @if (puedeReasignar()) {
                         <button
-                          class="boton-asignar"
+                          class="boton-asignar boton-reasignar"
                           type="button"
-                          [disabled]="!puedeConfirmarAsignacion(pedido, articulo)"
-                          (click)="confirmarAsignacion(pedido, articulo)"
-                        >Asignar</button>
+                          [disabled]="!asignacionConfirmada(pedido, articulo) || asignacionDesbloqueada(pedido, articulo) || asignacionGuardando(pedido, articulo)"
+                          (click)="desbloquearAsignacion(pedido, articulo)"
+                        >Reasignar</button>
                       }
                     </div>
                   } @else {
@@ -259,6 +260,10 @@
                       {{ nombreAsignado(pedido, articulo) }}
                     </span>
                   }
+                  <span class="tiempo-sla" [class.tiempo-excluido]="pedido.excluidoSla" title="Tiempo en pedidos de bodega">
+                    @if (!pedido.excluidoSla) { <i class="pi pi-clock" aria-hidden="true"></i> }
+                    {{ tiempoSla(pedido) }}
+                  </span>
                 </td>
               </tr>
             }
@@ -268,16 +273,24 @@
     </div> } @else {
       <div class="panel tabla-contenedor tabla-pedidos-agrupados" role="tabpanel">
         <table>
-          <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Vendedor</th><th>Asignado a</th><th>Ver detalle</th></tr></thead>
+          <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Vendedor</th><th>Asignado a</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
           <tbody>
             @for (pedido of pedidos(); track pedido.idOrigen) {
-              <tr>
-                <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+              @let estadoSla = estadoTiempoSla(pedido);
+              <tr [class.fila-sla-ok]="estadoSla === 'ok'"
+                [class.fila-sla-advertencia]="estadoSla === 'advertencia'"
+                [class.fila-sla-critica]="estadoSla === 'critica'">
+                <td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td>
                 <td data-label="Artículos">{{ pedido.articulos.length }}</td>
                 <td data-label="Bodegas">{{ codigosBodega(pedido.codigosAlmacen) }}</td>
                 <td data-label="Fecha y hora">{{ formatearFechaHora(pedido.fechaHoraPedido) }}</td>
                 <td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td>
-                <td data-label="Asignado a">{{ responsablesPedido(pedido) }}</td>
+                <td data-label="Asignado a">{{ responsablesPedido(pedido) }}
+                  <span class="tiempo-sla" [class.tiempo-excluido]="pedido.excluidoSla">
+                    @if (!pedido.excluidoSla) { <i class="pi pi-clock" aria-hidden="true"></i> }
+                    {{ tiempoSla(pedido) }}
+                  </span></td>
+                <td data-label="Modificado por">{{ modificadoPor(pedido) }}</td>
                 <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle"
                   [routerLink]="['/pedidos', pedido.idOrigen]"
                   [queryParams]="{ retorno: rutaRetorno(), codigoAlmacen: filtrosFormulario.codigosAlmacen }">Ver detalle</a></td>

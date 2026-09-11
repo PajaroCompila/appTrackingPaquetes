@@ -9,6 +9,7 @@ import type { IPedidoRepositorio } from './pedidoRepositorio.js';
 import { PedidoSapRepositorio, type IPedidoSapRepositorio } from './pedidoSapRepositorio.js';
 import type { IDespachoRepositorio } from '../despachos/despachoRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
+import type { SeguimientoPedidoRepositorio } from './seguimientoPedidoRepositorio.js';
 
 interface EstadoCacheSap {
   resultado?: PaginaPedidos;
@@ -22,6 +23,7 @@ export class PedidoServicio {
     private readonly pedidoRepositorio: IPedidoRepositorio,
     private readonly pedidoSapRepositorio: IPedidoSapRepositorio = new PedidoSapRepositorio(),
     private readonly despachoRepositorio?: IDespachoRepositorio,
+    private readonly seguimientoRepositorio?: SeguimientoPedidoRepositorio,
   ) {}
 
   public async buscarPedidos(filtros: FiltrosPedidos): Promise<PaginaPedidos> {
@@ -51,7 +53,14 @@ export class PedidoServicio {
       const lineasDespachadas = this.despachoRepositorio
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
-      const unificados = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])]
+      const pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
+      if (this.seguimientoRepositorio) {
+        await this.seguimientoRepositorio.registrarYAplicar(
+          pedidosOrigen,
+          (filtrosAcumulados.codigosAlmacen?.length ?? 0) === 0,
+        );
+      }
+      const unificados = pedidosOrigen
         .map((pedido) => ({ ...pedido, articulos: pedido.articulos.filter((articulo) => {
           const identidad = articulo.identificadorDetalle?.trim();
           return identidad
@@ -148,6 +157,7 @@ export class PedidoServicio {
       if (!pedido) {
         throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
       }
+      if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido.cabecera]);
       return pedido;
     } catch (error) {
       if (error instanceof ErrorAplicacion) {

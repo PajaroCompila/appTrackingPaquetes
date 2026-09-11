@@ -35,6 +35,9 @@ export interface ArticuloHistorial {
   fechaHoraPedido: string | null;
   nombreVendedor: string | null;
   usuarioAsignado?: string | null;
+  excluidoSla?: boolean;
+  modificado?: boolean;
+  modificadoPor?: string | null;
 }
 
 export interface PaginaArticulosHistorial {

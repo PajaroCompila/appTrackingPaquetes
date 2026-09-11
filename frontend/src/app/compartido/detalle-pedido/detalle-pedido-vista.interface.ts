@@ -37,6 +37,19 @@ export interface ArticuloDetalleVisual {
   operacionPermitida?: boolean;
 }
 
+export interface ModificacionPedidoVisual {
+  tipo: 'AGREGADO' | 'ELIMINADO' | 'CANTIDAD' | 'BODEGA';
+  identificadorDetalle: string;
+  codigoArticulo: string | null;
+  descripcion: string | null;
+  cantidadAnterior: number | null;
+  cantidadNueva: number | null;
+  codigoAlmacenAnterior: string | null;
+  codigoAlmacenNuevo: string | null;
+  detectadoEn: string;
+  modificadoPor: string | null;
+}
+
 export interface PedidoDetalleVisual {
   idOrigen: string;
   numeroPedido: string | null;
@@ -46,6 +59,7 @@ export interface PedidoDetalleVisual {
   sucursal?: string | null;
   datosOperativos: DatoOperativoDetalle[];
   articulos: ArticuloDetalleVisual[];
+  modificaciones?: ModificacionPedidoVisual[];
 }
 
 export interface ErrorDetalleVisual {

@@ -1,17 +1,21 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
 import { NavigationEnd, NavigationStart, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { AutenticacionService } from './funcionalidades/autenticacion/autenticacion.service';
 import { ConsultaInventarioArticuloHostComponent } from './compartido/inventario/consulta-inventario-articulo-host.component';
 import { ConsultaInventarioArticuloService } from './compartido/inventario/consulta-inventario-articulo.service';
-import { PedidosNotificacionesService } from './compartido/notificaciones/pedidos-notificaciones.service';
+import {
+  PedidosNotificacionesService,
+  type NotificacionPedido,
+} from './compartido/notificaciones/pedidos-notificaciones.service';
+import { formatearFechaHoraHonduras } from './compartido/fechas/fecha-honduras';
 
 @Component({
   selector: 'app-root',
   imports: [RouterLink, RouterLinkActive, RouterOutlet, ConsultaInventarioArticuloHostComponent],
   templateUrl: './app.html',
-  styleUrl: './app.css',
+  styleUrls: ['./app.css', './app-notificaciones.css'],
 })
 export class App {
   private readonly router = inject(Router);
@@ -20,13 +24,17 @@ export class App {
   private readonly consultaInventario = inject(ConsultaInventarioArticuloService);
   public readonly notificaciones = inject(PedidosNotificacionesService);
   public readonly esLogin = signal(this.router.url.startsWith('/login'));
+  public readonly panelNotificacionesAbierto = signal(false);
   public readonly usuario = this.autenticacion.usuario;
 
   public constructor() {
     this.router.events.pipe(
       filter((evento): evento is NavigationStart => evento instanceof NavigationStart),
       takeUntilDestroyed(this.destroyRef),
-    ).subscribe(() => this.consultaInventario.cerrar());
+    ).subscribe(() => {
+      this.consultaInventario.cerrar();
+      this.panelNotificacionesAbierto.set(false);
+    });
     this.router.events.pipe(
       filter((evento): evento is NavigationEnd => evento instanceof NavigationEnd),
       takeUntilDestroyed(this.destroyRef),
@@ -49,5 +57,47 @@ export class App {
   public contadorCampana(): string {
     const cantidad = this.notificaciones.noLeidos();
     return cantidad > 99 ? '99+' : String(cantidad);
+  }
+
+  public alternarPanelNotificaciones(): void {
+    this.panelNotificacionesAbierto.update((abierto) => !abierto);
+  }
+
+  public limpiarNotificaciones(): void {
+    this.notificaciones.limpiar();
+  }
+
+  public abrirDetalleNotificacion(notificacion: NotificacionPedido): void {
+    this.panelNotificacionesAbierto.set(false);
+    void this.router.navigate(['/pedidos', notificacion.idOrigen], {
+      queryParams: {
+        retorno: '/pedidos',
+        codigoAlmacen: notificacion.codigosAlmacen,
+      },
+    });
+  }
+
+  public fechaHoraNotificacion(valor: string | null): string {
+    return formatearFechaHoraHonduras(valor);
+  }
+
+  public almacenesNotificacion(codigos: readonly string[]): string {
+    return codigos.join(', ') || 'Sin bodega';
+  }
+
+  public cantidadArticulosNotificacion(cantidad: number): string {
+    return cantidad === 1 ? '1 artículo' : `${cantidad} artículos`;
+  }
+
+  @HostListener('document:click', ['$event'])
+  public cerrarPanelNotificaciones(evento: MouseEvent): void {
+    if (evento.target instanceof Element
+      && evento.target.closest('.contenedor-notificaciones')) return;
+    this.panelNotificacionesAbierto.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  public cerrarPanelNotificacionesConEscape(): void {
+    this.panelNotificacionesAbierto.set(false);
   }
 }

@@ -108,7 +108,10 @@ export function crearAsignacionRutas(
   rutas.post('/consultar', async (solicitud, respuesta, siguiente) => {
     try {
       const { lineas } = esquemaConsultaAsignaciones.parse(solicitud.body);
-      respuesta.json({ datos: await repositorio.consultar(lineas) });
+      respuesta.json({
+        datos: await repositorio.consultar(lineas),
+        horaServidor: new Date().toISOString(),
+      });
     } catch (error) {
       siguiente(error);
     }

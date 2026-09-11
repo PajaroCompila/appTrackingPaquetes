@@ -6,10 +6,12 @@ import { DespachoServicio } from './despachoServicio.js';
 import { LineaDespachoOrigenRepositorio } from './lineaDespachoOrigenRepositorio.js';
 import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
+import { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 
 export const despachoRutas = Router();
 const repositorio = new DespachoRepositorio();
 const servicio = new DespachoServicio(repositorio, new LineaDespachoOrigenRepositorio());
+const seguimientoRepositorio = new SeguimientoPedidoRepositorio();
 const idOrigen = z.string().regex(/^(R1|SAP):.{1,140}$/);
 const identidadDetalle = z.string().regex(/^\d{1,20}$/);
 const codigosAlmacen = z.preprocess((valor) => {
@@ -44,6 +46,7 @@ despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
     const resultado = filtros.vista === 'articulos'
       ? await repositorio.listarArticulos(filtros)
       : await repositorio.listar(filtros);
+    await seguimientoRepositorio.aplicar(resultado.pedidos);
     respuesta.json({ datos: resultado.pedidos, paginacion: {
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: resultado.total,
@@ -55,6 +58,7 @@ despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
 despachoRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
   try {
     const resultado = await repositorio.obtener(idOrigen.parse(solicitud.params.idOrigen));
+    if (resultado) await seguimientoRepositorio.aplicar([resultado]);
     if (resultado) resultado.articulos = resultado.articulos.filter(({ codigoAlmacen }) =>
       puedeVerAlmacen(solicitud.user!, codigoAlmacen));
     if (!resultado || resultado.articulos.length === 0) throw new ErrorAplicacion(404, 'DESPACHO_NO_ENCONTRADO',

@@ -54,7 +54,9 @@ export class AsignacionRepositorio {
       INSERT @lineas(idOrigen, identificadorDetalle) VALUES ${valores};
 
       SELECT linea.idOrigen, linea.identificadorDetalle,
-        asignacion.usuarioAsignado, asignacion.nombreAsignado, asignacion.actualizadoEn
+        asignacion.usuarioAsignado, asignacion.nombreAsignado,
+        CASE WHEN asignacion.usuarioAsignado IS NOT NULL THEN asignacion.creadoEn ELSE NULL END asignadoEn,
+        asignacion.actualizadoEn
       FROM @lineas linea
       LEFT JOIN dbo.AsignacionArticuloPedido asignacion
         ON asignacion.idOrigen = linea.idOrigen
@@ -84,6 +86,7 @@ export class AsignacionRepositorio {
         SET usuarioAsignado = @usuarioAsignado,
             nombreAsignado = @nombreAsignado,
             asignadoPor = @usuarioId,
+            creadoEn = SYSUTCDATETIME(),
             actualizadoEn = SYSUTCDATETIME()
       WHERE idOrigen = @idOrigen
         AND identificadorDetalle = @identificadorDetalle
@@ -107,7 +110,8 @@ export class AsignacionRepositorio {
         SET @confirmada = 1;
       END;
 
-      SELECT idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, actualizadoEn,
+      SELECT idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado,
+        creadoEn asignadoEn, actualizadoEn,
         @confirmada confirmada
       FROM dbo.AsignacionArticuloPedido
       WHERE idOrigen = @idOrigen AND identificadorDetalle = @identificadorDetalle;
@@ -147,7 +151,8 @@ export class AsignacionRepositorio {
 
         IF @@ROWCOUNT = 1 SET @actualizada = 1;
 
-        SELECT idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado, actualizadoEn,
+        SELECT idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado,
+          creadoEn asignadoEn, actualizadoEn,
           @actualizada confirmada
         FROM dbo.AsignacionArticuloPedido
         WHERE idOrigen = @idOrigen AND identificadorDetalle = @identificadorDetalle;
@@ -158,7 +163,13 @@ export class AsignacionRepositorio {
     if (!fila) {
       return {
         actualizada: false,
-        asignacion: { ...identidad, usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null },
+        asignacion: {
+          ...identidad,
+          usuarioAsignado: null,
+          nombreAsignado: null,
+          asignadoEn: null,
+          actualizadoEn: null,
+        },
       };
     }
     const { confirmada, ...asignacion } = fila;

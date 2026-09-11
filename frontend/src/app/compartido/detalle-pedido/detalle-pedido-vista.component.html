@@ -104,6 +104,38 @@
       </dl>
     </section>
 
+    @if (detalle.modificaciones?.length) {
+      <section class="tarjeta-detalle panel-modificaciones" aria-labelledby="titulo-modificaciones-pedido">
+        <div class="titulo-panel">
+          <div>
+            <p class="etiqueta-seccion">Cambios</p>
+            <h2 id="titulo-modificaciones-pedido">Modificaciones del pedido</h2>
+          </div>
+          <i class="pi pi-file-edit" aria-hidden="true"></i>
+        </div>
+        <div class="lista-modificaciones">
+          @for (grupo of gruposCambios; track grupo.tipo) {
+            @if (cambios(detalle.modificaciones!, grupo.tipo); as elementos) {
+              @if (elementos.length) {
+                <section class="grupo-modificaciones">
+                  <h3>{{ grupo.titulo }}</h3>
+                  @for (cambio of elementos; track cambio.detectadoEn + ':' + cambio.identificadorDetalle + ':' + cambio.tipo) {
+                    <article class="cambio-pedido">
+                      <p>{{ descripcionCambio(cambio) }}</p>
+                      <small>
+                        {{ fecha(cambio.detectadoEn) }}
+                        @if (cambio.modificadoPor) { · Modificado por {{ cambio.modificadoPor }} }
+                      </small>
+                    </article>
+                  }
+                </section>
+              }
+            }
+          }
+        </div>
+      </section>
+    }
+
     <section class="tarjeta-detalle panel-articulos" aria-labelledby="titulo-articulos-detalle">
       <div class="titulo-panel titulo-articulos">
         <div>

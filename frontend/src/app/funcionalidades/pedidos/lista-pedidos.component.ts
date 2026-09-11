@@ -43,7 +43,11 @@ const formularioInicial = (fechaActual = ''): FormularioFiltros => ({
 });
 const claveFiltrosPedidos = 'pedidos';
 const intervaloActualizacionPedidosMs = 15000;
+const intervaloRelojSlaMs = 1000;
+const limiteSlaAdvertenciaMs = 5 * 60 * 1000;
+const limiteSlaCriticaMs = 10 * 60 * 1000;
 type VistaPedidos = 'articulos' | 'pedido';
+type EstadoTiempoSla = 'ok' | 'advertencia' | 'critica';
 
 @Component({
   selector: 'app-lista-pedidos',
@@ -68,6 +72,7 @@ export class ListaPedidosComponent implements OnInit {
   private filtrosAplicados: FiltrosPedidos = { pagina: 1, cantidadPorPagina: 25 };
   private versionAsignaciones = 0;
   private usuariosAsignablesCargados = false;
+  private desfaseRelojServidorMs = 0;
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
@@ -94,11 +99,13 @@ export class ListaPedidosComponent implements OnInit {
   public readonly asignacionesDesbloqueadas = signal<ReadonlySet<string>>(new Set());
   public readonly mensajeAsignacion = signal('');
   public readonly mensajeAsignacionEsError = signal(false);
+  public readonly ahoraSlaMs = signal(Date.now());
 
   public ngOnInit(): void {
     this.cargarAlmacenes();
     this.cargarUsuariosAsignables();
     this.iniciarActualizacionAutomatica();
+    this.iniciarRelojSla();
     this.ruta.queryParamMap
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe((parametros) => {
@@ -236,6 +243,30 @@ export class ListaPedidosComponent implements OnInit {
     return Boolean(this.asignacionActual(pedido, articulo)?.usuarioAsignado);
   }
 
+  public estadoTiempoSla(pedido: PedidoResumen): EstadoTiempoSla | null {
+    const transcurrido = this.tiempoTranscurridoSlaMs(pedido);
+    if (transcurrido === null) return null;
+    if (transcurrido >= limiteSlaCriticaMs) return 'critica';
+    if (transcurrido >= limiteSlaAdvertenciaMs) return 'advertencia';
+    return 'ok';
+  }
+
+  public tiempoSla(pedido: PedidoResumen): string {
+    if (pedido.excluidoSla) return 'Excluido';
+    const transcurrido = this.tiempoTranscurridoSlaMs(pedido);
+    if (transcurrido === null) return '—';
+    const segundosTotales = Math.floor(transcurrido / 1000);
+    const horas = Math.floor(segundosTotales / 3600);
+    const minutos = Math.floor((segundosTotales % 3600) / 60);
+    const segundos = segundosTotales % 60;
+    const mmss = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+    return horas > 0 ? `${String(horas).padStart(2, '0')}:${mmss}` : mmss;
+  }
+
+  public modificadoPor(pedido: PedidoResumen): string {
+    return pedido.modificado ? pedido.modificadoPor?.trim() || 'No disponible' : '—';
+  }
+
   public puedeOperarArticulo(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
     const asignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado?.trim().toLowerCase();
     if (!asignado) return true;
@@ -302,6 +333,20 @@ export class ListaPedidosComponent implements OnInit {
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
     return Boolean(seleccion && seleccion !== actual.usuarioAsignado
       && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
+  }
+
+  public puedeGuardarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
+    return this.asignacionConfirmada(pedido, articulo)
+      ? this.puedeConfirmarReasignacion(pedido, articulo)
+      : this.puedeConfirmarAsignacion(pedido, articulo);
+  }
+
+  public guardarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
+    if (this.asignacionConfirmada(pedido, articulo)) {
+      this.confirmarReasignacion(pedido, articulo);
+      return;
+    }
+    this.confirmarAsignacion(pedido, articulo);
   }
 
   public confirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
@@ -576,7 +621,7 @@ export class ListaPedidosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta: { datos, paginacion }, esAutomatica, filtrosConsulta }) => {
+    ).subscribe(({ respuesta: { datos, paginacion, horaServidor }, esAutomatica, filtrosConsulta }) => {
       if (!esAutomatica && datos.length === 0 && this.pagina() > 1) {
         void this.actualizarRuta(this.pagina() - 1);
         return;
@@ -584,6 +629,7 @@ export class ListaPedidosComponent implements OnInit {
       this.reconciliarSeleccionTransferencia(datos);
       this.notificaciones.procesarRespuesta(datos, filtrosConsulta, !esAutomatica);
       this.pedidos.set(datos);
+      this.sincronizarRelojSla(horaServidor);
       this.cargarAsignaciones(datos);
       this.pagina.set(paginacion.pagina);
       this.hayMas.set(paginacion.hayMas);
@@ -781,8 +827,9 @@ export class ListaPedidosComponent implements OnInit {
     consulta
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
-        next: ({ datos }) => {
+        next: ({ datos, horaServidor }) => {
           if (versionConsulta !== this.versionAsignaciones) return;
+          this.sincronizarRelojSla(horaServidor);
           const actuales = new Map(this.asignaciones());
           const selecciones = new Map(this.seleccionesAsignacion());
           datos.forEach((asignacion) => {
@@ -844,6 +891,31 @@ export class ListaPedidosComponent implements OnInit {
     });
   }
 
+  private iniciarRelojSla(): void {
+    timer(0, intervaloRelojSlaMs)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe(() => this.ahoraSlaMs.set(Date.now() + this.desfaseRelojServidorMs));
+  }
+
+  private sincronizarRelojSla(horaServidor: string | null | undefined): void {
+    if (!horaServidor) return;
+    const servidorMs = Date.parse(horaServidor);
+    if (!Number.isFinite(servidorMs)) return;
+    this.desfaseRelojServidorMs = servidorMs - Date.now();
+    this.ahoraSlaMs.set(servidorMs);
+  }
+
+  private tiempoTranscurridoSlaMs(pedido: PedidoResumen): number | null {
+    if (pedido.excluidoSla) return null;
+    const valor = pedido.fechaEntradaCola ?? pedido.fechaEntradaOrigen ?? pedido.fechaHoraPedido;
+    if (!valor) return null;
+    const fecha = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(valor)
+      ? `${valor}-06:00` : valor;
+    const entradaMs = Date.parse(fecha);
+    if (!Number.isFinite(entradaMs)) return null;
+    return Math.max(0, this.ahoraSlaMs() - entradaMs);
+  }
+
   private obtenerAsignacionDesdeError(
     error: unknown,
     identidad: IdentidadArticuloAsignacion,
@@ -862,6 +934,7 @@ export class ListaPedidosComponent implements OnInit {
       ...identidad,
       usuarioAsignado: posible.usuarioAsignado,
       nombreAsignado: posible.nombreAsignado,
+      asignadoEn: typeof posible.asignadoEn === 'string' ? posible.asignadoEn : null,
       actualizadoEn: typeof posible.actualizadoEn === 'string' ? posible.actualizadoEn : null,
     };
   }

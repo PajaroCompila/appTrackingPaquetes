@@ -11,6 +11,7 @@ const pedido = {
   despachadoEn: '2026-08-03T12:00:00Z',
   usuarioDespacho: 'Sistemas',
   fechaHoraPedido: '2026-08-03T10:00:00Z',
+  fechaEntradaCola: '2026-08-03T11:54:30Z',
   nombreVendedor: 'Vendedor',
   articulos: [
     { identificadorDetalle: '1', codigoArticulo: 'A1', descripcion: 'Artículo uno', cantidad: 1, codigoAlmacen: 'B1', usuarioAsignado: 'Jorge Lara' },
@@ -64,6 +65,21 @@ describe('PedidosDespachadosComponent', () => {
     ]);
     expect(enlaces).toHaveLength(2);
     expect(enlaces[0].getAttribute('href')).toBe(enlaces[1].getAttribute('href'));
+    expect(texto).toContain('05:30');
+    expect(texto).not.toContain('Imprimir');
+  });
+
+  it('marca como excluido el tiempo de un pedido mayorista y no lo colorea', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    TestBed.inject(HttpTestingController).expectOne((solicitud) =>
+      solicitud.url.endsWith('/pedidos-despachados'),
+    ).flush({ datos: [{ ...pedido, excluidoSla: true }] });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.tiempo-total-despacho').textContent).toContain('Excluido');
+    expect(fixture.nativeElement.querySelector('.pedido-excluido')).toBeTruthy();
   });
 
   it('consulta por idOrigen y muestra todas las líneas del pedido', () => {

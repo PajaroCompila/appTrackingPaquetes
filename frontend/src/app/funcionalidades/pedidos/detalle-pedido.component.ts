@@ -70,6 +70,7 @@ export class DetallePedidoComponent implements OnInit {
         { etiqueta: 'Código de estado', valor: cabecera.codigoEstadoVenta, icono: 'pi pi-info-circle' },
         { etiqueta: 'Estado de sincronización', valor: cabecera.codigoSincronizacion, icono: 'pi pi-sync' },
       ],
+      modificaciones: cabecera.modificaciones ?? [],
       articulos: partidas.map((partida, indice) => ({
         clave: partida.numeroPartida ?? `${partida.codigoArticulo ?? 'articulo'}-${indice}`,
         identificadorDetalle: partida.numeroPartida,

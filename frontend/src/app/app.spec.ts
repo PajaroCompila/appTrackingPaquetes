@@ -92,7 +92,7 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Pedidos despachados');
   });
 
-  it('mantiene el contador entre rutas y lo limpia al pulsar la campana', async () => {
+  it('mantiene el contador entre rutas y abre el panel sin limpiar las notificaciones', async () => {
     const fixture = TestBed.createComponent(App);
     const notificaciones = TestBed.inject(PedidosNotificacionesService);
     const filtros = { pagina: 1 as const, cantidadPorPagina: 25 as const };
@@ -117,7 +117,56 @@ describe('App', () => {
 
     (fixture.nativeElement.querySelector('.campana-notificaciones') as HTMLButtonElement).click();
     fixture.detectChanges();
+    expect(notificaciones.noLeidos()).toBe(1);
+    expect(fixture.nativeElement.querySelector('.panel-notificaciones').classList).toContain('abierto');
+    expect(fixture.nativeElement.querySelector('.notificacion-pedido')).not.toBeNull();
+
+    (fixture.nativeElement.querySelector('.limpiar-notificaciones') as HTMLButtonElement).click();
+    fixture.detectChanges();
     expect(notificaciones.noLeidos()).toBe(0);
     expect(fixture.nativeElement.querySelector('.contador-notificaciones')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.notificaciones-vacias')).not.toBeNull();
+  });
+
+  it('abre el detalle del pedido al pulsar una notificación', () => {
+    const fixture = TestBed.createComponent(App);
+    const notificaciones = TestBed.inject(PedidosNotificacionesService);
+    const router = TestBed.inject(Router);
+    const navegar = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const filtros = { pagina: 1 as const, cantidadPorPagina: 25 as const };
+    const nuevo = {
+      idOrigen: 'R1:101', origenPedido: 'R1' as const, creadoEnR1: true,
+      sapDocEntry: null, folioPedido: '101', numeroPedido: '101', codigoVenta: null,
+      codigoVendedor: null, nombreVendedor: 'SPS Venta de Tienda', codigosAlmacen: ['BSPS03'],
+      nombresBodega: null, fechaHoraPedido: '2026-09-10T10:15:00', codigoEstadoVenta: null,
+      codigoSincronizacion: null, articulos: [],
+    };
+    notificaciones.procesarRespuesta([], filtros, true);
+    notificaciones.procesarRespuesta([nuevo], filtros, false);
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.campana-notificaciones') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.notificacion-pedido') as HTMLButtonElement).click();
+
+    expect(navegar).toHaveBeenCalledWith(['/pedidos', 'R1:101'], {
+      queryParams: { retorno: '/pedidos', codigoAlmacen: ['BSPS03'] },
+    });
+    expect(fixture.componentInstance.panelNotificacionesAbierto()).toBe(false);
+  });
+
+  it('cierra el panel al volver a pulsar la campana o al pulsar fuera', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const campana = fixture.nativeElement.querySelector('.campana-notificaciones') as HTMLButtonElement;
+
+    campana.click();
+    expect(fixture.componentInstance.panelNotificacionesAbierto()).toBe(true);
+    campana.click();
+    expect(fixture.componentInstance.panelNotificacionesAbierto()).toBe(false);
+
+    campana.click();
+    document.body.click();
+    expect(fixture.componentInstance.panelNotificacionesAbierto()).toBe(false);
   });
 });

@@ -40,6 +40,7 @@ export class PedidoControlador {
           hayMas: paginaPedidos.hayMas,
         },
         fuentes: paginaPedidos.fuentes,
+        horaServidor: new Date().toISOString(),
       });
     } catch (error) {
       siguiente(error);

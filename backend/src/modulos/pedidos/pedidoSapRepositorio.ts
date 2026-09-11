@@ -4,7 +4,9 @@ import type { DetallePedido, FiltrosPedidos, PaginaPedidos, PedidoResumen } from
 
 interface FilaSap {
   docEntry: number; docNum: number; nombreVendedor: string | null;
-  fechaHoraPedido: string | null; totalRegistros: number;
+  fechaHoraPedido: string | null; fechaEntradaOrigen: string | null;
+  codigoUsuarioOrigen: string | null; usuarioUltimaModificacion: string | null;
+  fechaUltimaModificacion: string | null; totalRegistros: number;
 }
 interface LineaSap {
   docEntry: number; numeroLinea: number; codigoArticulo: string | null; descripcion: string | null;
@@ -17,6 +19,11 @@ export interface IPedidoSapRepositorio {
 }
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
+const usuariosSapExcluidosSla = new Set(['TALLER01', 'SVENTA10', 'SVENTA11', 'SVENTA12']);
+
+export function esUsuarioSapExcluidoSla(codigoUsuario: string | null | undefined): boolean {
+  return usuariosSapExcluidosSla.has(codigoUsuario?.trim().toUpperCase() ?? '');
+}
 
 export class PedidoSapRepositorio implements IPedidoSapRepositorio {
   public async buscarPedidos(filtros: FiltrosPedidos): Promise<PaginaPedidos> {
@@ -29,10 +36,25 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
           v.[SlpName] AS nombreVendedor,
           CONVERT(char(19), DATEADD(minute, (o.[DocTime] / 100) * 60 + (o.[DocTime] % 100),
             CONVERT(datetime2, CONVERT(date, o.[DocDate]))), 126) AS fechaHoraPedido,
+          CONVERT(char(19), DATEADD(second,
+            (ISNULL(o.[CreateTS], 0) / 10000) * 3600
+              + ((ISNULL(o.[CreateTS], 0) / 100) % 100) * 60
+              + (ISNULL(o.[CreateTS], 0) % 100),
+            CONVERT(datetime2, CONVERT(date, o.[CreateDate]))), 126) AS fechaEntradaOrigen,
+          creador.[USER_CODE] AS codigoUsuarioOrigen,
+          COALESCE(NULLIF(LTRIM(RTRIM(modificador.[U_NAME])), ''), modificador.[USER_CODE])
+            AS usuarioUltimaModificacion,
+          CONVERT(char(19), DATEADD(second,
+            (ISNULL(o.[UpdateTS], 0) / 10000) * 3600
+              + ((ISNULL(o.[UpdateTS], 0) / 100) % 100) * 60
+              + (ISNULL(o.[UpdateTS], 0) % 100),
+            CONVERT(datetime2, CONVERT(date, o.[UpdateDate]))), 126) AS fechaUltimaModificacion,
           COUNT_BIG(*) OVER() AS totalRegistros
         FROM [dbo].[ORDR] o
         INNER JOIN [dbo].[OCRD] cliente ON cliente.[CardCode] = o.[CardCode]
         LEFT JOIN [dbo].[OSLP] v ON v.[SlpCode] = o.[SlpCode]
+        LEFT JOIN [dbo].[OUSR] creador ON creador.[USERID] = o.[UserSign]
+        LEFT JOIN [dbo].[OUSR] modificador ON modificador.[USERID] = o.[UserSign2]
         WHERE o.[U_SO1_01RETAILONE] = @creadoRetailOne
           AND cliente.[GroupCode] IN (@grupoMayoristaA, @grupoMayoristaB)
           AND o.[CANCELED] = @noCancelado AND o.[DocStatus] = @estadoAbierto
@@ -86,7 +108,12 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
         codigoVenta: null, codigoVendedor: null, nombreVendedor: texto(c.nombreVendedor),
         codigosAlmacen: [...new Set(articulos.map((a) => a.codigoAlmacen).filter((x): x is string => !!x))],
         nombresBodega: [...new Set(articulos.map((a) => a.nombreAlmacen).filter((x): x is string => !!x))].join(', ') || null,
-        fechaHoraPedido: c.fechaHoraPedido, codigoEstadoVenta: 'A', codigoSincronizacion: null, articulos };
+        fechaHoraPedido: c.fechaHoraPedido, fechaEntradaOrigen: c.fechaEntradaOrigen,
+        codigoUsuarioOrigen: texto(c.codigoUsuarioOrigen),
+        usuarioUltimaModificacion: texto(c.usuarioUltimaModificacion),
+        fechaUltimaModificacion: c.fechaUltimaModificacion,
+        excluidoSla: esUsuarioSapExcluidoSla(c.codigoUsuarioOrigen),
+        codigoEstadoVenta: 'A', codigoSincronizacion: null, articulos };
     });
   }
 

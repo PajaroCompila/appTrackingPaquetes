@@ -92,6 +92,7 @@ export class HistorialComponent implements OnInit {
         { etiqueta: 'Asignado a', valor: this.responsablesPedido(pedido), icono: 'pi pi-user' },
         { etiqueta: 'Bodega', valor: pedido.codigosAlmacen.join(', ') || null, icono: 'pi pi-map-marker' },
       ].filter(({ valor }) => valor !== null && valor !== undefined && String(valor).trim() !== ''),
+      modificaciones: pedido.modificaciones ?? [],
       articulos: pedido.articulos.map((articulo, indice) => ({
         clave: articulo.identificadorDetalle ?? `${articulo.codigoArticulo ?? 'articulo'}-${indice}`,
         identificadorDetalle: articulo.identificadorDetalle,
@@ -178,6 +179,9 @@ export class HistorialComponent implements OnInit {
     const responsables = pedido.responsablesAsignados ?? [...new Set(pedido.articulos
       .flatMap(({ usuarioAsignado }) => usuarioAsignado ? [usuarioAsignado] : []))];
     return responsables.length > 0 ? responsables.join(', ') : '—';
+  }
+  public modificadoPor(pedido: { modificado?: boolean; modificadoPor?: string | null }): string {
+    return pedido.modificado ? pedido.modificadoPor?.trim() || 'No disponible' : '—';
   }
   public fechaHora(valor: string | null, hora12 = false): string {
     return valor ? formatearFechaHoraHonduras(valor, hora12) : '—';

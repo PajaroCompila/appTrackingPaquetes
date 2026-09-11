@@ -18,6 +18,7 @@ const respuestaLista = {
     codigoVendedor: 30, nombreVendedor: 'Vendedor original',
     codigosAlmacen: ['COD-COLA'], nombresBodega: 'Bodega Principal SPS',
     fechaHoraPedido: '2026-07-30T12:55:00',
+    fechaEntradaCola: '2026-08-03T12:00:00.000Z',
     codigoEstadoVenta: 'A', codigoSincronizacion: 'N',
     articulos: [{
       identificadorDetalle: '1', codigoArticulo: '001234', descripcion: 'Artículo visible', cantidad: 2,
@@ -111,16 +112,19 @@ describe('ListaPedidosComponent', () => {
       consultar: vi.fn().mockReturnValue(of({ datos: [{
         idOrigen: 'R1:F1', identificadorDetalle: '1',
         usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+        asignadoEn: '2026-08-03T12:00:00.000Z',
         actualizadoEn: '2026-08-03T12:00:00',
-      }] })),
+      }], horaServidor: '2026-08-03T12:00:00.000Z' })),
       guardar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
         ...linea,
         usuarioAsignado,
         nombreAsignado: usuarioAsignado === 'mperez' ? 'Marcos Perez' : null,
+        asignadoEn: '2026-08-03T12:00:00.000Z',
         actualizadoEn: '2026-08-03T12:01:00',
       } })),
       reasignar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
         ...linea, usuarioAsignado, nombreAsignado: 'Marcos Perez',
+        asignadoEn: '2026-08-03T12:00:00.000Z',
         actualizadoEn: '2026-08-03T12:02:00Z',
       } })),
     };
@@ -558,15 +562,18 @@ describe('ListaPedidosComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const boton = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    const botonAsignar = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
+    const botonReasignar = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
     expect(componente.asignacionActual(pedido, pedido.articulos[0])).toMatchObject({
       usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
     });
     expect(selector).toBeTruthy();
     expect(selector.options).toHaveLength(1);
     expect(selector.disabled).toBe(true);
-    expect(boton.textContent).toContain('Desbloquear');
-    expect(boton.disabled).toBe(false);
+    expect(botonAsignar.textContent).toContain('Asignar');
+    expect(botonAsignar.disabled).toBe(true);
+    expect(botonReasignar.textContent).toContain('Reasignar');
+    expect(botonReasignar.disabled).toBe(false);
     expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
     expect(asignacionesService.consultar).toHaveBeenCalledWith([
       { idOrigen: 'R1:F1', identificadorDetalle: '1' },
@@ -580,6 +587,133 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
+  it('cambia automaticamente el semaforo en 05:00 y 10:00 usando la hora del servidor', async () => {
+    vi.setSystemTime(new Date('2026-08-03T12:04:59.000Z'));
+    asignacionesService.consultar.mockImplementation(() => of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+      asignadoEn: '2026-08-03T12:00:00.000Z',
+      actualizadoEn: '2026-08-03T12:00:00.000Z',
+    }], horaServidor: new Date().toISOString() }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const fila = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
+    expect(fila.classList).toContain('fila-sla-ok');
+    expect(fila.classList).not.toContain('fila-sla-advertencia');
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('04:59');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    fixture.detectChanges();
+    expect(fila.classList).toContain('fila-sla-advertencia');
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('05:00');
+
+    vi.setSystemTime(new Date('2026-08-03T12:09:59.000Z'));
+    componente.ahoraSlaMs.set(Date.now());
+    fixture.detectChanges();
+    expect(fila.classList).toContain('fila-sla-advertencia');
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('09:59');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    fixture.detectChanges();
+    expect(fila.classList).toContain('fila-sla-critica');
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('10:00');
+  });
+
+  it('muestra el tiempo desde que entra a la cola aunque todavía no tenga asignación', () => {
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, asignadoEn: null, actualizadoEn: null,
+    }], horaServidor: '2026-08-03T12:00:00.000Z' }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const fila = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('00:00');
+    expect(fila.classList).toContain('fila-sla-ok');
+  });
+
+  it('recupera el tiempo persistido al reconstruir la pantalla', () => {
+    vi.setSystemTime(new Date('2026-08-03T12:07:00.000Z'));
+    asignacionesService.consultar.mockImplementation(() => of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+      asignadoEn: '2026-08-03T12:00:00.000Z',
+      actualizadoEn: '2026-08-03T12:03:00.000Z',
+    }], horaServidor: new Date().toISOString() }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('07:00');
+    expect(fixture.nativeElement.querySelector('tbody tr').classList)
+      .toContain('fila-sla-advertencia');
+
+    fixture.destroy();
+    fixture = TestBed.createComponent(ListaPedidosComponent);
+    componente = fixture.componentInstance;
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('07:00');
+    expect(fixture.nativeElement.querySelector('tbody tr').classList)
+      .toContain('fila-sla-advertencia');
+  });
+
+  it('formatea mas de una hora sin crear consultas por segundo', async () => {
+    vi.setSystemTime(new Date('2026-08-03T13:05:23.000Z'));
+    asignacionesService.consultar.mockImplementation(() => of({ datos: [{
+      idOrigen: 'R1:F1', identificadorDetalle: '1',
+      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
+      asignadoEn: '2026-08-03T12:00:00.000Z',
+      actualizadoEn: '2026-08-03T12:00:00.000Z',
+    }], horaServidor: new Date().toISOString() }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+    const consultasIniciales = asignacionesService.consultar.mock.calls.length;
+
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent)
+      .toContain('01:05:23');
+    await vi.advanceTimersByTimeAsync(1000);
+    fixture.detectChanges();
+    expect(asignacionesService.consultar).toHaveBeenCalledTimes(consultasIniciales);
+    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent)
+      .toContain('01:05:24');
+  });
+
+  it('actualiza cien contadores con el mismo reloj y sin solicitudes adicionales', async () => {
+    vi.setSystemTime(new Date('2026-08-03T12:02:00.000Z'));
+    const articulos = Array.from({ length: 100 }, (_, indice) => ({
+      identificadorDetalle: String(indice + 1),
+      codigoArticulo: `A-${indice + 1}`,
+      descripcion: `Articulo ${indice + 1}`,
+      cantidad: 1,
+      codigoAlmacen: 'BSPS01',
+      nombreAlmacen: 'Bodega principal',
+    }));
+    pedidosService.obtenerPedidos.mockReturnValue(of({
+      ...respuestaLista,
+      datos: [{ ...respuestaLista.datos[0], articulos }],
+    }));
+    asignacionesService.consultar.mockImplementation((lineas) => of({
+      datos: lineas.map((linea: { idOrigen: string; identificadorDetalle: string }) => ({
+        ...linea,
+        usuarioAsignado: 'gcruz',
+        nombreAsignado: 'Gregorio Cruz',
+        asignadoEn: '2026-08-03T12:00:00.000Z',
+        actualizadoEn: '2026-08-03T12:00:00.000Z',
+      })),
+      horaServidor: new Date().toISOString(),
+    }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+    const consultasIniciales = asignacionesService.consultar.mock.calls.length;
+
+    expect(fixture.nativeElement.querySelectorAll('.tiempo-sla')).toHaveLength(100);
+    await vi.advanceTimersByTimeAsync(1000);
+    fixture.detectChanges();
+    expect(asignacionesService.consultar).toHaveBeenCalledTimes(consultasIniciales);
+    expect(fixture.nativeElement.querySelectorAll('.tiempo-sla')).toHaveLength(100);
+  });
+
   it('selecciona libremente y solo confirma al pulsar Asignar', () => {
     asignacionesService.consultar.mockReturnValue(of({ datos: [{
       idOrigen: 'R1:F1', identificadorDetalle: '1',
@@ -588,8 +722,10 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
     fixture.detectChanges();
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const boton = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    const boton = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
+    const botonReasignar = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
     expect(boton.textContent).toContain('Asignar');
+    expect(botonReasignar.disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('tbody tr').classList).not.toContain('fila-asignada');
 
     selector.value = 'mperez';
@@ -605,9 +741,12 @@ describe('ListaPedidosComponent', () => {
       { idOrigen: 'R1:F1', identificadorDetalle: '1' }, 'mperez',
     );
     const selectorConfirmado = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const botonConfirmado = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    const botonConfirmado = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
+    const botonReasignarConfirmado = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
     expect(selectorConfirmado.disabled).toBe(true);
-    expect(botonConfirmado.textContent).toContain('Desbloquear');
+    expect(botonConfirmado.textContent).toContain('Asignar');
+    expect(botonConfirmado.disabled).toBe(true);
+    expect(botonReasignarConfirmado.disabled).toBe(false);
     expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
     expect(fixture.nativeElement.textContent).toContain('Asignación guardada.');
   });
@@ -706,8 +845,9 @@ describe('ListaPedidosComponent', () => {
     expect(pestanas.map(({ textContent }) => textContent?.trim())).toEqual(['Artículos', 'Pedido']);
     expect(pestanas[0]?.getAttribute('aria-selected')).toBe('true');
 
-    const desbloquear = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
-    desbloquear.click();
+    const reasignar = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
+    expect(reasignar.textContent).toContain('Reasignar');
+    reasignar.click();
     fixture.detectChanges();
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
     selector.value = 'mperez';
@@ -715,13 +855,16 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
     expect(asignacionesService.reasignar).not.toHaveBeenCalled();
 
-    const reasignar = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
-    expect(reasignar.textContent).toContain('Reasignar');
-    reasignar.click();
+    const asignar = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
+    expect(asignar.textContent).toContain('Asignar');
+    expect(asignar.disabled).toBe(false);
+    asignar.click();
     expect(asignacionesService.reasignar).toHaveBeenCalledWith(
       { idOrigen: pedido.idOrigen, identificadorDetalle: '1' },
       'mperez', '2026-08-03T12:00:00',
     );
+    expect(componente.asignacionActual(pedido, pedido.articulos[0])?.asignadoEn)
+      .toBe('2026-08-03T12:00:00.000Z');
   });
 
   it.each([

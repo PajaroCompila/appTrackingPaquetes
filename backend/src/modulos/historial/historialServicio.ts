@@ -9,6 +9,7 @@ import { HistorialRepositorio } from './historialRepositorio.js';
 import { HistorialR1Repositorio } from './historialR1Repositorio.js';
 import { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
+import type { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 
 let conciliacionEnCurso: Promise<number> | null = null;
 
@@ -17,6 +18,7 @@ export class HistorialServicio {
     private readonly repositorio = new HistorialRepositorio(),
     private readonly repositorioConsulta?: HistorialR1Repositorio,
     private readonly asignacionRepositorio = new AsignacionRepositorio(),
+    private readonly seguimientoRepositorio?: SeguimientoPedidoRepositorio,
   ) {}
 
   public async sincronizar(): Promise<number> {
@@ -71,6 +73,7 @@ export class HistorialServicio {
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
     await this.agregarResponsablesPedidos(registros);
+    if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar(registros);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
   }
@@ -80,7 +83,10 @@ export class HistorialServicio {
       ? this.repositorio.obtenerHistorial(idOrigen)
       : (this.repositorioConsulta ?? new HistorialR1Repositorio()).obtener(idOrigen);
     const pedido = await consulta;
-    if (pedido) await this.agregarResponsablesPedidos([pedido]);
+    if (pedido) {
+      await this.agregarResponsablesPedidos([pedido]);
+      if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido]);
+    }
     return pedido;
   }
 
@@ -104,6 +110,7 @@ export class HistorialServicio {
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
     await this.agregarResponsablesArticulos(registros);
+    if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicarArticulos(registros);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
   }
