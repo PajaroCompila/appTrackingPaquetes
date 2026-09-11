@@ -272,8 +272,11 @@ export class ListaPedidosComponent implements OnInit {
     if (!asignado) return true;
     const usuario = this.autenticacion.usuario();
     const nombreUsuario = usuario?.nombreUsuario.trim().toLowerCase();
-    return usuario?.codigoRol === 'ADMINISTRADOR' || nombreUsuario === 'gcruz'
-      || nombreUsuario === asignado;
+    if (usuario?.codigoRol === 'ADMINISTRADOR' || nombreUsuario === 'gcruz') return true;
+    if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
+      return asignado === 'acalix' || asignado === 'jlara';
+    }
+    return nombreUsuario === asignado;
   }
 
   public asignacionGuardando(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
@@ -319,8 +322,15 @@ export class ListaPedidosComponent implements OnInit {
     const actual = this.asignacionActual(pedido, articulo);
     if (!identidad || !actual?.usuarioAsignado || !actual.actualizadoEn || !this.puedeReasignar()) return;
     const clave = claveArticuloAsignado(identidad);
-    this.seleccionesAsignacion.update((selecciones) =>
-      new Map(selecciones).set(clave, actual.usuarioAsignado!));
+    this.seleccionesAsignacion.update((selecciones) => {
+      const nuevas = new Map(selecciones);
+      if (this.usuariosAsignables().some(({ usuario }) => usuario === actual.usuarioAsignado)) {
+        nuevas.set(clave, actual.usuarioAsignado!);
+      } else {
+        nuevas.delete(clave);
+      }
+      return nuevas;
+    });
     this.asignacionesDesbloqueadas.update((actuales) => new Set([...actuales, clave]));
     this.mensajeAsignacion.set('');
   }
@@ -834,6 +844,7 @@ export class ListaPedidosComponent implements OnInit {
           const selecciones = new Map(this.seleccionesAsignacion());
           datos.forEach((asignacion) => {
             const clave = claveArticuloAsignado(asignacion);
+            if (this.asignacionesDesbloqueadas().has(clave)) return;
             actuales.set(clave, asignacion);
             if (asignacion.usuarioAsignado) selecciones.delete(clave);
             else if (this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'

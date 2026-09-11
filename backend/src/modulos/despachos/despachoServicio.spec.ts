@@ -64,7 +64,37 @@ describe('DespachoServicio', () => {
     expect(despacho.guardarLineas).not.toHaveBeenCalled();
   });
 
-  it('impide que otro usuario transfiera una partida asignada', async () => {
+  it.each([
+    ['acalix', 'Ana Calix', 'jlara'],
+    ['jlara', 'Jorge Lara', 'acalix'],
+    ['tlopez', 'Tommy López', 'tlopez'],
+  ])('permite a %s transferir después de una reasignación autorizada', async (
+    nombreUsuario, nombreVisible, usuarioAsignado,
+  ) => {
+    const seleccionada = linea('1', nombreUsuario === 'tlopez' ? 'TCIR01' : 'BSPS03');
+    const despacho = { identidadesLineas: vi.fn().mockResolvedValue(new Set()),
+      guardarLineas: vi.fn().mockResolvedValue({
+        transferidas: [{ idOrigen: 'SAP:10', identificadorDetalle: '1' }],
+      }) } as unknown as IDespachoRepositorio;
+    const origen = { obtenerLineas: vi.fn().mockResolvedValue([seleccionada]) } as unknown as LineaDespachoOrigenRepositorio;
+    const asignaciones = { consultar: vi.fn().mockResolvedValue([{
+      idOrigen: 'SAP:10', identificadorDetalle: '1', usuarioAsignado,
+      nombreAsignado: usuarioAsignado, actualizadoEn: new Date(),
+    }]) } as unknown as AsignacionRepositorio;
+
+    await expect(new DespachoServicio(despacho, origen, asignaciones).transferir([
+      { idOrigen: 'SAP:10', identificadorDetalle: '1' },
+    ], '00000000-0000-0000-0000-000000000001', {
+      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario,
+      nombreVisible, codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+      codigosAlmacenVisibles: undefined, sesionId: 'sesion', debeCambiarContrasena: false,
+    })).resolves.toMatchObject({
+      transferidas: [{ idOrigen: 'SAP:10', identificadorDetalle: '1' }],
+    });
+    expect(despacho.guardarLineas).toHaveBeenCalledOnce();
+  });
+
+  it('impide que un usuario ajeno transfiera una partida asignada', async () => {
     const seleccionada = linea('1', 'BSPS03');
     const despacho = { identidadesLineas: vi.fn().mockResolvedValue(new Set()),
       guardarLineas: vi.fn() } as unknown as IDespachoRepositorio;
@@ -77,8 +107,8 @@ describe('DespachoServicio', () => {
     await expect(new DespachoServicio(despacho, origen, asignaciones).transferir([
       { idOrigen: 'SAP:10', identificadorDetalle: '1' },
     ], '00000000-0000-0000-0000-000000000001', {
-      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'acalix',
-      nombreVisible: 'Ana Calix', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'otro',
+      nombreVisible: 'Otro usuario', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
       codigosAlmacenVisibles: undefined, sesionId: 'sesion', debeCambiarContrasena: false,
     })).rejects.toMatchObject({ codigo: 'RESPONSABLE_NO_AUTORIZADO', estadoHttp: 403 });
     expect(despacho.guardarLineas).not.toHaveBeenCalled();

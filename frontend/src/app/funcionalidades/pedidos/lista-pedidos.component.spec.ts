@@ -959,10 +959,10 @@ describe('ListaPedidosComponent', () => {
   });
 
   it.each([
-    ['jlara', 'Jorge Lara', 'acalix', 'Ana Calix', 'jlara', 'R1:F1'],
-    ['acalix', 'Ana Calix', 'jlara', 'Jorge Lara', 'acalix', 'R1:F1'],
+    ['jlara', 'Jorge Lara', 'jlara', 'Jorge Lara', 'acalix', 'R1:F1'],
+    ['acalix', 'Ana Calix', 'acalix', 'Ana Calix', 'jlara', 'R1:F1'],
     ['tlopez', 'Tommy López', 'gcruz', 'Gregorio Cruz', 'tlopez', 'R1:TCIR01:F1'],
-  ])('%s desbloquea y confirma exactamente una reasignación dentro de su lista', (
+  ])('%s desbloquea y confirma exactamente una reasignación dentro de su lista', async (
     nombreUsuario, nombreVisible, asignadoActual, nombreAsignadoActual, nuevoAsignado, idOrigen,
   ) => {
     usuarioSesion.set({
@@ -1000,10 +1000,17 @@ describe('ListaPedidosComponent', () => {
 
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
     expect(selector.disabled).toBe(false);
-    expect([...selector.options].map(({ value }) => value)).toEqual(datos.map(({ usuario }) => usuario));
+    expect([...selector.options].map(({ value }) => value)).toEqual([
+      '', ...datos.map(({ usuario }) => usuario),
+    ]);
     selector.value = nuevoAsignado;
     selector.dispatchEvent(new Event('change'));
     fixture.detectChanges();
+    expect(asignacionesService.reasignar).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(15000);
+    fixture.detectChanges();
+    expect(selector.value).toBe(nuevoAsignado);
     expect(asignacionesService.reasignar).not.toHaveBeenCalled();
 
     const botonConfirmar = fixture.nativeElement.querySelector(
@@ -1022,6 +1029,18 @@ describe('ListaPedidosComponent', () => {
     )?.asignadoEn).toBe('2026-08-03T12:00:00.000Z');
     expect((fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement).disabled)
       .toBe(true);
+    const selectorTransferencia = fixture.nativeElement.querySelector(
+      '.selector-transferencia input',
+    ) as HTMLInputElement;
+    expect(selectorTransferencia.disabled).toBe(false);
+    selectorTransferencia.click();
+    fixture.detectChanges();
+    const botonTransferir = fixture.nativeElement.querySelector(
+      '.acciones-transferencia .boton-primario',
+    ) as HTMLButtonElement;
+    expect(botonTransferir.disabled).toBe(false);
+    botonTransferir.click();
+    expect(pedidosService.despacharLineas).toHaveBeenCalledOnce();
   });
 
   it.each([

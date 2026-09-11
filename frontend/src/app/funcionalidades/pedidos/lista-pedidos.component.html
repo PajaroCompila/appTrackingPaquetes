@@ -221,6 +221,7 @@
                             @if (!asignacionDesbloqueada(pedido, articulo)) {
                               <option [value]="confirmada.usuarioAsignado">{{ confirmada.nombreAsignado }}</option>
                             } @else {
+                              <option value="">Seleccione un responsable</option>
                               @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
                                 <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
                               }

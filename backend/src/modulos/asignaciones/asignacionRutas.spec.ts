@@ -369,7 +369,7 @@ describe('asignaciones de artículos', () => {
   it.each([
     ['jlara', 'Jorge Lara', 'acalix', 'R1:F1'],
     ['acalix', 'Ana Calix', 'jlara', 'R1:F1'],
-    ['tlopez', 'Tommy López', 'tlopez', 'R1:TCIR01:F1'],
+    ['tlopez', 'Tommy López', 'tlopez', 'SAP:101'],
   ])('autoriza una sola reasignación válida para %s', async (
     nombreUsuario, nombreVisible, usuarioAsignado, idOrigen,
   ) => {

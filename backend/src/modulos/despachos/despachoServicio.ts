@@ -43,9 +43,8 @@ export class DespachoServicio {
     }
     if (usuario && !this.puedeOperarCualquierAsignacion(usuario)) {
       const asignaciones = await this.asignacionRepositorio.consultar(identidades);
-      const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
       const ajenas = asignaciones.filter(({ usuarioAsignado }) =>
-        usuarioAsignado && usuarioAsignado.trim().toLowerCase() !== nombreUsuario);
+        usuarioAsignado && !this.puedeOperarAsignacion(usuario, usuarioAsignado));
       if (ajenas.length > 0) {
         throw new ErrorAplicacion(403, 'RESPONSABLE_NO_AUTORIZADO',
           'Solo la persona asignada puede transferir esta partida.');
@@ -58,5 +57,15 @@ export class DespachoServicio {
   private puedeOperarCualquierAsignacion(usuario: IdentidadAutenticada): boolean {
     return usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
       || usuario.nombreUsuario.trim().toLowerCase() === 'gcruz';
+  }
+
+  private puedeOperarAsignacion(usuario: IdentidadAutenticada, usuarioAsignado: string): boolean {
+    const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+    const asignado = usuarioAsignado.trim().toLowerCase();
+    if (usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR' || nombreUsuario === 'gcruz') return true;
+    if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
+      return asignado === 'acalix' || asignado === 'jlara';
+    }
+    return nombreUsuario === asignado;
   }
 }
