@@ -98,6 +98,14 @@ export function compararDetalles(
   return cambios;
 }
 
+export function identificadoresNuevosSinAsignacion(
+  cambios: Omit<CambioPedido, 'detectadoEn' | 'modificadoPor'>[],
+): string[] {
+  return [...new Set(cambios
+    .filter(({ tipo }) => tipo === 'AGREGADO')
+    .map(({ identificadorDetalle }) => identificadorDetalle))];
+}
+
 function crearCambio(
   tipo: TipoCambioPedido,
   anterior: DetalleSeguimiento | null,
@@ -346,6 +354,19 @@ export class SeguimientoPedidoRepositorio {
             FROM OPENJSON(@cambios) WITH (tipo varchar(12), identificadorDetalle nvarchar(150),
               codigoArticulo nvarchar(100), descripcion nvarchar(500), cantidadAnterior decimal(19,6),
               cantidadNueva decimal(19,6), codigoAlmacenAnterior nvarchar(16), codigoAlmacenNuevo nvarchar(16));`);
+        const identificadoresNuevos = identificadoresNuevosSinAsignacion(pendiente.cambios);
+        if (identificadoresNuevos.length > 0) {
+          await new sql.Request(transaccion)
+            .input('idOrigen', sql.NVarChar(150), pendiente.pedido.idOrigen)
+            .input('identificadores', sql.NVarChar(sql.MAX), JSON.stringify(identificadoresNuevos))
+            .query(`UPDATE asignacion
+              SET usuarioAsignado = NULL, nombreAsignado = NULL,
+                actualizadoEn = SYSUTCDATETIME()
+              FROM dbo.AsignacionArticuloPedido asignacion
+              JOIN OPENJSON(@identificadores) identificador
+                ON asignacion.identificadorDetalle = identificador.[value]
+              WHERE asignacion.idOrigen = @idOrigen;`);
+        }
         await new sql.Request(transaccion).input('idOrigen', sql.NVarChar(150), pendiente.pedido.idOrigen)
           .input('huella', sql.NVarChar(sql.MAX), pendiente.huella)
           .input('detectadoEn', sql.DateTimeOffset(3), pendiente.detectadoEn)

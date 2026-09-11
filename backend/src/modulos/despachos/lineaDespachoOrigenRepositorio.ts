@@ -3,6 +3,7 @@ import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 import { consultarSistemaOrigen } from '../../infraestructura/sql/consultaSistemaOrigen.js';
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import type { ArticuloPedidoResumen, PedidoResumen } from '../pedidos/pedido.interface.js';
+import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from '../pedidos/gruposClienteSap.js';
 
 export interface IdentidadLineaDespacho {
   idOrigen: string;
@@ -158,7 +159,8 @@ export class LineaDespachoOrigenRepositorio {
       LEFT JOIN [dbo].[OSLP] vendedor ON vendedor.[SlpCode] = pedido.[SlpCode]
       LEFT JOIN [dbo].[OWHS] almacen ON almacen.[WhsCode] = detalle.[WhsCode]
       WHERE pedido.[CANCELED] = 'N' AND pedido.[DocStatus] = 'O'
-        AND pedido.[U_SO1_01RETAILONE] = 'N' AND cliente.[GroupCode] IN (103, 113)
+        AND pedido.[U_SO1_01RETAILONE] = 'N'
+        AND cliente.[GroupCode] IN (${GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL})
         AND detalle.[LineStatus] = 'O' AND detalle.[OpenQty] > 0
         AND (${condiciones.join(' OR ')});
     `, (solicitud) => {

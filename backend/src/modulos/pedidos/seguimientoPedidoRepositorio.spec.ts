@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { compararDetalles } from './seguimientoPedidoRepositorio.js';
+import {
+  compararDetalles,
+  identificadoresNuevosSinAsignacion,
+} from './seguimientoPedidoRepositorio.js';
 
 const linea = (
   identificadorDetalle: string,
@@ -26,5 +29,14 @@ describe('compararDetalles', () => {
     const anteriores = [linea('1', 'A1', 2, 'B1'), linea('2', 'A2', 1, 'B2')];
     const actuales = [linea('2', 'A2', 1, 'B2'), linea('1', 'A1', 2, 'B1')];
     expect(compararDetalles(anteriores, actuales)).toEqual([]);
+  });
+
+  it('deja sin asignación una partida nueva o reemplazada', () => {
+    const cambios = compararDetalles(
+      [linea('1', 'A1', 1, 'B1')],
+      [linea('1', 'A2', 1, 'B1'), linea('2', 'A3', 1, 'B1')],
+    );
+
+    expect(identificadoresNuevosSinAsignacion(cambios)).toEqual(['1', '2']);
   });
 });

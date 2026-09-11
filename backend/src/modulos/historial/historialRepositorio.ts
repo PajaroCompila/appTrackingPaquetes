@@ -13,6 +13,7 @@ import type {
 } from './historial.interface.js';
 import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionBaseDatos.js';
 import { fechaSqlSinZona, fechaTextoSinZonaParaSql } from '../../compartido/fechaSql.js';
+import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from '../pedidos/gruposClienteSap.js';
 
 export interface CandidatoValidacion { idOrigen: string; folioPedido: string }
 export interface CandidatoSap { idOrigen: string; sapDocEntry: string }
@@ -114,15 +115,13 @@ export class HistorialRepositorio {
       LEFT JOIN dbo.[RDR1] detalle ON detalle.[DocEntry] = pedido.[DocEntry]
       LEFT JOIN dbo.[OWHS] almacen ON almacen.[WhsCode] = detalle.[WhsCode]
       WHERE pedido.[U_SO1_01RETAILONE] = @creadoRetailOne
-        AND cliente.[GroupCode] IN (@grupoMayoristaA, @grupoMayoristaB)
+        AND cliente.[GroupCode] IN (${GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL})
         AND pedido.[CANCELED] = @noCancelado
         AND pedido.[DocStatus] = @estadoCerrado
         AND (pedido.[UpdateDate] >= @fechaDesde OR pedido.[DocDate] >= @fechaDesde)
       ORDER BY pedido.[DocEntry], detalle.[LineNum];
     `, (solicitud) => solicitud
       .input('creadoRetailOne', sql.Char(1), 'N')
-      .input('grupoMayoristaA', sql.Int, 103)
-      .input('grupoMayoristaB', sql.Int, 113)
       .input('noCancelado', sql.Char(1), 'N')
       .input('estadoCerrado', sql.Char(1), 'C')
       .input('fechaDesde', sql.Date, fechaDesde)),

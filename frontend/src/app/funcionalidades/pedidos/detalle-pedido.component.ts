@@ -85,8 +85,8 @@ export class DetallePedidoComponent implements OnInit {
           ? this.asignaciones().get(claveArticuloAsignado({
             idOrigen: cabecera.idOrigen,
             identificadorDetalle: partida.numeroPartida,
-          }))?.nombreAsignado ?? null
-          : null,
+          }))?.nombreAsignado ?? 'Sin asignar'
+          : 'Sin asignar',
         operacionPermitida: this.puedeOperarPartida(cabecera.idOrigen, partida.numeroPartida),
       })),
     };
