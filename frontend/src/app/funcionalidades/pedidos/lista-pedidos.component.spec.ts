@@ -837,6 +837,35 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
+  it('no preselecciona a Tommy en pedidos ajenos a Circunvalación', () => {
+    usuarioSesion.set({
+      usuarioId: '2', nombreUsuario: 'tlopez', nombreVisible: 'Tommy López',
+      codigoRol: 'CONSULTA', codigoAlmacen: null, debeCambiarContrasena: false,
+    });
+    asignacionesService.obtenerUsuarios.mockReturnValue(of({
+      puedeAsignar: true,
+      puedeAsignarTodos: false,
+      datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
+    }));
+    pedidosService.obtenerPedidos.mockReturnValue(of({
+      ...respuestaLista,
+      datos: [{ ...respuestaLista.datos[0], idOrigen: 'R1:TSPS01:F1' }],
+    }));
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:TSPS01:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    const asignar = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    expect(selector.value).toBe('');
+    expect(asignar.disabled).toBe(true);
+    asignar.click();
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+  });
+
   it('muestra Artículos primero y reasigna solamente al confirmar', () => {
     const pedido = respuestaLista.datos[0];
     fixture.detectChanges();
