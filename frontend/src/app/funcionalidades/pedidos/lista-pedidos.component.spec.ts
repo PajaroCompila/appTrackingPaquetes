@@ -157,6 +157,16 @@ describe('ListaPedidosComponent', () => {
     vi.useRealTimers();
   });
 
+  it('resalta visualmente el nombre del bodeguero confirmado', () => {
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect(selector.disabled).toBe(true);
+    expect(selector.classList).toContain('selector-asignado-confirmado');
+    expect(selector.options[selector.selectedIndex]?.text).toBe('Gregorio Cruz');
+  });
+
   it('carga pedidos, catálogo y los nuevos datos operativos', () => {
     fixture.detectChanges();
     const texto = fixture.nativeElement.textContent as string;

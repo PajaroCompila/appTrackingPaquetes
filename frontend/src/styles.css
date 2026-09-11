@@ -530,6 +530,23 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   background: var(--control-deshabilitado-fondo);
   color: var(--control-deshabilitado-texto);
 }
+.vista-pedidos .control-asignacion .selector-asignacion.selector-asignado-confirmado:disabled {
+  border-color: #1d5289;
+  background: #dcebf8;
+  box-shadow: inset 4px 0 0 #1d5289, 0 1px 2px rgb(13 50 87 / 18%);
+  color: #0b345e;
+  font-size: .8rem;
+  font-weight: 800;
+}
+.vista-pedidos .asignacion-lectura:not(.sin-asignar) {
+  padding: .42rem .65rem;
+  border: 1px solid #1d5289;
+  border-radius: .45rem;
+  background: #dcebf8;
+  box-shadow: inset 4px 0 0 #1d5289, 0 1px 2px rgb(13 50 87 / 18%);
+  color: #0b345e;
+  font-weight: 800;
+}
 .vista-pedidos .tiempo-sla {
   display: inline-flex;
   grid-column: 1 / -1;

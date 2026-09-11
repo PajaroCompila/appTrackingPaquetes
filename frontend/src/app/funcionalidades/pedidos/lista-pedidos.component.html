@@ -212,6 +212,7 @@
                         @if (asignacionActual(pedido, articulo); as confirmada) {
                           <select
                             class="selector-asignacion"
+                            [class.selector-asignado-confirmado]="!asignacionDesbloqueada(pedido, articulo)"
                             [disabled]="!asignacionDesbloqueada(pedido, articulo) || asignacionGuardando(pedido, articulo)"
                             [attr.aria-label]="'Técnico asignado al artículo ' + marcador(articulo.codigoArticulo)"
                             [value]="valorAsignacionVisible(pedido, articulo)"
