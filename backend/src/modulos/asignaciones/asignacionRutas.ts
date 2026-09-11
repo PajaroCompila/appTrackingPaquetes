@@ -42,7 +42,7 @@ export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: str
 
 export function puedeReasignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-    || nombreUsuario.trim().toLowerCase() === 'gcruz';
+    || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(nombreUsuario.trim().toLowerCase());
 }
 
 export function usuariosAsignablesParaSesion(
@@ -158,6 +158,11 @@ export function crearAsignacionRutas(
         return;
       }
       const datos = esquemaReasignar.parse(solicitud.body);
+      if (usuario.nombreUsuario.trim().toLowerCase() === 'tlopez'
+        && !datos.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
+        throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
+          'Solo puede reasignarse pedidos de Circunvalación.');
+      }
       const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
       const resultado = await repositorio.reasignar(
         datos,

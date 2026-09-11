@@ -800,7 +800,7 @@ export class ListaPedidosComponent implements OnInit {
               : [];
           this.usuariosAsignables.set(visibles);
           this.puedeAsignarTodos.set(asignaTodos);
-          this.puedeReasignar.set(Boolean(puedeReasignar && asignaTodos));
+          this.puedeReasignar.set(Boolean(puedeReasignar));
           this.puedeAsignar.set(puedeAsignar && this.puedeAsignarPedidos() && visibles.length > 0);
           this.usuariosAsignablesCargados = true;
           this.cargarAsignaciones(this.pedidos());
