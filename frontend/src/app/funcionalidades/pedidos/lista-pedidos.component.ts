@@ -530,7 +530,16 @@ export class ListaPedidosComponent implements OnInit {
           this.transfiriendo.set(false);
           this.actualizarAhora.next(false);
         },
-        error: (error: { error?: { mensaje?: string } }) => {
+        error: (error: { status?: number; error?: { codigo?: string; mensaje?: string } }) => {
+          if (error.status === 409 && error.error?.codigo === 'LINEA_YA_TRANSFERIDA') {
+            this.limpiarSeleccionTransferencia();
+            this.mensajeTransferencia.set(
+              'Una de las partidas seleccionadas ya fue transferida por otro usuario.',
+            );
+            this.transfiriendo.set(false);
+            this.actualizarAhora.next(false);
+            return;
+          }
           this.mensajeTransferencia.set(
             error.error?.mensaje || 'No pudimos transferir los artículos. Probá de nuevo.',
           );
