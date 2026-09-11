@@ -10,6 +10,7 @@ import { PedidoSapRepositorio, type IPedidoSapRepositorio } from './pedidoSapRep
 import type { IDespachoRepositorio } from '../despachos/despachoRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from './seguimientoPedidoRepositorio.js';
+import { aplicarExclusionSlaPorVendedor } from './pedidoSla.js';
 
 interface EstadoCacheSap {
   resultado?: PaginaPedidos;
@@ -54,12 +55,14 @@ export class PedidoServicio {
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
       const pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
+      aplicarExclusionSlaPorVendedor(pedidosOrigen);
       if (this.seguimientoRepositorio) {
         await this.seguimientoRepositorio.registrarYAplicar(
           pedidosOrigen,
           (filtrosAcumulados.codigosAlmacen?.length ?? 0) === 0,
         );
       }
+      aplicarExclusionSlaPorVendedor(pedidosOrigen);
       const unificados = pedidosOrigen
         .map((pedido) => ({ ...pedido, articulos: pedido.articulos.filter((articulo) => {
           const identidad = articulo.identificadorDetalle?.trim();
@@ -157,7 +160,9 @@ export class PedidoServicio {
       if (!pedido) {
         throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
       }
+      aplicarExclusionSlaPorVendedor([pedido.cabecera]);
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido.cabecera]);
+      aplicarExclusionSlaPorVendedor([pedido.cabecera]);
       return pedido;
     } catch (error) {
       if (error instanceof ErrorAplicacion) {
