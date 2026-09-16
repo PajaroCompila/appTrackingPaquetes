@@ -1,7 +1,7 @@
 <section class="pagina vista-pedidos" [class.pagina-detalle]="idOrigen()" aria-labelledby="titulo-historial">
   @if (idOrigen()) {
     <app-detalle-pedido-vista
-      [configuracion]="configuracionDetalle"
+      [configuracion]="configuracionDetalleVisual()"
       [pedido]="detalleVisual()"
       [cargando]="cargando()"
       [error]="error()"
@@ -24,7 +24,7 @@
       <div class="campo"><label for="fechaHasta">Fecha hasta</label><input id="fechaHasta" name="fechaHasta" type="date" required [(ngModel)]="filtros.fechaHasta" /></div>
       <div class="campo campo-amplio campo-almacenes">
         <span id="etiqueta-almacenes" class="etiqueta-campo">Almacenes</span>
-        <details class="selector-multiple">
+        <details class="selector-multiple" appSelectorAlmacenes>
           <summary aria-labelledby="etiqueta-almacenes">{{ resumenAlmacenes() }}</summary>
           <fieldset>
             <legend class="solo-lectores">Seleccionar almacenes</legend>
@@ -58,7 +58,7 @@
         }
       </div>
       <div class="campo">
-        <label for="cantidadHistorial">Registros por página</label>
+        <label for="cantidadHistorial">Pedidos por página</label>
         <select id="cantidadHistorial" name="cantidadPorPagina"
           [(ngModel)]="filtros.cantidadPorPagina" (change)="cambiarCantidadPorPagina()">
           <option [ngValue]="25">25</option>
@@ -84,22 +84,26 @@
       <div class="estado-interfaz" role="status"><p>Cargando historial…</p></div>
     } @else if (error(); as mensaje) {
       <div class="estado-interfaz estado-error" role="alert"><h2>{{ mensaje.titulo }}</h2><p>{{ mensaje.detalle }}</p></div>
-    } @else if ((vista() === 'pedido' && registros().length === 0) || (vista() === 'articulos' && articulos().length === 0)) {
-      <div class="estado-interfaz" role="status"><h2>Sin resultados</h2><p>No hay pedidos entregados en el rango.</p></div>
     } @else {
-      @if (vista() === 'pedido') {
+      @for (grupo of grupos(); track grupo.clave) {
+      <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-historial-' + grupo.clave">
+      <h2 [id]="'titulo-historial-' + grupo.clave">{{ grupo.titulo }}</h2>
+      @if ((vista() === 'pedido' && grupo.pedidos.length === 0)
+        || (vista() === 'articulos' && grupo.articulos.length === 0)) {
+        <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
+      } @else if (vista() === 'pedido') {
       <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
         <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
-          <tbody>@for (pedido of registros(); track pedido.idOrigen) {
-            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">Facturado</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
+          <tbody>@for (pedido of grupo.pedidos; track pedido.idOrigen) {
+            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ numeroDocumento(pedido) }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estadoHistorial || 'Facturado' }}</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
           }</tbody>
         </table>
       </div>
       } @else {
       <div class="panel tabla-contenedor tabla-articulos" role="tabpanel" aria-labelledby="pestana-articulos">
         <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
-          <tbody>@for (articulo of articulos(); track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
-            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="articulo.excluidoSla">{{ articulo.numeroPedido }}</strong></td>
+          <tbody>@for (articulo of grupo.articulos; track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
+            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="articulo.excluidoSla">{{ numeroDocumento(articulo) }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
                 title="Doble clic para consultar inventario"
                 [appCodigoArticuloInventario]="articulo.codigoArticulo"
@@ -111,7 +115,7 @@
               <td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
               <td data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
               <td data-label="Fecha y hora"><span class="texto-dos-lineas">{{ fechaHora(articulo.fechaHoraPedido, true) }}</span></td>
-              <td data-label="Estado"><span class="etiqueta-estado">Facturado</span></td>
+              <td data-label="Estado"><span class="etiqueta-estado">{{ articulo.estadoHistorial || 'Facturado' }}</span></td>
               <td data-label="Vendedor"><span class="texto-dos-lineas">{{ marcador(articulo.nombreVendedor) }}</span></td>
               <td data-label="Usuario"><span class="texto-dos-lineas">{{ marcador(articulo.usuarioAsignado ?? null) }}</span></td>
               <td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', articulo.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
@@ -120,8 +124,12 @@
         </table>
       </div>
       }
+      <app-paginacion [paginaActual]="grupo.pagina" [totalRegistros]="grupo.totalRegistros"
+        [cantidadPorPagina]="filtros.cantidadPorPagina" [deshabilitada]="cargando()"
+        [etiquetaRegistros]="vista() === 'articulos' ? 'partidas' : 'pedidos'"
+        (paginaSeleccionada)="irPagina(grupo.clave, $event)" />
+      </section>
+      }
     }
-
-    <nav class="paginacion" aria-label="Paginación del historial"><button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button><span>Página {{ pagina() }}</span><button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button></nav>
   }
 </section>

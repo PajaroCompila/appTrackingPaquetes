@@ -4,6 +4,7 @@ import { consultarSistemaOrigen } from '../../infraestructura/sql/consultaSistem
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import type { ArticuloPedidoResumen, PedidoResumen } from '../pedidos/pedido.interface.js';
 import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from '../pedidos/gruposClienteSap.js';
+import { COLUMNAS_REFERENCIA_LINEA_R1, firmaLineaR1, type ReferenciaLineaR1 } from '../pedidos/firmaLineaR1.js';
 
 export interface IdentidadLineaDespacho {
   idOrigen: string;
@@ -15,7 +16,7 @@ export interface LineaDespachoValidada extends IdentidadLineaDespacho {
   articulo: ArticuloPedidoResumen;
 }
 
-interface FilaLineaOrigen {
+interface FilaLineaOrigen extends ReferenciaLineaR1 {
   idPedido: string | number;
   numeroPedido: string | number;
   identificadorDetalle: string | number;
@@ -38,6 +39,7 @@ function agrupar(filas: FilaLineaOrigen[], origen: 'R1' | 'SAP', codigoFuente = 
     const idOrigen = origen === 'R1' && codigoFuente
       ? `R1:${codigoFuente}:${clavePedido}` : `${origen}:${clavePedido}`;
     const articulo: ArticuloPedidoResumen = {
+      ...(origen === 'R1' ? { firmaConciliacion: firmaLineaR1(fila, fila.codigoArticulo, fila.codigoAlmacen, fila.cantidad) } : {}),
       identificadorDetalle,
       codigoArticulo: texto(fila.codigoArticulo),
       descripcion: texto(fila.descripcion),
@@ -120,6 +122,7 @@ export class LineaDespachoOrigenRepositorio {
         detalle.[U_SO1_NUMEROARTICULO] AS codigoArticulo,
         detalle.[U_SO1_DESCRIPCION] AS descripcion,
         detalle.[U_SO1_CANTIDAD] AS cantidad,
+        ${COLUMNAS_REFERENCIA_LINEA_R1},
         detalle.[U_SO1_ALMACEN] AS codigoAlmacen,
         almacen.[U_SO1_NOMBREALMACEN] AS nombreAlmacen
       FROM [dbo].[@SO1_01VENTA] venta

@@ -8,7 +8,9 @@
   </form>
   @if(error()){<p class="texto-error" role="alert">{{error()}}</p>}
   <div class="panel tabla-contenedor"><table><thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Bodegas visibles</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>@for(u of usuarios();track u.usuarioId){<tr><td>{{u.nombreCompleto}}</td><td>{{u.nombreUsuario}}</td><td>{{u.nombreRol}}</td><td>{{u.codigosAlmacenVisibles.length?u.codigosAlmacenVisibles.join(', '):'Todas'}}</td><td>{{u.activo?'Activo':'Inactivo'}}</td><td>{{fecha(u.ultimoAcceso)}}</td><td class="acciones"><button (click)="editar(u)">Editar</button><button (click)="configurarAlmacenes(u)">Bodegas</button><button (click)="cambiarEstado(u)">{{u.activo?'Desactivar':'Activar'}}</button><button (click)="restablecer(u)">Restablecer contraseña</button></td></tr>}</tbody></table></div>
-  <nav class="paginacion"><button class="boton boton-secundario" (click)="anterior()" [disabled]="pagina()===1">Anterior</button><span>Página {{pagina()}}</span><button class="boton boton-secundario" (click)="siguiente()" [disabled]="!hayMas()">Siguiente</button></nav>
+  <app-paginacion [paginaActual]="pagina()" [totalRegistros]="totalRegistros()"
+    [cantidadPorPagina]="25" [deshabilitada]="cargando()" etiquetaRegistros="usuarios"
+    (paginaSeleccionada)="irPagina($event)" />
   @if(modal()){
     <div class="fondo-modal">
       <form class="panel modal" (ngSubmit)="modal()==='restablecer'?guardarContrasena():modal()==='almacenes'?guardarAlmacenes():guardar()">

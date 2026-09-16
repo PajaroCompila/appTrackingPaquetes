@@ -22,6 +22,7 @@ export interface FiltrosDespachados {
   pagina: number;
   cantidadPorPagina: number;
   vista?: 'articulos' | 'pedido';
+  clasificacion?: 'normal' | 'especial';
 }
 
 export interface IDespachoRepositorio {
@@ -130,6 +131,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
       .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null)
       .input('fechaHasta', sql.Date, filtros.fechaHasta ?? null)
+      .input('clasificacion', sql.VarChar(8), filtros.clasificacion ?? null)
       .input('inicio', sql.Int, (filtros.pagina - 1) * filtros.cantidadPorPagina)
       .input('cantidad', sql.Int, filtros.cantidadPorPagina);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
@@ -141,13 +143,18 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     const filtroDetalleAlmacenes = parametrosAlmacen.length > 0
       ? `WHERE detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
     const resultado = await solicitud.query(`WITH Pedidos AS (
-        SELECT pedido.*, usuario.nombreVisible usuarioDespacho, COUNT(*) OVER() total
+        SELECT pedido.*, usuario.nombreVisible usuarioDespacho,
+          ISNULL(seguimiento.excluidoSla, 0) excluidoSla, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
+        LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
         WHERE pedido.estadoLocal = 'DESPACHADO' AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
           AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
           AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
           AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
+          AND (@clasificacion IS NULL
+            OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+            OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
           ${filtroAlmacenes}
         ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
           pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC
@@ -183,6 +190,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
           estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
           usuarioDespacho: fila.usuarioDespacho,
+          excluidoSla: Boolean(fila.excluidoSla),
         });
       }
       mapa.get(fila.idOrigen)!.articulos.push({
@@ -212,6 +220,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
       .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null)
       .input('fechaHasta', sql.Date, filtros.fechaHasta ?? null)
+      .input('clasificacion', sql.VarChar(8), filtros.clasificacion ?? null)
       .input('inicio', sql.Int, (filtros.pagina - 1) * filtros.cantidadPorPagina)
       .input('cantidad', sql.Int, filtros.cantidadPorPagina);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
@@ -224,7 +233,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         detalle.descripcion, detalle.cantidad, detalle.codigoAlmacen detalleCodigoAlmacen,
         detalle.nombreAlmacen detalleNombreAlmacen, detalle.transferidoEn,
         usuarioDetalle.nombreVisible usuarioLinea, asignacion.nombreAsignado usuarioAsignado,
-        COUNT(*) OVER() total
+        ISNULL(seguimiento.excluidoSla, 0) excluidoSla, COUNT(*) OVER() total
       FROM dbo.PedidoDespachado pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
@@ -233,10 +242,14 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       LEFT JOIN dbo.AsignacionArticuloPedido asignacion
         ON asignacion.idOrigen = detalle.idOrigen
        AND asignacion.identificadorDetalle = detalle.identificadorDetalle
+      LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
       WHERE pedido.estadoLocal = 'DESPACHADO'
         AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
         AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
         AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
+        AND (@clasificacion IS NULL
+          OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+          OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
         ${filtroAlmacenes}
       ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
         pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
@@ -258,6 +271,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null,
       estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
       usuarioDespacho: fila.usuarioDespacho,
+      excluidoSla: Boolean(fila.excluidoSla),
       responsablesAsignados: fila.usuarioAsignado ? [fila.usuarioAsignado] : [],
       articulos: [{
         identificadorDetalle: fila.identificadorDetalle,

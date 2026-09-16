@@ -6,9 +6,9 @@ import { z } from 'zod';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
 import { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 
-export const historialRutas = Router();
-const servicio = new HistorialServicio(undefined, undefined, undefined, new SeguimientoPedidoRepositorio());
 const idOrigen = z.string().regex(/^(R1|SAP):.{1,140}$/);
+export function crearHistorialRutas(servicio = new HistorialServicio(undefined, undefined, undefined, new SeguimientoPedidoRepositorio())): Router {
+const historialRutas = Router();
 
 historialRutas.get('/', async (solicitud, respuesta, siguiente) => {
   const validacion = esquemaFiltrosHistorial.safeParse(solicitud.query);
@@ -26,6 +26,7 @@ historialRutas.get('/', async (solicitud, respuesta, siguiente) => {
         pagina: pagina.pagina,
         cantidadPorPagina: pagina.cantidadPorPagina,
         cantidadDevuelta: pagina.registros.length,
+        totalRegistros: pagina.totalRegistros,
         hayMas: pagina.hayMas,
       },
     });
@@ -46,14 +47,15 @@ historialRutas.get('/articulos', async (solicitud, respuesta, siguiente) => {
     const pagina = await servicio.buscarArticulos(filtros);
     respuesta.json({ datos: pagina.registros, paginacion: {
       pagina: pagina.pagina, cantidadPorPagina: pagina.cantidadPorPagina,
-      cantidadDevuelta: pagina.registros.length, hayMas: pagina.hayMas,
+      cantidadDevuelta: pagina.registros.length, totalRegistros: pagina.totalRegistros,
+      hayMas: pagina.hayMas,
     } });
   } catch (error) { siguiente(error); }
 });
 
 historialRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
   try {
-    const pedido = await servicio.obtener(idOrigen.parse(solicitud.params.idOrigen));
+    const pedido = await servicio.obtener(idOrigen.parse(solicitud.params.idOrigen), solicitud.user!.codigoRol ?? undefined);
     if (pedido) pedido.articulos = pedido.articulos.filter(({ codigoAlmacen }) =>
       puedeVerAlmacen(solicitud.user!, codigoAlmacen));
     if (!pedido || pedido.articulos.length === 0) throw new ErrorAplicacion(404, 'HISTORIAL_NO_ENCONTRADO',
@@ -63,3 +65,6 @@ historialRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
     siguiente(error);
   }
 });
+return historialRutas;
+}
+export const historialRutas = crearHistorialRutas();

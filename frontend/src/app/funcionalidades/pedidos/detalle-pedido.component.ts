@@ -1,6 +1,7 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { timer } from 'rxjs';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 import type {
   ConfiguracionDetallePedido,
@@ -29,6 +30,7 @@ export class DetallePedidoComponent implements OnInit {
   private readonly destruirRef = inject(DestroyRef);
   private folioPedido = '';
   private codigosAlmacen: string[] = [];
+  private consultaEnCurso = false;
 
   public readonly detalle = signal<DetallePedido | null>(null);
   public readonly cargando = signal(true);
@@ -43,7 +45,6 @@ export class DetallePedidoComponent implements OnInit {
     etiquetaRetorno: 'Regresar a pedidos pendientes',
     tituloInformacion: 'Información del pedido',
     etiquetaArticulos: 'Artículos del pedido',
-    soloConsulta: true,
   };
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     const detalle = this.detalle();
@@ -67,8 +68,6 @@ export class DetallePedidoComponent implements OnInit {
       datosOperativos: [
         { etiqueta: 'Asignado a', valor: responsables.join(', ') || 'Sin asignar', icono: 'pi pi-user' },
         { etiqueta: 'Bodegas', valor: cabecera.nombresBodega, icono: 'pi pi-map-marker' },
-        { etiqueta: 'Código de estado', valor: cabecera.codigoEstadoVenta, icono: 'pi pi-info-circle' },
-        { etiqueta: 'Estado de sincronización', valor: cabecera.codigoSincronizacion, icono: 'pi pi-sync' },
       ],
       modificaciones: cabecera.modificaciones ?? [],
       articulos: partidas.map((partida, indice) => ({
@@ -98,8 +97,11 @@ export class DetallePedidoComponent implements OnInit {
       .subscribe((parametros) => {
         this.folioPedido = parametros.get('folioPedido') ?? '';
         this.codigosAlmacen = this.ruta.snapshot.queryParamMap.getAll('codigoAlmacen');
-        this.cargarDetalle();
+        this.cargarDetalle(false);
       });
+    timer(5000, 5000)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe(() => this.cargarDetalle(true));
   }
 
   public regresar(): void {
@@ -108,13 +110,17 @@ export class DetallePedidoComponent implements OnInit {
   }
 
   public reintentar(): void {
-    this.cargarDetalle();
+    this.cargarDetalle(false);
   }
 
-  private cargarDetalle(): void {
-    this.cargando.set(true);
-    this.error.set(null);
-    this.detalle.set(null);
+  private cargarDetalle(esAutomatica: boolean): void {
+    if (this.consultaEnCurso || !this.folioPedido) return;
+    this.consultaEnCurso = true;
+    if (!esAutomatica) {
+      this.cargando.set(true);
+      this.error.set(null);
+      this.detalle.set(null);
+    }
     this.pedidosService.obtenerDetallePedido(this.folioPedido, this.codigosAlmacen)
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
@@ -122,10 +128,14 @@ export class DetallePedidoComponent implements OnInit {
           this.detalle.set(datos);
           this.cargarAsignaciones(datos);
           this.cargando.set(false);
+          this.consultaEnCurso = false;
         },
         error: (error: unknown) => {
-          this.error.set(obtenerMensajeError(error, 'detalle'));
+          if (!esAutomatica || !this.detalle()) {
+            this.error.set(obtenerMensajeError(error, 'detalle'));
+          }
           this.cargando.set(false);
+          this.consultaEnCurso = false;
         },
       });
   }

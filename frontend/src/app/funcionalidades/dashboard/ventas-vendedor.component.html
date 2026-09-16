@@ -35,7 +35,10 @@
                   <tr><td><strong>{{ venta.numeroPedido }}</strong></td><td>{{ venta.numeroFactura ?? 'Sin factura registrada' }}</td><td class="monto">{{ monto(venta.montoTotal, venta.moneda) }}</td></tr>
                 }
               </tbody></table></div>
-              <div class="paginacion-detalle"><button class="boton boton-secundario" type="button" [disabled]="detalle.pagina === 1" (click)="seleccionarVendedor(vendedor, detalle.pagina - 1)">Anterior</button><span>Página {{ detalle.pagina }} · {{ detalle.totalPedidos }} pedidos</span><button class="boton boton-secundario" type="button" [disabled]="!detalle.hayMas" (click)="seleccionarVendedor(vendedor, detalle.pagina + 1)">Siguiente</button></div>
+              <app-paginacion [paginaActual]="detalle.pagina" [totalRegistros]="detalle.totalPedidos"
+                [cantidadPorPagina]="detalle.cantidadPorPagina" [deshabilitada]="cargandoDetalle()"
+                etiquetaRegistros="pedidos"
+                (paginaSeleccionada)="seleccionarVendedor(vendedor, $event)" />
             }
           }
         </section>

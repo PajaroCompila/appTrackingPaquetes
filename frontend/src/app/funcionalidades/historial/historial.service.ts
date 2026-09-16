@@ -11,6 +11,7 @@ export interface FiltrosHistorial {
   codigosAlmacen: string[];
   pagina: number;
   cantidadPorPagina: number;
+  clasificacion?: 'normal' | 'especial';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +30,7 @@ export class HistorialService {
     for (const codigoAlmacen of filtros.codigosAlmacen) {
       parametros = parametros.append('codigoAlmacen', codigoAlmacen);
     }
+    if (filtros.clasificacion) parametros = parametros.set('clasificacion', filtros.clasificacion);
     return this.http.get<RespuestaHistorial>(`${environment.urlApi}/historial-validados`, {
       params: parametros,
     });
@@ -52,6 +54,7 @@ export class HistorialService {
       .set('cantidadPorPagina', filtros.cantidadPorPagina);
     if (filtros.numeroPedido.trim()) parametros = parametros.set('numeroPedido', filtros.numeroPedido.trim());
     for (const codigo of filtros.codigosAlmacen) parametros = parametros.append('codigoAlmacen', codigo);
+    if (filtros.clasificacion) parametros = parametros.set('clasificacion', filtros.clasificacion);
     return parametros;
   }
 }

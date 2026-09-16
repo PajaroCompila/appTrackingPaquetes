@@ -73,6 +73,9 @@ describe('DetallePedidoComponent', () => {
     fixture.nativeElement.querySelector('.boton-regresar-detalle').click();
     expect(texto).toContain('Pedido #101468453');
     expect(texto).not.toContain('Folio F1');
+    expect(texto).not.toContain('Código de estado');
+    expect(texto).not.toContain('Estado de sincronización');
+    expect(texto).not.toContain('Solo consulta');
     expect(enrutador.navigateByUrl).toHaveBeenCalledWith('/pedidos?pagina=2');
     expect(pedidosService.obtenerDetallePedido).toHaveBeenCalledWith('F1', ['BSPS01', 'BSPS02']);
   });
@@ -96,5 +99,44 @@ describe('DetallePedidoComponent', () => {
     fixture.componentInstance.regresar();
 
     expect(enrutador.navigateByUrl).toHaveBeenCalledWith('/pedidos');
+  });
+
+  it('sustituye en segundo plano las partidas modificadas por las vigentes', async () => {
+    vi.useFakeTimers();
+    const respuesta = (codigoArticulo: string, numeroPartida: string) => of({
+      datos: {
+        cabecera: {
+          idOrigen: 'R1:TSPS01:F1', folioPedido: 'F1', numeroPedido: '101',
+          codigoVenta: null, codigoVendedor: 1, nombreVendedor: 'Vendedor',
+          codigosAlmacen: ['TSPS01'], nombresBodega: 'Tienda Principal',
+          fechaHoraPedido: '2026-09-14T10:00:00', codigoEstadoVenta: 'A',
+          codigoSincronizacion: null, origenPedido: 'R1' as const, creadoEnR1: true,
+          sapDocEntry: null, articulos: [],
+        },
+        partidas: [{
+          numeroPartida, codigoArticulo, descripcionArticulo: codigoArticulo,
+          cantidadSolicitada: 1, codigoAlmacen: 'TSPS01',
+          nombreAlmacen: 'Tienda Principal', codigoEstadoEntrega: 'A',
+        }],
+      },
+    });
+    try {
+      await configurar(respuesta('ART-ANTERIOR', '1'));
+      pedidosService.obtenerDetallePedido
+        .mockReturnValueOnce(respuesta('ART-ANTERIOR', '1'))
+        .mockReturnValue(respuesta('ART-NUEVO', '2'));
+      fixture.detectChanges();
+      expect(fixture.componentInstance.detalleVisual()?.articulos.map(({ codigo }) => codigo))
+        .toEqual(['ART-ANTERIOR']);
+
+      await vi.advanceTimersByTimeAsync(5000);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.detalleVisual()?.articulos.map(({ codigo }) => codigo))
+        .toEqual(['ART-NUEVO']);
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
   });
 });

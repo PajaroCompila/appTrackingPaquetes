@@ -60,9 +60,12 @@ describe('PedidoServicio', () => {
       ...paginaVacia, pedidos: [crearPedido('R1', 'F1', '100')], totalRegistros: 1,
     });
     const sap = crearRepositorioSap([crearPedido('SAP', '22', '100')]);
+    let responderSap!: (valor: Awaited<ReturnType<IPedidoSapRepositorio['buscarPedidos']>>) => void;
+    vi.mocked(sap.buscarPedidos).mockImplementationOnce(() => new Promise(resolve => { responderSap = resolve; }));
     const servicio = new PedidoServicio(r1, sap);
     const primeraConsulta = await servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
-    await Promise.resolve();
+    responderSap({ ...paginaVacia, pedidos: [crearPedido('SAP', '22', '100')], totalRegistros: 1 });
+    await vi.waitFor(() => expect(sap.buscarPedidos).toHaveResolved());
     const resultado = await servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
 
     expect(primeraConsulta.pedidos.map((p) => p.idOrigen)).toEqual(['R1:F1']);
@@ -88,6 +91,37 @@ describe('PedidoServicio', () => {
     expect(resultado.pedidos.map((p) => p.idOrigen)).toEqual(['R1:F1']);
     expect(completarSap).toBeTypeOf('function');
     completarSap?.();
+  });
+
+  it('usa la version de SAP actualizada durante la misma consulta', async () => {
+    const r1 = crearRepositorio();
+    const resolverR1: Array<(valor: typeof paginaVacia) => void> = [];
+    vi.mocked(r1.buscarPedidos).mockImplementation(() => new Promise((resolver) => {
+      resolverR1.push(resolver);
+    }));
+    const anterior = crearPedido('SAP', '22', '100');
+    anterior.articulos[0]!.codigoArticulo = 'ART-ANTERIOR';
+    const actualizado = crearPedido('SAP', '22', '100');
+    actualizado.articulos[0]!.codigoArticulo = 'ART-NUEVO';
+    const sap = crearRepositorioSap();
+    vi.mocked(sap.buscarPedidos)
+      .mockResolvedValueOnce({ ...paginaVacia, pedidos: [anterior], totalRegistros: 1 })
+      .mockResolvedValueOnce({ ...paginaVacia, pedidos: [actualizado], totalRegistros: 1 });
+    const servicio = new PedidoServicio(r1, sap);
+
+    const primera = servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+    await vi.waitFor(() => expect(resolverR1).toHaveLength(1));
+    resolverR1.shift()?.(paginaVacia);
+    await primera;
+    await vi.waitFor(() => expect(sap.buscarPedidos).toHaveBeenCalledTimes(1));
+
+    const segunda = servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+    await vi.waitFor(() => expect(sap.buscarPedidos).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(resolverR1).toHaveLength(1));
+    resolverR1.shift()?.(paginaVacia);
+    const resultado = await segunda;
+
+    expect(resultado.pedidos[0]?.articulos[0]?.codigoArticulo).toBe('ART-NUEVO');
   });
 
   it('conserva R1 e informa disponibilidad parcial cuando SAP falla', async () => {
@@ -176,5 +210,23 @@ describe('PedidoServicio', () => {
     expect(articulos.hayMas).toBe(true);
     expect(pedidos.pedidos).toHaveLength(1);
     expect(pedidos.pedidos[0]?.articulos).toHaveLength(30);
+  });
+
+  it('permite consultar primero los pedidos mas recientes para las notificaciones', async () => {
+    const r1 = crearRepositorio();
+    vi.mocked(r1.buscarPedidos).mockResolvedValue({
+      ...paginaVacia,
+      pedidos: [
+        { ...crearPedido('R1', 'F1', '100'), fechaHoraPedido: '2026-09-14T08:00:00' },
+        { ...crearPedido('R1', 'F2', '101'), fechaHoraPedido: '2026-09-14T09:00:00' },
+      ],
+      totalRegistros: 2,
+    });
+
+    const resultado = await new PedidoServicio(r1, crearRepositorioSap()).buscarPedidos({
+      pagina: 1, cantidadPorPagina: 25, vista: 'pedido', orden: 'desc',
+    });
+
+    expect(resultado.pedidos.map(({ numeroPedido }) => numeroPedido)).toEqual(['101', '100']);
   });
 });

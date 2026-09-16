@@ -1,4 +1,5 @@
 import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { CerrarTooltipNavegacionDirective } from './compartido/interaccion/cerrar-tooltip-navegacion.directive';
 import { NavigationEnd, NavigationStart, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
@@ -9,11 +10,13 @@ import {
   PedidosNotificacionesService,
   type NotificacionPedido,
 } from './compartido/notificaciones/pedidos-notificaciones.service';
+import { SonidoNotificacionService } from './compartido/notificaciones/sonido-notificacion.service';
 import { formatearFechaHoraHonduras } from './compartido/fechas/fecha-honduras';
+import { PedidosNotificacionesGlobalesService } from './compartido/notificaciones/pedidos-notificaciones-globales.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, ConsultaInventarioArticuloHostComponent],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, ConsultaInventarioArticuloHostComponent, CerrarTooltipNavegacionDirective],
   templateUrl: './app.html',
   styleUrls: ['./app.css', './app-notificaciones.css'],
 })
@@ -23,11 +26,14 @@ export class App {
   private readonly destroyRef = inject(DestroyRef);
   private readonly consultaInventario = inject(ConsultaInventarioArticuloService);
   public readonly notificaciones = inject(PedidosNotificacionesService);
+  public readonly sonidoNotificaciones = inject(SonidoNotificacionService);
   public readonly esLogin = signal(this.router.url.startsWith('/login'));
   public readonly panelNotificacionesAbierto = signal(false);
   public readonly usuario = this.autenticacion.usuario;
+  private readonly notificacionesGlobales = inject(PedidosNotificacionesGlobalesService);
 
   public constructor() {
+    this.notificacionesGlobales.iniciar();
     this.router.events.pipe(
       filter((evento): evento is NavigationStart => evento instanceof NavigationStart),
       takeUntilDestroyed(this.destroyRef),
@@ -61,6 +67,16 @@ export class App {
 
   public alternarPanelNotificaciones(): void {
     this.panelNotificacionesAbierto.update((abierto) => !abierto);
+  }
+
+  public alternarSonidoNotificaciones(): void {
+    this.sonidoNotificaciones.alternar();
+  }
+
+  public textoSonidoNotificaciones(): string {
+    return this.sonidoNotificaciones.activo()
+      ? 'Desactivar sonido de notificaciones'
+      : 'Activar sonido de notificaciones';
   }
 
   public limpiarNotificaciones(): void {

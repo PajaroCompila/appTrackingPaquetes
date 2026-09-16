@@ -1,0 +1,18 @@
+:host { display: block; }
+.paginacion-numerada { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .55rem; margin: 1rem 0; }
+.numeros-pagina { display: flex; align-items: center; justify-content: center; gap: .2rem; }
+button { font: inherit; }
+.control-pagina, .numero-pagina { min-height: 2.5rem; border: 1px solid #bfd0e1; border-radius: .5rem; background: #fff; color: #17477d; cursor: pointer; }
+.control-pagina { padding: .55rem .9rem; }
+.numero-pagina { min-width: 2.5rem; padding: .45rem .55rem; border-color: transparent; }
+.numero-pagina:hover:not(:disabled), .control-pagina:hover:not(:disabled) { background: #eaf2fa; border-color: #8caecc; }
+.numero-pagina.actual { background: #1d568f; border-color: #1d568f; color: #fff; font-weight: 700; cursor: default; }
+button:focus-visible { outline: 3px solid rgb(43 111 177 / 30%); outline-offset: 2px; }
+button:disabled { cursor: default; opacity: .5; }
+.separador { min-width: 1.5rem; color: #5b6f84; text-align: center; }
+.total-paginas { width: 100%; color: #4f6479; font-size: .875rem; text-align: center; }
+@media (max-width: 560px) {
+  .paginacion-numerada { gap: .35rem; }
+  .control-pagina { padding-inline: .55rem; }
+  .numero-pagina { min-width: 2.25rem; }
+}

@@ -10,11 +10,26 @@ import type {
   PaginaHistorial,
   PedidoHistorial,
 } from './historial.interface.js';
+import { NOMBRES_VENDEDORES_ESPECIALES } from '../pedidos/pedidoSla.js';
+
+const coincidenciaVendedorEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
+  `UPPER(ISNULL(vendedor.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
+
+function filtroClasificacion(clasificacion: FiltrosHistorial['clasificacion']): string {
+  return clasificacion === 'especial' ? `AND ${coincidenciaVendedorEspecial}`
+    : clasificacion === 'normal' ? `AND NOT ${coincidenciaVendedorEspecial}` : '';
+}
+
+function agregarVendedoresEspeciales(solicitud: sql.Request): void {
+  NOMBRES_VENDEDORES_ESPECIALES.forEach((nombre, indice) =>
+    solicitud.input(`vendedorEspecial${indice}`, sql.NVarChar(40), `%${nombre}%`));
+}
 
 interface CabeceraR1 {
   folioPedido: string; numeroPedido: string; codigoVenta: string | null;
   codigoVendedor: number | null; nombreVendedor: string | null; fechaHoraPedido: string | null;
   codigoEstadoVenta: string | null; codigoSincronizacion: string | null;
+  totalRegistros: number;
 }
 interface LineaR1 {
   folioPedido: string; numeroPartida: number | null; codigoArticulo: string | null;
@@ -25,7 +40,10 @@ interface MetaLocal {
   idOrigen: string; despachadoEn: Date; validadoDetectadoEn: Date | null; usuarioDespacho: string;
 }
 interface CabeceraFuente { sucursal: ConfiguracionSucursalR1; fila: CabeceraR1 }
-interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> { folioPedido: string }
+interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> {
+  folioPedido: string;
+  totalRegistros: number;
+}
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
 
@@ -55,6 +73,8 @@ export class HistorialR1Repositorio {
       metadatos.get(`R1:${sucursal.codigoTienda}:${fila.folioPedido}`),
     ));
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
+      totalRegistros: disponibles.reduce((total, { value }) =>
+        total + Number(value.filas[0]?.totalRegistros ?? 0), 0),
       hayMas: todas.length > inicio + filtros.cantidadPorPagina };
   }
 
@@ -76,6 +96,8 @@ export class HistorialR1Repositorio {
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     return { registros: todos.slice(inicio, inicio + filtros.cantidadPorPagina),
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
+      totalRegistros: disponibles.reduce((total, { value }) =>
+        total + Number(value.filas[0]?.totalRegistros ?? 0), 0),
       hayMas: todos.length > inicio + filtros.cantidadPorPagina };
   }
 
@@ -106,7 +128,7 @@ export class HistorialR1Repositorio {
       detalle.[U_SO1_CANTIDAD] cantidad,
       detalle.[U_SO1_ALMACEN] codigoAlmacen,
       almacen.[U_SO1_NOMBREALMACEN] nombreAlmacen,
-      vendedor.[SlpName] nombreVendedor,
+      vendedor.[SlpName] nombreVendedor, COUNT(*) OVER() totalRegistros,
       CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN NULL ELSE
         CONVERT(char(19), DATEADD(minute, (venta.[U_SO1_HORA] / 100) * 60 +
         (venta.[U_SO1_HORA] % 100), CONVERT(datetime2, CONVERT(date, venta.[U_SO1_FECHA]))), 126)
@@ -124,6 +146,7 @@ export class HistorialR1Repositorio {
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL
           OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) LIKE CONCAT('%', @numeroPedido))
+        ${filtroClasificacion(filtros.clasificacion)}
         ${parametrosAlmacen.length > 0 ? `AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})` : ''}
       ORDER BY venta.[U_SO1_FECHA] DESC, venta.[U_SO1_HORA] DESC, venta.[Name], detalle.[U_SO1_NUMPARTIDA]
       OFFSET 0 ROWS FETCH NEXT @cantidad ROWS ONLY OPTION (RECOMPILE);`;
@@ -133,6 +156,7 @@ export class HistorialR1Repositorio {
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null).input('cantidad', sql.Int, cantidad);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
+    agregarVendedoresEspeciales(solicitud);
     return (await solicitud.query<ArticuloR1>(consulta)).recordset;
   }
 
@@ -143,7 +167,7 @@ export class HistorialR1Repositorio {
     const consulta = `SELECT venta.[Name] folioPedido,
       CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido,
       venta.[Code] codigoVenta, venta.[U_SO1_VENDEDOR] codigoVendedor,
-      vendedor.[SlpName] nombreVendedor,
+      vendedor.[SlpName] nombreVendedor, COUNT(*) OVER() totalRegistros,
       CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN NULL ELSE
         CONVERT(char(19), DATEADD(minute, (venta.[U_SO1_HORA] / 100) * 60 +
         (venta.[U_SO1_HORA] % 100), CONVERT(datetime2, CONVERT(date, venta.[U_SO1_FECHA]))), 126)
@@ -158,6 +182,7 @@ export class HistorialR1Repositorio {
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL
           OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) LIKE CONCAT('%', @numeroPedido))
+        ${filtroClasificacion(filtros.clasificacion)}
         ${parametrosAlmacen.length > 0 ? `AND EXISTS (SELECT 1 FROM [dbo].[@SO1_01VENTADETALLE] detalle
           WHERE detalle.[U_SO1_FOLIO] = venta.[Name]
             AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')}))` : ''}
@@ -171,6 +196,7 @@ export class HistorialR1Repositorio {
       .input('cantidad', sql.Int, cantidad);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
+    agregarVendedoresEspeciales(solicitud);
     return (await solicitud.query<CabeceraR1>(consulta)).recordset;
   }
 
@@ -178,7 +204,7 @@ export class HistorialR1Repositorio {
     const consulta = `SELECT TOP (1) venta.[Name] folioPedido,
       CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido,
       venta.[Code] codigoVenta, venta.[U_SO1_VENDEDOR] codigoVendedor,
-      vendedor.[SlpName] nombreVendedor,
+      vendedor.[SlpName] nombreVendedor, COUNT(*) OVER() totalRegistros,
       CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN NULL ELSE
         CONVERT(char(19), DATEADD(minute, (venta.[U_SO1_HORA] / 100) * 60 +
         (venta.[U_SO1_HORA] % 100), CONVERT(datetime2, CONVERT(date, venta.[U_SO1_FECHA]))), 126)

@@ -366,6 +366,7 @@ export class HistorialRepositorio {
       .input('fechaHasta', sql.Date, filtros.fechaHasta)
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
       .input('idOrigen', sql.NVarChar(150), idOrigen)
+      .input('clasificacion', sql.VarChar(8), filtros.clasificacion ?? null)
       .input('inicio', sql.Int, inicio)
       .input('cantidad', sql.Int, filtros.cantidadPorPagina);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
@@ -377,12 +378,16 @@ export class HistorialRepositorio {
           pedido.idPedidoDespachado, CONVERT(bigint, NULL) idPedidoSapHistorial
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
+        LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
         WHERE pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
           AND pedido.estadoLocal = 'VALIDADO'
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
           AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) >= @fechaDesde
           AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) < DATEADD(day, 1, @fechaHasta)
           AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+          AND (@clasificacion IS NULL
+            OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+            OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
           ${parametrosAlmacen.length > 0 ? `AND EXISTS (SELECT 1
             FROM dbo.PedidoDespachadoDetalle filtro
             WHERE filtro.idPedidoDespachado = pedido.idPedidoDespachado
@@ -394,10 +399,15 @@ export class HistorialRepositorio {
           CONVERT(datetime2(3), NULL), pedido.cerradoDetectadoEn, CONVERT(nvarchar(200), NULL),
           CONVERT(bigint, NULL), pedido.idPedidoSapHistorial
         FROM dbo.PedidoSapHistorial pedido
+        LEFT JOIN dbo.SeguimientoPedido seguimiento
+          ON seguimiento.idOrigen = CONCAT('SAP:', pedido.sapDocEntry)
         WHERE (@idOrigen IS NULL OR CONCAT('SAP:', pedido.sapDocEntry) = @idOrigen)
           AND pedido.fechaHoraPedido >= @fechaDesde
           AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta)
           AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+          AND (@clasificacion IS NULL
+            OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+            OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
           ${parametrosAlmacen.length > 0 ? `AND EXISTS (SELECT 1
             FROM dbo.PedidoSapHistorialDetalle filtro
             WHERE filtro.idPedidoSapHistorial = pedido.idPedidoSapHistorial
@@ -460,6 +470,7 @@ export class HistorialRepositorio {
     const total = Number(resultado.recordset[0]?.total ?? 0);
     return { registros: [...mapa.values()], pagina: filtros.pagina,
       cantidadPorPagina: filtros.cantidadPorPagina,
+      totalRegistros: total,
       hayMas: inicio + filtros.cantidadPorPagina < total };
   }
 
@@ -470,6 +481,7 @@ export class HistorialRepositorio {
       .input('fechaDesde', sql.Date, filtros.fechaDesde)
       .input('fechaHasta', sql.Date, filtros.fechaHasta)
       .input('numeroPedido', sql.NVarChar(20), filtros.numeroPedido ?? null)
+      .input('clasificacion', sql.VarChar(8), filtros.clasificacion ?? null)
       .input('inicio', sql.Int, inicio)
       .input('cantidad', sql.Int, filtros.cantidadPorPagina);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
@@ -482,11 +494,15 @@ export class HistorialRepositorio {
       FROM dbo.PedidoDespachado pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
+      LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
       WHERE pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
         AND pedido.estadoLocal = 'VALIDADO'
         AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) >= @fechaDesde
         AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+        AND (@clasificacion IS NULL
+          OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+          OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
         ${parametrosAlmacen.length > 0
           ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
       UNION ALL
@@ -497,9 +513,14 @@ export class HistorialRepositorio {
       FROM dbo.PedidoSapHistorial pedido
       JOIN dbo.PedidoSapHistorialDetalle detalle
         ON detalle.idPedidoSapHistorial = pedido.idPedidoSapHistorial
+      LEFT JOIN dbo.SeguimientoPedido seguimiento
+        ON seguimiento.idOrigen = CONCAT('SAP:', pedido.sapDocEntry)
       WHERE pedido.fechaHoraPedido >= @fechaDesde
         AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+        AND (@clasificacion IS NULL
+          OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+          OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
         ${parametrosAlmacen.length > 0
           ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
     ), Pagina AS (
@@ -524,6 +545,7 @@ export class HistorialRepositorio {
     }));
     const total = Number(resultado.recordset[0]?.total ?? 0);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
+      totalRegistros: total,
       hayMas: inicio + registros.length < total };
   }
 

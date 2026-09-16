@@ -2,7 +2,6 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
-  HostListener,
   Input,
   OnChanges,
   Output,
@@ -39,7 +38,6 @@ import {
 export class DetallePedidoVistaComponent implements OnChanges {
   private readonly impresionesService = inject(ImpresionesService);
   private readonly destruirRef = inject(DestroyRef);
-  private lineasPendientesRegistro: IdentidadArticuloImpresion[] = [];
 
   @Input({ required: true }) public configuracion!: ConfiguracionDetallePedido;
   @Input() public pedido: PedidoDetalleVisual | null = null;
@@ -155,29 +153,23 @@ export class DetallePedidoVistaComponent implements OnChanges {
     const elegidos = this.pedido.articulos.flatMap((articulo) => {
       const identidad = this.identidad(articulo);
       return identidad && seleccionadas.has(claveArticuloImpreso(identidad))
-        ? [{ articulo, identidad }]
+        ? [articulo]
         : [];
     });
     if (elegidos.length === 0) return;
 
-    this.articulosImpresion.set(elegidos.map(({ articulo }) => ({
+    this.articulosImpresion.set(elegidos.map((articulo) => ({
       codigo: articulo.codigo?.trim() || '—',
       descripcion: articulo.descripcion?.trim() || '—',
       cantidad: articulo.cantidad,
       bodega: articulo.codigoAlmacen?.trim() || '—',
     })));
-    this.lineasPendientesRegistro = elegidos.map(({ identidad }) => identidad);
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.preparandoImpresion.set(true);
     setTimeout(() => {
       window.print();
-      this.confirmarImpresion();
+      this.preparandoImpresion.set(false);
     });
-  }
-
-  @HostListener('window:afterprint')
-  public finalizarImpresion(): void {
-    this.confirmarImpresion();
   }
 
   private cargarEstadoImpresion(): void {
@@ -201,29 +193,6 @@ export class DetallePedidoVistaComponent implements OnChanges {
           this.lineasImpresas.set(new Set(datos.map(claveArticuloImpreso)));
         },
         error: () => undefined,
-      });
-  }
-
-  private confirmarImpresion(): void {
-    const lineas = this.lineasPendientesRegistro;
-    if (lineas.length === 0) {
-      this.preparandoImpresion.set(false);
-      return;
-    }
-    this.lineasPendientesRegistro = [];
-    this.preparandoImpresion.set(false);
-    this.lineasSeleccionadas.set(new Set());
-    this.impresionesService.registrar(lineas)
-      .pipe(takeUntilDestroyed(this.destruirRef))
-      .subscribe({
-        next: ({ datos }) => {
-          const impresas = new Set(this.lineasImpresas());
-          datos.forEach((linea) => impresas.add(claveArticuloImpreso(linea)));
-          this.lineasImpresas.set(impresas);
-        },
-        error: () => this.mensajeImpresion.set(
-          'La impresión se abrió, pero no se pudo guardar el indicador.',
-        ),
       });
   }
 

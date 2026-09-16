@@ -4,12 +4,13 @@ import type { CodigoRol, RolLocal, UsuarioLocal } from './usuario.interface';
 import { UsuarioService } from './usuario.service';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import type { Almacen } from '../pedidos/almacen.interface';
+import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
 
 const claveFiltrosUsuarios = 'pedidosBodega.usuarios.filtros';
 
 @Component({
   selector: 'app-usuarios',
-  imports: [FormsModule],
+  imports: [FormsModule, PaginacionComponent],
   templateUrl: './usuarios.component.html',
   styleUrl: './usuarios.component.css',
 })
@@ -26,6 +27,7 @@ export class UsuariosComponent implements OnInit {
   public readonly seleccionado = signal<UsuarioLocal | null>(null);
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
+  public readonly totalRegistros = signal(0);
   public readonly almacenes = signal<Almacen[]>([]);
   public busqueda = '';
   public rol = '';
@@ -47,6 +49,7 @@ export class UsuariosComponent implements OnInit {
       pagina: this.pagina(), cantidadPorPagina: 25 }).subscribe({
       next: (respuesta) => {
         this.usuarios.set(respuesta.datos); this.hayMas.set(respuesta.paginacion.hayMas);
+        this.totalRegistros.set(respuesta.paginacion.totalRegistros);
         this.cargando.set(false);
       },
       error: () => { this.error.set('No pudimos cargar los usuarios.'); this.cargando.set(false); },
@@ -114,6 +117,10 @@ export class UsuariosComponent implements OnInit {
   }
   public siguiente(): void {
     if (this.hayMas()) { this.pagina.update((valor) => valor + 1); this.guardarFiltros(); this.cargar(); }
+  }
+  public irPagina(pagina: number): void {
+    if (this.cargando()) return;
+    this.pagina.set(pagina); this.guardarFiltros(); this.cargar();
   }
 
   private guardarFiltros(): void {

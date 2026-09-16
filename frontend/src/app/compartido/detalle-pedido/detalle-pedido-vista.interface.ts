@@ -9,7 +9,6 @@ export interface ConfiguracionDetallePedido {
   etiquetaRetorno: string;
   tituloInformacion: string;
   etiquetaArticulos: string;
-  soloConsulta: boolean;
   aviso?: string | null;
   permitirImpresion?: boolean;
 }
@@ -51,6 +50,13 @@ export interface ModificacionPedidoVisual {
 }
 
 export interface PedidoDetalleVisual {
+  tipoDocumento?: string;
+  auditoriaSap?: {
+    usuarioRegistrador: string | null;
+    nombreRegistrador: string | null;
+    documentoEntrega: string;
+    fechaEntrega: string;
+  };
   idOrigen: string;
   numeroPedido: string | null;
   vendedor: string | null;

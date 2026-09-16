@@ -1,0 +1,123 @@
+SIDEBAR Y FILTRO DE ALMACENES
+Fecha: 16/09/2026
+Repositorio: appPedidosBodega-ultima-version
+
+1. CAUSA DEL TOOLTIP PEGADO
+El tooltip es un span .etiqueta-nav mostrado por CSS con hover, focus-visible
+y focus-within. No utiliza PrimeNG ni un overlay. El sidebar sobrevive a la
+navegación de Angular y el icono conserva el puntero/foco después del clic.
+Por eso el tooltip continuaba visible en la pantalla siguiente.
+
+2. CORRECCIÓN DEL SIDEBAR
+CerrarTooltipNavegacionDirective oculta las etiquetas al pulsar una opción.
+Las restaura al volver a entrar con el puntero o al recibir un nuevo foco.
+Mover el mouse entre hijos del mismo icono no reabre la etiqueta recién cerrada.
+No se impide la navegación y no se modifica el diseño ni la transición CSS.
+Incluye enlaces y botones, también Cerrar sesión.
+
+3. CAUSA DEL SALTO DE SCROLL
+Marcar un checkbox ejecutaba una búsqueda y/o navegación de query params.
+Los handlers reiniciaban páginas y recargaban los listados. En Despachados
+la recarga manual además retiraba temporalmente toda la tabla del DOM y
+reducía la altura del documento; el navegador ajustaba el scroll al nuevo
+máximo. Se reprodujo en Edge: scroll 140 -> 6 al presionar Buscar.
+No hay scrollPositionRestoration configurado en el router.
+
+4. SELECCIONAR NO ES BUSCAR
+Los cuatro handlers ahora actualizan la selección y llaman al mismo método
+de persistencia que ya utilizaban, sin navegar ni consultar por el checkbox.
+Buscar conserva el mecanismo de consulta, URL, páginas y filtros existente.
+No se usa window.scrollTo ni un enfoque forzado en el código de la aplicación.
+En Despachados el indicador de carga inicial se muestra cuando aún no hay
+una actualización completada. Tras cargar, la tabla permanece visible
+durante Buscar. Los flags, consultas y botones deshabilitados no cambian.
+
+5. CIERRE PROGRAMÁTICO AL BUSCAR
+SelectorAlmacenesDirective controla el details nativo del selector.
+Escucha submit en captura sobre el formulario y pone open=false antes
+del ngSubmit de Angular. Clic fuera cierra también antes de Buscar o Limpiar.
+NavigationStart cierra el panel al navegar. Escape permite cerrarlo.
+Los listeners y la suscripción se retiran al destruir la directiva.
+
+6. CHECKBOX Y MULTISELECCIÓN
+Clic dentro del details no cierra el panel. Marcar, desmarcar y seleccionar
+varias bodegas mantienen abierto el selector. No se impide el evento nativo.
+
+7. PERSISTENCIA
+No se modificó FiltrosGlobalesService ni el formato de almacenamiento.
+La selección permanece en chips/checkboxes al cerrar o Buscar.
+Validado entre las cuatro pantallas y después de recargar la última ruta.
+Limpiar conserva su comportamiento de reinicio existente.
+
+8. PANTALLAS Y CASOS COMPROBADOS EN EDGE
+/pedidos
+/pedidos-despachados
+/historial-validados
+/pedidos-devueltos
+
+Comprobaciones con Playwright sobre Edge real, viewport 1366x768:
+- Hover visible, clic del sidebar oculta inmediatamente, navegación normal.
+- Volver a entrar con mouse y nuevo foco recuperan el tooltip.
+- Scroll intermedio 140: checkbox no navega ni genera una nueva consulta.
+- Dos bodegas seleccionadas, desmarcar y volver a marcar: panel abierto.
+- Buscar cierra, conserva dos selecciones y mantiene scroll 140 antes,
+  durante y después de la consulta en las cuatro rutas.
+- Limpiar cierra y reinicia la selección.
+- Clic fuera cierra.
+- Con el selector abierto, navegar desde sidebar no deja un panel flotante.
+- Persistencia global entre rutas y tras recarga.
+- Sin errores JavaScript del navegador.
+
+Toda respuesta API se interceptó con datos de prueba. Ninguna solicitud
+de esta comprobación llegó al backend real; no se escribió SAP ni R1.
+El scrollTo del script de QA únicamente establece la posición inicial
+del caso, nunca forma parte de la solución ni del código de producción.
+
+9. BUILD Y PRUEBAS
+Frontend build: aprobado. Continúan las tres advertencias previas por
+presupuesto CSS en app, detalle-pedido-vista y lista-pedidos.
+Pruebas enfocadas: 5 archivos / 37 pruebas aprobadas.
+Incluyen 10 nuevas pruebas de las directivas y una de tabla visible durante
+Buscar, manteniendo el bloqueo de carga de los botones.
+Se actualizaron tres pruebas que esperaban búsqueda automática al cambiar
+bodegas. Ahora comprueban ausencia de consulta por selección, persistencia
+y consulta con los valores elegidos al presionar Buscar.
+Los diez fallos heredados de lista-pedidos.component.spec.ts no se corrigieron
+ni se ocultaron: están fuera de este ajuste puntual.
+Suite frontend final: 29 archivos, 132 pruebas aprobadas y esos mismos
+10 fallos (142 pruebas en total). No hay fallos adicionales por este ajuste.
+Backend build y suite: aprobados, 72 archivos / 393 pruebas.
+No se modificó backend durante este ajuste de interacción.
+
+10. ARCHIVOS DE ESTE AJUSTE
+frontend/src/app/app.ts
+frontend/src/app/app.html
+frontend/src/app/compartido/interaccion/cerrar-tooltip-navegacion.directive.ts
+frontend/src/app/compartido/interaccion/selector-almacenes.directive.ts
+frontend/src/app/compartido/interaccion/interaccion-filtros-navegacion.spec.ts
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.ts
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.html
+frontend/src/app/funcionalidades/pedidos-despachados/pedidos-despachados.component.ts
+frontend/src/app/funcionalidades/pedidos-despachados/pedidos-despachados.component.html
+frontend/src/app/funcionalidades/pedidos-despachados/pedidos-despachados.component.spec.ts
+frontend/src/app/funcionalidades/historial/historial.component.ts
+frontend/src/app/funcionalidades/historial/historial.component.html
+frontend/src/app/funcionalidades/historial/historial.component.spec.ts
+frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.component.ts
+frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.component.html
+documentacion/Interaccion sidebar y almacenes - 2026-09-16.txt
+
+PUBLICACIÓN AUTORIZADA
+El usuario resolvió expresamente la contradicción con el NO commit/NO push
+del adjunto: pidió publicar todos los cambios pendientes a main, incluidos
+los anteriores. La publicación Git incluye ese conjunto completo, no solo
+este ajuste. No implica despliegue o reinicio del servidor.
+
+PENDIENTES HEREDADOS
+F5 real todavía no fue proporcionado/validado y la detección automática de
+devoluciones permanece protegida. No se activó por suposición.
+La regresión previa en asignacionRutas.ts, donde falta PATCH /reasignar
+mientras el frontend todavía lo utiliza, sigue pendiente. La suite backend
+verde no acredita esa funcionalidad porque las pruebas previas se eliminaron.
+Los diez fallos de ListaPedidos y esta regresión no están resueltos.
+No considerar esta publicación como validación completa para producción.

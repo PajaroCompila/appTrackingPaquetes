@@ -44,10 +44,14 @@ describe('HistorialComponent', () => {
       { texto: 'Pedido', activa: 'false' },
     ]);
     expect(fixture.nativeElement.textContent).not.toContain('Imprimir');
+    const consultasIniciales = buscar.mock.calls.length;
     componente.alternarAlmacen('BSPS03', true);
-    expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({ codigosAlmacen: ['BSPS03'] }));
+    expect(buscar.mock.calls.length).toBe(consultasIniciales);
     componente.alternarAlmacen('BSPS04', true);
     expect(componente.filtros.codigosAlmacen).toEqual(['BSPS03', 'BSPS04']);
+    expect(buscar.mock.calls.length).toBe(consultasIniciales);
+    expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(['BSPS03', 'BSPS04']);
+    componente.buscar();
     expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({
       codigosAlmacen: ['BSPS03', 'BSPS04'],
     }));
@@ -63,7 +67,62 @@ describe('HistorialComponent', () => {
     fixture.detectChanges();
     expect(componente.filtros.codigosAlmacen).toEqual(['BSPS03']);
     expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(['BSPS03']);
+    expect(buscar.mock.calls.length).toBe(consultasIniciales + 2);
+    componente.buscar();
     expect(buscar).toHaveBeenLastCalledWith(expect.objectContaining({ codigosAlmacen: ['BSPS03'] }));
+    fixture.destroy();
+    vi.useRealTimers();
+  });
+
+  it('separa normales y especiales con páginas independientes', async () => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    const buscarArticulos = vi.fn((filtros: { clasificacion?: string; pagina: number }) => of({
+      datos: [{
+        idOrigen: filtros.clasificacion === 'especial' ? 'R1:E1' : 'R1:N1',
+        identificadorDetalle: '1', numeroPedido: filtros.clasificacion === 'especial' ? '200' : '100',
+        codigoArticulo: filtros.clasificacion === 'especial' ? 'ESPECIAL' : 'NORMAL',
+        descripcion: 'Artículo', cantidad: 1, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Bodega',
+        fechaHoraPedido: '2026-09-14T10:00:00', nombreVendedor: 'Vendedor',
+        excluidoSla: filtros.clasificacion === 'especial',
+      }],
+      paginacion: { pagina: filtros.pagina, cantidadPorPagina: 25,
+        cantidadDevuelta: 1, totalRegistros: 50, hayMas: true },
+    }));
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { buscar: vi.fn(), buscarArticulos,
+          obtener: vi.fn() } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: vi.fn()
+          .mockReturnValue(of({ datos: [] })) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true),
+          navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]
+      .map((titulo: HTMLElement) => titulo.textContent?.trim());
+    expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
+    expect(fixture.nativeElement.textContent).toContain('NORMAL');
+    expect(fixture.nativeElement.textContent).toContain('ESPECIAL');
+
+    fixture.componentInstance.irPagina('especiales', 2);
+    expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({
+      clasificacion: 'normal', pagina: 1,
+    }));
+    expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({
+      clasificacion: 'especial', pagina: 2,
+    }));
     fixture.destroy();
     vi.useRealTimers();
   });

@@ -28,7 +28,7 @@
 .numero-pedido { margin: .55rem 0 .2rem; color: #244b78; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 600; overflow-wrap: anywhere; }
 .descripcion-detalle { margin: .15rem 0 0; color: var(--gris-600); }
 .etiquetas-cabecera { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; }
-.etiqueta-estado, .etiqueta-consulta, .contador-articulos, .etiqueta-bodega {
+.etiqueta-estado, .contador-articulos, .etiqueta-bodega {
   display: inline-flex; align-items: center; gap: .35rem; width: fit-content; padding: .35rem .65rem;
   border: 1px solid transparent; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
 }
@@ -36,7 +36,6 @@
 .estado-advertencia { border-color: #efcf87; background: #fff7df; color: #795400; }
 .estado-informacion { border-color: #b5cee6; background: #eaf3fb; color: #174e7d; }
 .estado-peligro { border-color: #e6b4b0; background: #fff0ef; color: #9c2f27; }
-.etiqueta-consulta { border-color: #cbd6e0; background: #f4f7fa; color: #40566a; }
 
 .aviso-detalle { display: flex; align-items: center; gap: .65rem; padding: .75rem .9rem; border: 1px solid #efcf87; border-radius: .7rem; background: #fff9e8; color: #684c0c; }
 .resumen-detalle { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }

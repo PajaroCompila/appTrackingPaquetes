@@ -10,6 +10,7 @@ import type {
   VentasVendedorDashboard,
 } from './dashboard.interface';
 import { DashboardService } from './dashboard.service';
+import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
 
 const fechaLocal = (fecha: Date): string => {
   const anio = fecha.getFullYear(); const mes = String(fecha.getMonth() + 1).padStart(2, '0');
@@ -19,7 +20,7 @@ const intervaloActualizacionVendedoresMs = 15000;
 
 @Component({
   selector: 'app-ventas-vendedor',
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink, PaginacionComponent],
   templateUrl: './ventas-vendedor.component.html',
   styleUrl: './ventas-vendedor.component.css',
 })

@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { PedidosDespachadosComponent } from './pedidos-despachados.component';
+import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 
 const pedido = {
   idOrigen: 'R1:F1',
@@ -18,6 +19,22 @@ const pedido = {
     { identificadorDetalle: '2', codigoArticulo: 'A2', descripcion: 'Artículo dos', cantidad: 2, codigoAlmacen: 'B2', usuarioAsignado: 'Ana Calix' },
   ],
 };
+
+function responderListados(
+  http: HttpTestingController,
+  normales: unknown[] = [],
+  especiales: unknown[] = [],
+) {
+  const solicitudes = http.match((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+  expect(solicitudes).toHaveLength(2);
+  const normal = solicitudes.find(({ request }) => request.params.get('clasificacion') === 'normal')!;
+  const especial = solicitudes.find(({ request }) => request.params.get('clasificacion') === 'especial')!;
+  normal.flush({ datos: normales, paginacion: { pagina: 1, cantidadPorPagina: 25,
+    totalRegistros: normales.length, hayMas: false } });
+  especial.flush({ datos: especiales, paginacion: { pagina: 1, cantidadPorPagina: 25,
+    totalRegistros: especiales.length, hayMas: false } });
+  return { normal, especial };
+}
 
 describe('PedidosDespachadosComponent', () => {
   function configurar(idOrigen: string | null, retorno: string | null = null): void {
@@ -45,9 +62,7 @@ describe('PedidosDespachadosComponent', () => {
     configurar(null);
     const fixture = TestBed.createComponent(PedidosDespachadosComponent);
     fixture.detectChanges();
-    TestBed.inject(HttpTestingController).expectOne((solicitud) =>
-      solicitud.url.endsWith('/pedidos-despachados'),
-    ).flush({ datos: [pedido] });
+    responderListados(TestBed.inject(HttpTestingController), [pedido]);
     fixture.detectChanges();
 
     const texto = fixture.nativeElement.textContent as string;
@@ -73,13 +88,36 @@ describe('PedidosDespachadosComponent', () => {
     configurar(null);
     const fixture = TestBed.createComponent(PedidosDespachadosComponent);
     fixture.detectChanges();
-    TestBed.inject(HttpTestingController).expectOne((solicitud) =>
-      solicitud.url.endsWith('/pedidos-despachados'),
-    ).flush({ datos: [{ ...pedido, excluidoSla: true }] });
+    responderListados(TestBed.inject(HttpTestingController), [], [{ ...pedido, excluidoSla: true }]);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.tiempo-total-despacho').textContent).toContain('Excluido');
     expect(fixture.nativeElement.querySelector('.pedido-excluido')).toBeTruthy();
+  });
+
+  it('muestra ambas secciones y mantiene su paginación independiente', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    responderListados(http, [pedido], [{ ...pedido, idOrigen: 'R1:E1', numeroPedido: '200',
+      excluidoSla: true }]);
+    fixture.detectChanges();
+
+    const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]
+      .map((titulo: HTMLElement) => titulo.textContent?.trim());
+    expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
+
+    fixture.componentInstance.irPagina('especiales', 2);
+    const solicitudes = http.match((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(solicitudes.find(({ request }) => request.params.get('clasificacion') === 'normal')
+      ?.request.params.get('pagina')).toBe('1');
+    expect(solicitudes.find(({ request }) => request.params.get('clasificacion') === 'especial')
+      ?.request.params.get('pagina')).toBe('2');
+    solicitudes.forEach((solicitud) => solicitud.flush({ datos: [], paginacion: {
+      pagina: Number(solicitud.request.params.get('pagina')), cantidadPorPagina: 25,
+      totalRegistros: 0, hayMas: false,
+    } }));
   });
 
   it('consulta por idOrigen y muestra todas las líneas del pedido', () => {
@@ -112,27 +150,24 @@ describe('PedidosDespachadosComponent', () => {
     const fixture = TestBed.createComponent(PedidosDespachadosComponent);
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
-    const inicial = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    const inicial = responderListados(http).normal;
     expect(inicial.request.params.get('fechaDesde')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    inicial.flush({ datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false } });
     http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [] });
     const componente = fixture.componentInstance;
     componente.filtros.numeroPedido = '101469987';
     componente.filtros.fechaDesde = '2026-08-15';
     componente.filtros.fechaHasta = '2026-08-19';
     componente.alternarAlmacen('BSPS01', true);
-    const primerAlmacen = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
-    expect(primerAlmacen.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01']);
-    primerAlmacen.flush({ datos: [], paginacion: {
-      pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false,
-    } });
+    http.expectNone((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
     componente.alternarAlmacen('BSPS02', true);
-    const filtrada = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    http.expectNone((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(['BSPS01', 'BSPS02']);
+    componente.buscar();
+    const filtrada = responderListados(http).normal;
     expect(filtrada.request.params.get('numeroPedido')).toBe('101469987');
     expect(filtrada.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01', 'BSPS02']);
     expect(filtrada.request.params.get('fechaDesde')).toBe('2026-08-15');
     expect(filtrada.request.params.get('fechaHasta')).toBe('2026-08-19');
-    filtrada.flush({ datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25, totalRegistros: 0, hayMas: false } });
     fixture.destroy();
   });
 
@@ -141,19 +176,15 @@ describe('PedidosDespachadosComponent', () => {
     const fixture = TestBed.createComponent(PedidosDespachadosComponent);
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
-    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'))
-      .flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
+    responderListados(http);
     http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [
       { codigoAlmacen: 'BSPS03', nombreAlmacen: 'Bodega 3', codigoSucursal: 'SPS', nombreSucursal: 'San Pedro Sula' },
       { codigoAlmacen: 'BSPS04', nombreAlmacen: 'Bodega 4', codigoSucursal: 'SPS', nombreSucursal: 'San Pedro Sula' },
     ] });
 
     fixture.componentInstance.alternarAlmacen('BSPS03', true);
-    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'))
-      .flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.componentInstance.alternarAlmacen('BSPS04', true);
-    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'))
-      .flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
+    http.expectNone((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
     fixture.detectChanges();
 
     const chips = [...fixture.nativeElement.querySelectorAll('.etiqueta-almacen')]
@@ -161,12 +192,32 @@ describe('PedidosDespachadosComponent', () => {
     expect(chips).toEqual(expect.arrayContaining([expect.stringContaining('BSPS03'), expect.stringContaining('BSPS04')]));
 
     (fixture.nativeElement.querySelector('[aria-label="Quitar Bodega 3"]') as HTMLButtonElement).click();
-    const sinBodegaTres = http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    http.expectNone((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
+    expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(['BSPS04']);
+    fixture.componentInstance.buscar();
+    const sinBodegaTres = responderListados(http).normal;
     expect(sinBodegaTres.request.params.getAll('codigoAlmacen')).toEqual(['BSPS04']);
-    sinBodegaTres.flush({ datos: [], paginacion: { hayMas: false, totalRegistros: 0 } });
     fixture.detectChanges();
     expect(fixture.componentInstance.filtros.codigosAlmacen).toEqual(['BSPS04']);
     expect(fixture.nativeElement.textContent).not.toContain('BSPS03 ×');
+    fixture.destroy();
+  });
+
+  it('conserva la tabla visible durante Buscar sin cambiar el bloqueo de carga', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    responderListados(http, [pedido]);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [] });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(2);
+    fixture.componentInstance.buscar();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.cargando()).toBe(true);
+    expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelector('button[type=submit]').disabled).toBe(true);
+    responderListados(http, [pedido]);
     fixture.destroy();
   });
 });

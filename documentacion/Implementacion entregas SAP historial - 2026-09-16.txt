@@ -1,0 +1,414 @@
+ENTREGAS SAP EN HISTORIAL — IMPLEMENTACIÓN Y VALIDACIÓN
+Fecha: 16/09/2026
+
+REPOSITORIO
+C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+
+Se conservaron las modificaciones locales existentes. No se utilizó reset,
+restore ni checkout para descartar archivos. No se trabajó en el repositorio
+appPedidosBodega antiguo. Este cambio no incluye un despliegue en otro servidor.
+
+1. RESULTADO
+
+Las entregas SAP se consultan como documentos ODLN/DLN1 independientes de ORDR.
+Una entrega original, no cancelada y con salida comprobada se incorpora al
+historial local. Su estado financiero es:
+
+  Entregado, Sin factura: sin factura activa documentalmente vinculada.
+  Facturado: con factura activa vinculada mediante INV1.BaseType = 15.
+
+La entrega puede tener DocStatus O o C. El cierre de la cabecera no es la prueba
+de salida. Una entrega desde cotización no inventa un pedido intermedio.
+
+2. ARQUITECTURA
+
+EntregaSapFuente:
+  Lectura SAP independiente, sin modificaciones en pedidoSapRepositorio.ts.
+  Descubre entregas y facturas por lotes y recupera hechos documentales.
+
+EntregaSapSincronizador:
+  Descubrimiento incremental, recuperación histórica acotada y revisión rotativa.
+  Se ejecuta dentro del sincronizador de historial, no desde /api/pedidos.
+
+EntregaSapRepositorio:
+  Guarda solamente en PedidosBodega. Expone proyecciones explícitas para el
+  historial y evita devolver el documento interno con datos administrativos.
+
+HistorialServicio:
+  Integra la nueva fuente local con las fuentes existentes R1 e historial SAP.
+  No espera una consulta SAP para leer las entregas ya guardadas.
+
+Frontend:
+  Reutiliza las dos vistas existentes y el componente de detalle.
+  No se cambiaron columnas, tabs, estilos, filtros ni controles de impresión.
+
+3. IDENTIDAD ESTABLE
+
+Cabecera:
+  SAP:PAJARO_AZUL:15:6669
+
+Líneas:
+  SAP:PAJARO_AZUL:15:6669:0
+  SAP:PAJARO_AZUL:15:6669:1
+
+Las líneas usan la identidad de cabecera y el LineNum real; no se renumeran como
+partidas de ORDR. La clave local de línea es (idOrigen, lineNum).
+
+SAP:6669 continúa siendo la identidad antigua de un ORDR. No se reutiliza para
+esta entrega. El detalle reconoce la identidad completa antes de consultar la
+fuente antigua de pedidos SAP.
+
+4. DESCUBRIMIENTO INCREMENTAL
+
+Entregas nuevas:
+  SELECT TOP (@limite) e.DocEntry
+  FROM ODLN e JOIN OCRD c ON c.CardCode = e.CardCode
+  WHERE e.DocEntry > @cursor
+    AND e.DocType = 'I'
+    AND ISNULL(e.U_SO1_01RETAILONE, 'N') = 'N'
+    AND c.GroupCode IN (100,101,102,103,104,105,106,107,108,109,
+                        110,111,112,113,114,115,116,117,118)
+  ORDER BY e.DocEntry ASC
+
+En la primera ejecución se toman las 50 entregas elegibles más recientes, en
+orden descendente. Luego se recuperan entregas anteriores en lotes de 25 usando
+DocEntry < cursor. No se hace un scan completo de fechas en cada refresh.
+
+Revisión:
+  Hasta 50 entregas locales conocidas por ciclo, en orden de DocEntry.
+  Al alcanzar el final se reinicia el cursor de revisión.
+
+Facturas nuevas:
+  Hasta 25 cabeceras OINV posteriores al cursor financiero.
+  Se buscan sus INV1.BaseType = 15 y sus entregas elegibles.
+  El cursor también avanza sobre facturas sin entrega elegible, para no quedar
+  bloqueado por facturas de otros flujos.
+
+Una factura nueva agrega su entrega al lote de revisión, aunque esa entrega sea
+antigua. La actualización ocurre en el mismo ciclo que detecta esa factura.
+Si hay más de 25 facturas nuevas acumuladas, se procesan en ciclos sucesivos.
+
+El lote combinado se divide en bloques de hasta 150 DocEntry. Cada bloque hace
+tres SELECT: documentos/líneas, movimientos y facturas. No existe una consulta
+OIVL por artículo. Las revisiones de cambios en facturas antiguas dependen de la
+rotación de entregas; no se promete detección instantánea de esas modificaciones.
+
+5. VALIDACIÓN LOGÍSTICA
+
+La candidata original debe tener CANCELED = N. No se exige DocStatus C.
+
+La salida se comprueba con OIVL exclusivamente:
+  TransType = 15
+  CreatedBy = ODLN.DocEntry
+  DocLineNum = DLN1.LineNum
+  ItemCode = DLN1.ItemCode
+  LocCode = DLN1.WhsCode
+
+Se agrupa SUM(OutQty - InQty) por documento, línea, artículo y almacén.
+No se suman OIVL y OINM.
+
+Solo se muestran líneas con cantidad efectivamente comprobada mayor a cero.
+La cantidad visible se convierte de unidades de inventario a unidades de venta:
+  MIN(salida comprobada, InvQty) * Quantity / InvQty.
+
+InvQty cero o salida no demostrada no generan una cantidad entregada ficticia.
+Una factura sola no convierte un documento sin salida demostrada en historial
+logístico. Los datos sin salida pueden conservarse para una revisión posterior.
+
+6. FACTURACIÓN DOCUMENTAL
+
+Se leen INV1 y OINV con:
+  INV1.BaseType = 15
+  INV1.BaseEntry = ODLN.DocEntry
+  OINV.CANCELED = N
+
+Cada BaseLine se verifica contra una línea real de la entrega recuperada.
+Se conservan DocEntry, DocNum, BaseLine y cantidad de factura.
+
+El texto Facturado indica existencia de una factura activa vinculada. No es una
+afirmación de cobertura financiera total de todas las cantidades del pedido
+origen. Las referencias por línea quedan guardadas para ampliar esa cobertura.
+
+No se utilizan coincidencias por cliente, artículo, fecha, comentarios ni
+U_SO1_FACTURA como prueba de facturación en esta nueva fuente.
+
+7. MISMO REGISTRO CUANDO APARECE UNA FACTURA
+
+La factura actualiza el estado financiero de la misma identidad de entrega.
+No cambia su fecha original ni el identificador de sus artículos.
+La fecha de detección inicial se conserva; la fecha de revisión sí se actualiza.
+
+La tabla EntregaSapHistorialCambio conserva cambios de estado y referencias de
+facturas. No se eliminan los registros anteriores de esa trazabilidad.
+
+La página de detalle de una entrega SAP se refresca en segundo plano cada
+15 segundos, sin sustituir el detalle por una pantalla de carga. Si falla esa
+lectura automática, conserva el detalle anterior. Las otras páginas de detalle
+no recibieron un cambio de comportamiento.
+
+8. CASO REAL: ENTREGA 6669 / 40968
+
+SAP:PAJARO_AZUL:15:6669
+CANCELED: N
+DocStatus: O
+Fecha/hora de creación: 14/09/2026 09:02:01
+Estado logístico: SALIDA_COMPROBADA
+Estado financiero: Entregado, Sin factura
+Facturas activas vinculadas: ninguna
+
+Línea 0: YAM-MODX7, TSPS01, salida 1, cantidad 1.
+Línea 1: YAM-PA150, BSPS03, salida 1, cantidad 1.
+
+Ambas líneas tienen BaseType 23 y BaseEntry 160052.
+BaseLine real: 2 y 3, respectivamente.
+Cotización base: 100206148.
+Referencia R1 de la entrega: SPSS04CO60265.
+Pedido: No aplica.
+
+Validación local:
+  Una cabecera en vista Pedido.
+  Dos filas en vista Artículos.
+  Una única identidad incluso después de guardar el lote repetidamente.
+
+9. CASO REAL FACTURADO: ENTREGA 6618
+
+Entrega DocEntry: 6618
+Entrega DocNum: 100155642
+CANCELED: N
+DocStatus: C
+Estado logístico: SALIDA_COMPROBADA
+Estado financiero: Facturado
+
+Pedido base real: ORDR 919780 / 101459807, BaseType 17.
+Cinco líneas, BaseLine 0 a 4, con salidas comprobadas de 7, 7, 5, 3 y 4.
+Factura vinculada: OINV 881777 / 201646148.
+Las cinco líneas de factura tienen BaseType 15 y BaseEntry 6618.
+El detalle facturado no muestra el bloque administrativo de entrega sin factura.
+
+10. CASO REAL SIN BASE: ENTREGA 4432
+
+Entrega DocEntry: 4432
+Entrega DocNum: 200016780
+Fecha/hora: 26/08/2024 12:09:36
+CANCELED: N
+DocStatus: C
+Línea: ALI-AWR-100N, TSPS01, salida comprobada 1.
+BaseType: -1; BaseEntry y BaseLine se representan como no aplicables.
+Estado financiero: Entregado, Sin factura.
+No se inventa un pedido ni una cotización.
+Para verla se debe usar un rango de historial que incluya agosto de 2024.
+
+11. OUSR Y AUDITORÍA ADMINISTRATIVA
+
+Resolución real:
+  ODLN.UserSign -> OUSR.USERID.
+
+Entrega 40968:
+  UserSign 55.
+  USER_CODE PIERROT.
+  U_NAME Pierrot Maalouf.
+
+Se muestra PIERROT, respetando el identificador solicitado.
+El nombre descriptivo queda disponible dentro de la proyección administrativa.
+
+El bloque se llama Información SAP. Incluye:
+  Estado.
+  Usuario SAP que registró la entrega.
+  Documento de entrega.
+  Fecha/hora SAP.
+
+No se utiliza el texto Entregado por: el usuario registrador no demuestra quién
+entregó físicamente la mercadería.
+
+12. PROTECCIÓN BACKEND Y NO ADMINISTRADORES
+
+La ruta toma el rol de la sesión autenticada, no de query params ni del body.
+El repositorio proyecta campos públicos explícitos y solo agrega auditoriaSap
+cuando rol = ADMINISTRADOR y estado = Entregado, Sin factura.
+
+HistorialServicio vuelve a retirar auditoriaSap para otros roles o estados.
+Las listas nunca incluyen la auditoría, ni siquiera para administradores.
+
+OPERADOR_BODEGA y CONSULTA conservan el estado operativo, pero sus respuestas no
+incluyen PIERROT, usuarioRegistrador, nombreRegistrador ni UserSign.
+
+Se probaron requests HTTP con un query fraudulento rol=ADMINISTRADOR mientras la
+sesión era operador o consulta. No hubo exposición del bloque reservado.
+Esas pruebas HTTP usan identidades de sesión simuladas; la protección de
+autenticación ya existente en la aplicación no fue reemplazada.
+
+Los datos administrativos internos permanecen en PedidosBodega; no se devuelve
+el JSON interno completo por ninguna de las nuevas rutas de historial.
+
+13. NO VINCULACIÓN FALSA NI ASIGNACIÓN INVENTADA
+
+La entrega 40968 tiene base formal OQUT 160052, no ORDR 961461.
+No se marca el pedido 101475685 como entregado por esta entrega.
+
+Las referencias de base se toman de DLN1.BaseType/BaseEntry/BaseLine.
+Los números se resuelven contra la cabecera del tipo correspondiente.
+No se relacionan documentos por ItemCode, cliente, folio parecido o comentarios.
+
+Ana Calix conserva su asignación R1 existente. Esa asignación no se copia a esta
+entrega. La nueva proyección tiene responsables vacíos y usuarioAsignado nulo.
+Vendedor, usuario SAP registrador y responsable local se mantienen separados.
+
+14. PARCIALES, VARIAS ENTREGAS Y CANCELACIONES
+
+Se guarda por línea BaseType, BaseEntry, BaseLine, Quantity, InvQty y cantidad
+entregada comprobada. No existe una operación que marque el pedido base completo
+como entregado por encontrar una sola línea de entrega.
+
+Dos entregas del mismo pedido y BaseLine conservan dos identidades documentales
+distintas. No se consolidan como si fueran una misma entrega.
+
+CANCELED distinto de N produce estado logístico CANCELADA y excluye la entrega
+de la consulta operativa, sin borrar la entidad, sus líneas ni sus cambios.
+No se interpretan devoluciones como eliminación del documento original.
+
+No se implementó conciliación ORDN/RDN1 ni cálculo global de cobertura completa
+del pedido: se conservaron las claves necesarias para extenderlos luego.
+No se validó una cancelación o parcial real; esos escenarios se probaron con
+datos controlados, tal como permite la evidencia disponible.
+
+Los flujos históricos anteriores de ORDR y R1 permanecen intactos. La nueva
+entrega es otra entidad documental, no una conversión de sus registros antiguos.
+
+15. PERSISTENCIA Y MIGRACIÓN 14
+
+Aplicada y reejecutada correctamente en PedidosBodega:
+  npm run db:migrate:entregas-sap
+
+Tablas:
+  EntregaSapHistorial: identidad, DocEntry, fecha original, estados, datos mínimos
+    del documento, detección y revisión.
+  EntregaSapHistorialLinea: clave de línea, almacén, bases, InvQty, cantidades y
+    datos mínimos del artículo.
+  EntregaSapHistorialCambio: trazabilidad de estados y facturas detectadas.
+  ControlEntregasSap: cursores de descubrimiento, recuperación, revisión y factura.
+
+El JSON interno guarda empresa, ObjType, DocEntry/DocNum, DocDate/DocTime,
+CreateDate/CreateTS, UpdateDate/UpdateTS, CANCELED, DocStatus, vendedor,
+referencias, usuario registrador, cantidades y facturas. No copia documentos SAP
+completos ni datos ajenos al flujo.
+
+Las claves únicas y el upsert por lote impiden repetir la cabecera o su línea.
+La transacción local usa XACT_ABORT y bloqueos de actualización/rango.
+El avance de cursores y la persistencia quedan en la misma transacción.
+Si otro sincronizador avanzó el control, el lote obsoleto se revierte y reintenta.
+
+Cada operación de escritura verifica DB_NAME() = PedidosBodega.
+La migración es explícita: no se crea esquema SAP o R1 ni se provisiona una base
+externa durante un request.
+
+16. FALLOS Y RENDIMIENTO
+
+Si SAP falla o devuelve un lote incompleto, no se guarda un lote vacío para
+sustituir el historial y no se avanzan sus cursores.
+El sincronizador registra el fallo y reintenta en el ciclo posterior.
+
+La lectura del historial de entregas es local, con filtro por fecha y almacén,
+count SQL y OFFSET/FETCH. No carga todo el histórico en memoria para paginar.
+Las cabeceras y líneas tienen índices por fecha, almacén y base documental.
+
+Mediciones reales, no garantías de latencia:
+  Lectura SAP de los tres casos: 77 ms en la última validación, 229 ms en otra.
+  Paquete de ocho lecturas locales de detalle/listas/páginas: 182 ms y 290 ms.
+  Ciclos incrementales medidos: 315 ms, 268 ms y 569 ms.
+
+Las cifras cambian con conectividad y carga. No se afirma que toda la pantalla
+o las fuentes históricas anteriores siempre respondan en 200 ms.
+
+Se corrigió una carrera en la conexión compartida SAP: varias consultas
+simultáneas ahora esperan un mismo intento de conexión, en lugar de abrir pools
+duplicados. Se conserva el enfriamiento de 30 segundos y la configuración de
+solo lectura existente. Se añadieron pruebas de concurrencia y fallo.
+
+17. ARCHIVOS DE ESTA IMPLEMENTACIÓN
+
+Nuevos backend:
+  backend/scripts/migrarEntregasSap.ts
+  backend/scripts/validarEntregasSap.ts
+  backend/src/infraestructura/sql/conexionSap.spec.ts
+  backend/src/modulos/historial/entregaSap.interface.ts
+  backend/src/modulos/historial/entregaSapFuente.ts
+  backend/src/modulos/historial/entregaSapRepositorio.ts
+  backend/src/modulos/historial/entregaSapSincronizador.ts
+  backend/src/modulos/historial/entregaSapMigracion.ts
+  backend/src/modulos/historial/entregaSap.spec.ts
+
+Modificados backend:
+  backend/package.json
+  backend/src/infraestructura/sql/conexionSap.ts
+  backend/src/modulos/historial/historial.interface.ts
+  backend/src/modulos/historial/historialServicio.ts
+  backend/src/modulos/historial/historialRutas.ts
+  backend/src/modulos/historial/sincronizadorHistorial.ts
+
+Nuevos frontend:
+  frontend/src/app/funcionalidades/historial/entrega-sap.interface.ts
+  frontend/src/app/funcionalidades/historial/entrega-sap.component.spec.ts
+
+Modificados frontend:
+  frontend/src/app/funcionalidades/historial/historial.interface.ts
+  frontend/src/app/funcionalidades/historial/historial.component.ts
+  frontend/src/app/funcionalidades/historial/historial.component.html
+  frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.interface.ts
+  frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.html
+
+Este informe también es nuevo. Los demás archivos marcados como modificados en
+git status ya contenían cambios locales y no forman parte de este ajuste.
+No se editaron archivos CSS ni los módulos de asignación, SLA, sonido,
+notificaciones, dashboard, usuarios, impresión, inventario ni R1.
+
+18. BUILDS Y PRUEBAS
+
+Backend:
+  npm run build: correcto.
+  Pruebas específicas de entregas, historial y conexión: 29/29 correctas.
+  Suite fuente completa, npm test -- src pruebas:
+    182 correctas; 1 fallida; 39 archivos de pruebas.
+
+Fallo existente fuera de este ajuste:
+  backend/pruebas/pedidoServicio.test.ts:68
+  "muestra R1 primero e incorpora SAP en la siguiente consulta".
+  Espera solo R1:F1 en la primera respuesta; recibe R1:F1 y SAP:22.
+  Se reprodujo al ejecutar el archivo junto con las pruebas enfocadas.
+  No se modificó esa prueba ni PedidoServicio para ocultarlo o ampliar el alcance.
+  Por este fallo, la suite completa NO se reporta como totalmente aprobada.
+
+Frontend:
+  npm run build: correcto.
+  Pruebas relacionadas con historial, entrega SAP y detalle compartido:
+    17 correctas, 4 archivos.
+  Advertencias de presupuesto CSS en app.css, detalle compartido y lista de
+    pedidos: se conservaron; esos estilos no se modificaron en esta tarea.
+
+Escenarios cubiertos:
+  Sin factura; factura activa; abierta con movimiento; cotización; sin base;
+  idempotencia; rol ADMINISTRADOR; roles operador/consulta; no vinculación falsa;
+  factura posterior; cancelación conservadora; almacén incorrecto; sin salida;
+  unidades de inventario/parcial; varias entregas; SAP caído; lote incompleto;
+  query fraudulento de rol; consultas solo SELECT; conexión SAP compartida.
+
+Validación real repetible:
+  npm run validar:entregas-sap
+  Correcta para 6669, 6618 y 4432; idempotencia, paginación incluso fuera de rango,
+  filtro BSPS03, campos administrativos y cantidades reales comprobados.
+  Este comando guarda exclusivamente esos tres casos en las nuevas tablas locales.
+
+19. ALCANCE FINAL Y LECTURA EXTERNA
+
+SAP: únicamente SELECT mediante consultarSap y su validador de lectura.
+R1: no recibió escrituras ni cambios de reglas.
+Whitelist SAP 100 a 118: reutilizada, sin cambios.
+U_SO1_VERIFICADO de R1: no fue sustituido por la regla ODLN.
+
+No se alteraron asignación, reasignación, traslado, SLA, colores, notificaciones,
+sonido, inventario, PEPS, dashboard, usuarios ni lógica de impresión.
+Los tabs y columnas se mantuvieron. El cambio visible es el tipo/estado real de
+las nuevas entregas y el bloque administrativo autorizado en su detalle.
+
+En otro entorno debe aplicarse la migración local 14 antes de usar la nueva
+fuente. El script no modifica SAP/R1. No se realizó commit, push ni actualización
+remota como parte de esta solicitud, que no los indica.

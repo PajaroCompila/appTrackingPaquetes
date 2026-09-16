@@ -23,6 +23,7 @@ describe('PedidosService', () => {
       codigosAlmacen: ['BSPS01', 'BSPS02'],
       pagina: 2,
       cantidadPorPagina: 50,
+      orden: 'desc',
     }).subscribe();
 
     const solicitud = controladorHttp.expectOne(
@@ -32,6 +33,7 @@ describe('PedidosService', () => {
     expect(solicitud.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01', 'BSPS02']);
     expect(solicitud.request.params.get('pagina')).toBe('2');
     expect(solicitud.request.params.get('cantidadPorPagina')).toBe('50');
+    expect(solicitud.request.params.get('orden')).toBe('desc');
     expect(solicitud.request.params.has('fechaDesde')).toBe(false);
     solicitud.flush({ datos: [], paginacion: { pagina: 2, cantidadPorPagina: 50, cantidadDevuelta: 0, hayMas: false } });
   });

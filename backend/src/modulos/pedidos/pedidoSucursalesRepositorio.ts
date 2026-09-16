@@ -46,9 +46,10 @@ export class PedidoSucursalesRepositorio implements IPedidoRepositorio {
     );
     const disponibles = estados.flatMap(({ estado }) => estado.resultado ? [estado.resultado] : []);
     if (disponibles.length === 0) throw new ErrorDependenciaDatos();
+    const factorOrden = filtros.orden === 'desc' ? -1 : 1;
     const pedidos = disponibles.flatMap((resultado) => resultado.pedidos)
-      .sort((a, b) => (a.fechaHoraPedido ?? '\uffff').localeCompare(b.fechaHoraPedido ?? '\uffff')
-        || a.idOrigen.localeCompare(b.idOrigen))
+      .sort((a, b) => factorOrden * ((a.fechaHoraPedido ?? '\uffff')
+        .localeCompare(b.fechaHoraPedido ?? '\uffff') || a.idOrigen.localeCompare(b.idOrigen)))
       .slice(0, cantidadAcumulada);
     const totalRegistros = disponibles.reduce((total, resultado) => total + resultado.totalRegistros, 0);
     return { pedidos, pagina: 1, cantidadPorPagina: cantidadAcumulada, totalRegistros,
@@ -67,6 +68,9 @@ export class PedidoSucursalesRepositorio implements IPedidoRepositorio {
       codigosAlmacen: [...(filtros.codigosAlmacen ?? [])].sort(),
       codigoEstadoVenta: filtros.codigoEstadoVenta ?? null,
       codigoSincronizacion: filtros.codigoSincronizacion ?? null,
+      vista: filtros.vista ?? 'articulos',
+      clasificacion: filtros.clasificacion ?? null,
+      orden: filtros.orden ?? 'asc',
       pagina: filtros.pagina,
       cantidadPorPagina: filtros.cantidadPorPagina,
     });
@@ -93,9 +97,7 @@ export class PedidoSucursalesRepositorio implements IPedidoRepositorio {
       .then((resultado) => {
         estado.resultado = resultado;
       })
-      .catch(() => {
-        estado.resultado = undefined;
-      })
+      .catch(() => undefined)
       .finally(() => {
         estado.actualizacion = undefined;
       });

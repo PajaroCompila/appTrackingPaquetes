@@ -35,6 +35,20 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'pedidos-devueltos',
+    canActivate: [autenticacionGuard],
+    loadComponent: () =>
+      import('./funcionalidades/pedidos-devueltos/pedidos-devueltos.component').then(
+        ({ PedidosDevueltosComponent }) => PedidosDevueltosComponent,
+      ),
+  },
+  {
+    path: 'pedidos-devueltos/:idOrigen',
+    canActivate: [autenticacionGuard],
+    loadComponent: () => import('./funcionalidades/pedidos-devueltos/pedidos-devueltos.component')
+      .then(({ PedidosDevueltosComponent }) => PedidosDevueltosComponent),
+  },
+  {
     path: 'historial-validados/:idOrigen',
     canActivate: [autenticacionGuard],
     loadComponent: () => import('./funcionalidades/historial/historial.component')

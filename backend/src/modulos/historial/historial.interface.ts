@@ -1,6 +1,10 @@
 import type { PedidoResumen } from '../pedidos/pedido.interface.js';
+import type { AuditoriaEntregaSap, EntregaSapPublica, EstadoEntregaSap } from './entregaSap.interface.js';
 
 export interface PedidoHistorial extends PedidoResumen {
+  estadoHistorial?: EstadoEntregaSap;
+  entregaSap?: EntregaSapPublica;
+  auditoriaSap?: AuditoriaEntregaSap;
   estadoLocal: 'VALIDADO' | 'DESPACHADO';
   despachadoEn: string | null;
   validadoDetectadoEn: string | null;
@@ -14,16 +18,20 @@ export interface FiltrosHistorial {
   codigosAlmacen: string[];
   pagina: number;
   cantidadPorPagina: number;
+  clasificacion?: 'normal' | 'especial';
 }
 
 export interface PaginaHistorial {
   registros: PedidoHistorial[];
   pagina: number;
   cantidadPorPagina: number;
+  totalRegistros: number;
   hayMas: boolean;
 }
 
 export interface ArticuloHistorial {
+  estadoHistorial?: EstadoEntregaSap;
+  entregaSap?: EntregaSapPublica;
   idOrigen: string;
   identificadorDetalle: string | null;
   numeroPedido: string;
@@ -44,5 +52,6 @@ export interface PaginaArticulosHistorial {
   registros: ArticuloHistorial[];
   pagina: number;
   cantidadPorPagina: number;
+  totalRegistros: number;
   hayMas: boolean;
 }

@@ -33,7 +33,7 @@
       </div>
       <div class="campo campo-amplio">
         <span id="etiqueta-almacenes-despachados" class="etiqueta-campo">Almacenes</span>
-        <details class="selector-multiple">
+        <details class="selector-multiple" appSelectorAlmacenes>
           <summary aria-labelledby="etiqueta-almacenes-despachados">{{ resumenAlmacenes() }}</summary>
           <fieldset>
             <legend class="solo-lectores">Seleccionar almacenes</legend>
@@ -90,14 +90,17 @@
         [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
     </div>
 
-    @if (cargando()) {
+    @if (cargando() && !ultimaActualizacion()) {
       <div class="estado-interfaz"><p>Cargando pedidos…</p></div>
     } @else if (error()) {
       <div class="estado-interfaz estado-error"><p>No pudimos cargar los pedidos despachados.</p></div>
-    } @else if (!pedidos().length) {
-      <div class="estado-interfaz"><p>No hay pedidos despachados.</p></div>
     } @else {
-      @if (vista() === 'articulos') { <div class="panel tabla-contenedor" role="tabpanel">
+      @for (grupo of grupos(); track grupo.clave) {
+        <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-despachados-' + grupo.clave">
+          <h2 [id]="'titulo-despachados-' + grupo.clave">{{ grupo.titulo }}</h2>
+          @if (grupo.pedidos.length === 0) {
+            <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
+          } @else if (vista() === 'articulos') { <div class="panel tabla-contenedor" role="tabpanel">
         <table>
           <colgroup>
             <col class="ancho-pedido" />
@@ -114,7 +117,7 @@
             <col class="ancho-tiempo-total" />
           </colgroup>
           <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th></tr></thead>
-          @for (pedido of pedidos(); track pedido.idOrigen + ':' + pedido.articulos[0]?.identificadorDetalle) {
+          @for (pedido of grupo.pedidos; track pedido.idOrigen + ':' + pedido.articulos[0]?.identificadorDetalle) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
                 <tr>
@@ -139,7 +142,7 @@
           <table>
             <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
             <tbody>
-              @for (pedido of pedidos(); track pedido.idOrigen) {
+              @for (pedido of grupo.pedidos; track pedido.idOrigen) {
                 <tr>
                   <td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ pedido.numeroPedido }}</strong></td>
                   <td data-label="Artículos">{{ pedido.articulos.length }}</td>
@@ -159,11 +162,16 @@
           </table>
         </div>
       }
-      <nav class="paginacion" aria-label="Paginación de pedidos despachados">
-        <button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button>
-        <span>Página {{ pagina() }} · {{ totalRegistros() }} {{ vista() === 'articulos' ? 'partidas' : 'pedidos' }}</span>
-        <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">Siguiente</button>
-      </nav>
+      <app-paginacion
+        [paginaActual]="grupo.pagina"
+        [totalRegistros]="grupo.totalRegistros"
+        [cantidadPorPagina]="filtros.cantidadPorPagina"
+        [etiquetaRegistros]="vista() === 'articulos' ? 'partidas' : 'pedidos'"
+        [deshabilitada]="cargando()"
+        (paginaSeleccionada)="irPagina(grupo.clave, $event)"
+      />
+        </section>
+      }
     }
   }
 </section>

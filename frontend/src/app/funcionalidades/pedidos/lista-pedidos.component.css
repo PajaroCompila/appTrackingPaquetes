@@ -119,6 +119,9 @@
 
 .tabla-contenedor { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
 .tabla-contenedor table { width: 100%; max-width: 100%; table-layout: fixed; }
+.grupo-listado-pedidos { margin-top: 1.25rem; }
+.grupo-listado-pedidos > h2 { margin: 0 0 .65rem; color: #0b3972; font-size: 1.15rem; }
+.grupo-sin-resultados { padding: 1.35rem; color: #5b6f84; text-align: center; }
 .aviso-fuente { padding: .65rem .8rem; border-radius: .5rem; background: #fff4d6; color: #6a4a00; }
 .estado-actualizacion { margin: -.35rem 0 0; color: var(--gris-600); font-size: .78rem; text-align: right; }
 .aviso-actualizacion { margin: 0; padding: .55rem .7rem; border-radius: .45rem; background: #fff4d6; color: #6a4a00; font-size: .82rem; }
@@ -245,6 +248,12 @@
 .pagina-detalle { width: min(100% - 2rem, 1400px); }
 
 @media (max-width: 680px) {
+  :host .vista-despachados:not(.pagina-detalle) .bloque-superior-operativo,
+  :host .vista-despachados:not(.pagina-detalle) > .estado-actualizacion {
+    width: calc(100% + 1rem);
+    max-width: none;
+    margin-left: -.5rem;
+  }
   .pagina-detalle { width: min(100% - 1rem, 1400px); }
   .tabla-contenedor table { min-width: 0; table-layout: auto; }
   .columna-seleccion, .columna-pedido, .columna-codigo, .columna-descripcion,

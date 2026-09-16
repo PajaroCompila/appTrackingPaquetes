@@ -45,16 +45,13 @@
       <div class="cabecera-texto">
         <p class="etiqueta-seccion">{{ configuracion.contexto }}</p>
         <h1 id="titulo-detalle-compartido">{{ configuracion.titulo }}</h1>
-        <p class="numero-pedido">Pedido #{{ valor(detalle.numeroPedido) }}</p>
+        <p class="numero-pedido">{{ detalle.tipoDocumento ? detalle.tipoDocumento + ' ' : 'Pedido #' }}{{ valor(detalle.numeroPedido) }}</p>
         <p class="descripcion-detalle">{{ configuracion.descripcion }}</p>
       </div>
       <div class="etiquetas-cabecera" aria-label="Estado del pedido">
         <span class="etiqueta-estado" [class]="'etiqueta-estado estado-' + configuracion.severidadEstado">
           {{ configuracion.etiquetaEstado }}
         </span>
-        @if (configuracion.soloConsulta) {
-          <span class="etiqueta-consulta"><i class="pi pi-eye" aria-hidden="true"></i> Solo consulta</span>
-        }
       </div>
     </header>
 
@@ -72,7 +69,7 @@
       </article>
       <article class="tarjeta-resumen">
         <span class="icono-resumen"><i class="pi pi-calendar" aria-hidden="true"></i></span>
-        <div><span>Fecha del pedido</span><strong>{{ fecha(detalle.fechaPedido) }}</strong></div>
+        <div><span>{{ detalle.tipoDocumento ? 'Fecha de entrega' : 'Fecha del pedido' }}</span><strong>{{ fecha(detalle.fechaPedido) }}</strong></div>
       </article>
       <article class="tarjeta-resumen">
         <span class="icono-resumen"><i class="pi pi-box" aria-hidden="true"></i></span>
@@ -103,6 +100,18 @@
         }
       </dl>
     </section>
+
+    @if (detalle.auditoriaSap; as auditoria) {
+      <section class="tarjeta-detalle panel-operativo" aria-labelledby="titulo-auditoria-sap">
+        <div class="titulo-panel"><h2 id="titulo-auditoria-sap">Información SAP</h2></div>
+        <dl class="cuadricula-operativa">
+          <div><dt>Estado</dt><dd>Entregado, Sin factura</dd></div>
+          <div><dt>Usuario SAP que registró la entrega</dt><dd>{{ valor(auditoria.usuarioRegistrador || auditoria.nombreRegistrador) }}</dd></div>
+          <div><dt>Documento de entrega</dt><dd>{{ auditoria.documentoEntrega }}</dd></div>
+          <div><dt>Fecha/hora</dt><dd>{{ fecha(auditoria.fechaEntrega) }}</dd></div>
+        </dl>
+      </section>
+    }
 
     @if (detalle.modificaciones?.length) {
       <section class="tarjeta-detalle panel-modificaciones" aria-labelledby="titulo-modificaciones-pedido">

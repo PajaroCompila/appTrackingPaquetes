@@ -1,0 +1,316 @@
+RECUPERACIÓN Y VALIDACIÓN DE PEDIDOS DEVUELTOS
+Fecha: 16 de septiembre de 2026
+Repositorio: C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+Rama: main. Sin commit, push, merge ni cambios preparados en el índice.
+
+RESULTADO Y LÍMITES
+Backend y frontend compilan. La app está disponible en el puerto 4400.
+Se sustituyó el módulo con datos de ejemplo por consultas locales persistentes,
+detalle, filtros, paginación y recepción física por partidas. Se eliminó el
+porcentaje de la interfaz: el progreso se expresa únicamente como 2 / 4.
+
+NO se considera finalizada la detección automática operativa: falta un ejemplo
+real del cierre F5 de Susana para validar sus señales y el momento del evento.
+La detección queda bloqueada, sin nuevas consultas periódicas de fuente, hasta
+tener esa evidencia. No se fabricaron devoluciones para llenar la pantalla.
+La suite general del frontend tiene fallos heredados fuera de este módulo.
+No se puede afirmar que todas las funciones ajenas están validadas de punta a
+punta. Los problemas encontrados se reportan abajo y no se corrigieron.
+
+A. ESTADO HEREDADO
+
+1. Qué había hecho Copilot.
+   En la carpeta vigente existían backend/servicio/rutas/pruebas y cinco archivos
+   frontend del módulo, además de la ruta y la opción de navegación.
+   Clasificación al recibir el trabajo:
+   - Servicio puro de estados: PARCIAL; sus cinco pruebas sí pasaban.
+   - Rutas backend: INCORRECTAS para producción. Devolvían tres pedidos de
+     ejemplo (1001, 1002, 1003), paginación fija y objetos nuevos por petición.
+     La confirmación no persistía ni aplicaba autorización por bodega.
+   - Prueba de rutas: INCORRECTA; solo contenía una aserción trivial.
+   - Frontend: PARCIAL. Había filtros y pestañas, pero no confirmación completa,
+     detalle funcional ni paginación efectiva en el servicio.
+   - Ruta principal y sidebar: COMPLETOS para acceder a la pantalla.
+   - Modelo local, migración, repositorio y detección: AUSENTES.
+   Git no identifica el autor de cambios sin commit. No es posible atribuir a
+   Copilot cada modificación del árbol solo por su fecha o por el relato.
+
+2. Qué estaba en la carpeta incorrecta.
+   La carpeta antigua tenía tres archivos de una pantalla de devoluciones con
+   datos de ejemplo, sin el módulo backend equivalente. Solo se leyó como
+   referencia; NO se escribió en appPedidosBodega ni se copió código desde ella.
+
+3. Qué sí existía en la carpeta vigente.
+   ListaPedidosComponent contenía implementaciones reales de vista, cambiarVista,
+   gruposPedidos, estadoTiempoSla y responsablesPedido. También estaban presentes
+   los cambios recientes de entregas SAP, conciliación, notificaciones, sonido,
+   pedidos normales/especiales y paginación. Se preservaron.
+
+4. Qué estaba roto.
+   El módulo de devoluciones no era persistente ni operativo. Sus filtros,
+   confirmación y detalle estaban incompletos. Además se encontraron cambios
+   heredados ajenos en asignaciones y ListaPedidos; ver el apartado de incidencias.
+
+B. FRONTEND
+
+5. Causa raíz de ListaPedidosComponent.
+   El fallo de compilación descrito NO fue reproducible en el repositorio vigente.
+   El build ejecutado ANTES de editar terminó correctamente. El listener 4400
+   también existía. No hay evidencia suficiente para afirmar si el fallo anterior
+   provino de otra carpeta, una versión intermedia o un conflicto ya resuelto.
+
+6. Miembros recuperados.
+   Ninguno: los miembros mencionados ya tenían implementación funcional.
+   No se agregaron stubs ni se eliminó HTML para satisfacer el compilador.
+
+7. Fuente de recuperación.
+   No fue necesario recuperar ListaPedidos. Se revisó el diff y se consultó la
+   carpeta anterior solo en lectura. No se sustituyó ListaPedidos por otra versión.
+
+8. Resultado del build.
+   Correcto al inicio y al finalizar: cero errores TypeScript y de template.
+   Persisten tres advertencias previas de presupuesto CSS, no errores:
+   app.css 7,76 kB; lista-pedidos.component.css 7,72 kB;
+   detalle-pedido-vista.component.css 7,38 kB; límite de advertencia 7 kB.
+
+C. DEVOLUCIONES Y DIAGNÓSTICO SOLO SELECT
+
+9. Campo R1 real para F5/cierre.
+   Se verificaron los campos de [@SO1_01VENTA]: U_SO1_STATUS,
+   U_SO1_VERIFICADO, U_SO1_FECHACIERREDOC, U_SO1_FOLIODOCCIERRE,
+   U_SO1_ESTADOCANCEL, U_SO1_FECHASOLCANCEL y U_SO1_MOTIVOCANCELAC,
+   además del folio y la referencia U_SO1_DOCUMENTOSBO.
+   NO se certificó cuál identifica específicamente F5. Ejemplos reales:
+   - SPSS27PE388002: STATUS C, VERIFICADO N, fecha cierre nula,
+     ESTADOCANCEL P y otros datos de cancelación nulos.
+     SAP 101475867 / DocEntry 961989: DocStatus C, CANCELED N.
+   - SPSS03PE390659: STATUS C, VERIFICADO Y, fecha cierre 16/09/2026,
+     ESTADOCANCEL P y otros datos de cancelación nulos.
+     SAP 101475875 / DocEntry 962011: DocStatus C, CANCELED N.
+   Ambos muestran que cerrado no basta para inferir devolución física.
+
+10. Regla real de cancelación.
+    SAP ORDR.CANCELED=Y sí identifica anulación explícita del pedido.
+    ORDR.DocStatus=C NO equivale a anulación. Se encontraron pedidos SAP anulados
+    reales; la muestra consultada de facturas OINV anuladas no devolvió registros.
+    La última modificación ORDR.UpdateDate/UpdateTS NO acredita la fecha exacta
+    de cancelación. No se usa para inventarla ni para concluir que se anuló
+    después del despacho. El sincronizador queda desactivado por defecto hasta
+    validar una fuente del evento y su fecha. F5 R1 y factura anulada quedan
+    igualmente pendientes. No existe endpoint que permita inventar estos eventos.
+    La fecha de las pruebas unitarias es un dato controlado de prueba, no un campo
+    supuesto de SAP ni una validación operativa.
+
+11. Relación con el snapshot local.
+    Para SAP: DocEntry exacto del despacho. Para R1: folio exacto relacionado con
+    U_SO1_01FOLIORETAIL1. Más de una coincidencia se rechaza. No se relaciona por
+    artículo, vendedor, cliente o cantidades. El registro local exige despacho
+    previo, líneas originales identificables y cronología verificada; rechaza
+    despachos validados/entregados y conciliaciones con salida SAP comprobada.
+
+12. Modelo local.
+    Migración 16 aplicada únicamente a PedidosBodega. Crea DevolucionPedido,
+    DevolucionPedidoDetalle y ControlDevoluciones. Cabecera: origen, idOrigen,
+    folio, número, despacho original, vendedor, cancelación, motivo, evidencia,
+    estado, conteos y fecha de devolución completa. Detalle: línea original,
+    identificador estable, artículo, descripción, cantidad, bodega original,
+    estado, cantidad recibida, UUID del usuario receptor y fecha UTC.
+    Las claves foráneas apuntan a PedidoDespachado, PedidoDespachadoDetalle y
+    UsuarioAplicacion. No se creó otra tabla de usuarios.
+
+13. Estados.
+    PENDIENTE DE DEVOLUCIÓN, DEVOLUCIÓN PARCIAL y DEVUELTO, exclusivamente locales.
+
+14. Vendedor automático.
+    Copiado de PedidoDespachado.nombreVendedor. Sin selector ni cambio manual.
+    No se confunde vendedor responsable con autor de cancelación. Si este último
+    no está acreditado se muestra No disponible, sin inventar un nombre.
+
+15. Bodega original.
+    Copiada por partida del snapshot PedidoDespachadoDetalle.codigoAlmacen.
+    No se consulta OITW para decidir destino ni se reconstruyen artículos desde
+    el documento modificado por el vendedor. A/B/C despachados siguen siendo A/B/C.
+
+16. Recibido por.
+    El backend usa req.user.usuarioId. No acepta receptor ni bodega arbitrarios
+    en el cuerpo de confirmación. El nombre visible se obtiene del usuario local.
+
+17. Confirmación parcial/completa.
+    Selección múltiple; cada línea confirma su cantidad original completa.
+    Guarda receptor y fecha por línea; actualiza conteos/estado y fecha completa.
+    No se implementó recepción fraccionada de unidades de una misma línea,
+    porque no forma parte del flujo solicitado. Progreso visible: 2 / 4, no %.
+
+18. Idempotencia.
+    Identidad SHA-256 por despacho/evento, restricción única y transacción.
+    Confirmar una línea recibida no reemplaza su receptor ni su primera fecha.
+    Todas las partidas se validan antes de escribir; si alguna falla se revierte
+    toda la confirmación. Aislamiento SERIALIZABLE y bloqueos de actualización.
+
+19. Permisos.
+    ADMINISTRADOR puede recibir cualquier bodega.
+    OPERADOR_BODEGA solo recibe códigos explícitamente autorizados en su sesión.
+    Un operador sin bodegas configuradas NO puede confirmar.
+    CONSULTA no confirma. Validación frontend y backend. La lectura reutiliza
+    la política existente de almacenes del sistema sin modificar otros módulos.
+
+D. INTERFAZ
+
+20. Encabezado.
+    PEDIDOS / Pedidos devueltos / Controlá los productos que deben regresar
+    físicamente a sus bodegas. Integrado en el layout existente.
+
+21. Filtros.
+    Número, fechas desde/hasta, almacenes globales, estado y tamaño de página.
+    Buscar y Limpiar filtros. La API valida fechas reales, rango, páginas y valores.
+    No se creó almacenamiento independiente de la selección global de bodegas.
+
+22. Orden de pestañas.
+    Pedido | Artículos, solo en este módulo; sin cambios en otras pantallas.
+
+23. Vista inicial.
+    Pedido por defecto. Vista y página se preservan en parámetros de navegación.
+
+24. Estado vacío.
+    Se mantienen encabezado, filtros, pestañas y tarjeta de resultados.
+    Sin resultados / No hay pedidos devueltos con los filtros seleccionados.
+    La lectura real de la base devolvió cero devoluciones; no se inventaron filas.
+
+25. Confirmar devolución.
+    A la derecha, debajo de las pestañas, en la vista Artículos y en detalle.
+    Deshabilitado con selección cero. Selección de una o varias líneas elegibles.
+    Confirmar recarga los datos persistentes; errores conservan la pantalla.
+
+26. Simetría.
+    Tarjetas blancas, azul corporativo, márgenes del layout, textos centrados,
+    filtros iniciales de igual ancho, código en negrita/una línea, descripción
+    máximo dos líneas, selección circular y paginación compartida.
+    No se cambiaron estilos de Pendientes, Despachados ni Historial en este trabajo.
+    Revisadas capturas de vacío, Pedido, Artículos y detalle en Edge sin errores
+    de JavaScript. Los casos con devoluciones se visualizaron con API interceptada
+    en una sesión de prueba; NO son devoluciones reales insertadas en la base.
+
+E. VALIDACIÓN
+
+27. Backend build.
+    npm run build: aprobado, código de salida 0.
+
+28. Backend tests.
+    Pruebas específicas: 4 archivos, 24 pruebas aprobadas.
+    Suite general final: 72 archivos y 393 pruebas aprobadas, salida 0.
+    Cubren estados parciales/completos, identidad, no despacho, snapshot original,
+    recepción por sesión, rechazo de otra bodega, consulta, administrador,
+    operador sin bodegas y rechazo de fechas de evento no verificadas.
+    Las pruebas de repositorio inspeccionan SQL/transacciones con mocks. No se
+    confirma una devolución real en producción para simular los casos A-K.
+
+29. Frontend build.
+    npm run build: aprobado, código de salida 0; tres advertencias CSS previas.
+
+30. Frontend tests.
+    Relacionadas: 3 archivos, 19 pruebas aprobadas (módulo y navegación).
+    Suite general final: 121 pruebas aprobadas y 10 fallidas (131 en total);
+    27 archivos aprobados y 1 fallido, salida 1.
+    Los 10 fallos encontrados están en lista-pedidos.component.spec.ts, fuera
+    del módulo. No se eliminaron pruebas ni se alteró esa funcionalidad para
+    conseguir un resultado verde.
+
+31. Listener 4400.
+    PID 8584, 0.0.0.0:4400 LISTENING. El proceso ya estaba levantado desde la
+    carpeta vigente; no se arrancó otra instancia. Backend en puerto 3280,
+    con PID variable por el watcher que recarga cambios.
+
+32. /pedidos.
+    HTTP 200 en 127.0.0.1:4400 y encabezado renderizado en navegador de prueba.
+    No acredita que asignación/transferencia reales estén libres de regresiones.
+
+33. /pedidos-despachados.
+    HTTP 200 y encabezado renderizado. Sin cambios de estilo en esta tarea.
+
+34. Historial.
+    Ruta existente /historial-validados: HTTP 200 y encabezado renderizado.
+    Sin cambios de estilo ni en su lógica de entregas durante esta tarea.
+
+35. /pedidos-devueltos.
+    HTTP 200 en localhost y 192.168.10.169:4400.
+    Repositorio real contra PedidosBodega: vistas Pedido y Artículos devuelven
+    datos=[] y total=0. Handler real con identidad inyectada solo en proceso de
+    diagnóstico: GET raíz, filtros/Artículos y página 2 respondieron 200.
+    No se debilitó autenticación de la app para esas pruebas.
+    Navegación/selección/recepción parcial/consulta se probaron en Edge con API
+    interceptada. Faltan cancelación F5 y recepción física reales de punta a punta.
+
+36. Git final.
+    main...origin/main; índice vacío. git diff --stat:
+    64 files changed, 1238 insertions(+), 983 deletions(-).
+    Este resumen incluye TODOS los cambios heredados contra HEAD, no solo esta
+    tarea, y NO incluye archivos sin seguimiento (incluido el nuevo módulo).
+    No se ejecutó reset, restore, clean, checkout destructivo, stash ni merge.
+
+37. Cero escrituras SAP/R1.
+    Confirmado para este trabajo: diagnósticos de fuentes únicamente SELECT;
+    migración/escrituras de recepción apuntan exclusivamente a PedidosBodega.
+    No se usó Service Layer, no se movió inventario ni se escribió en OITW.
+    No se modificaron ni se borraron pedidos de SAP/R1 para producir casos de prueba.
+
+INCIDENCIAS HEREDADAS AJENAS AL MÓDULO: REPORTADAS, NO CORREGIDAS
+
+- El diff de backend/src/modulos/asignaciones/asignacionRutas.ts elimina la ruta
+  PATCH /reasignar y el indicador puedeReasignar. El frontend aún contiene llamadas
+  a esa ruta; existe riesgo directo de 404 y de pérdida de habilitación.
+- En ListaPedidos se observan cambios en habilitación de reasignación, control
+  Tommy/CIR, sincronización de hora y manejo especial de conflicto de transferencia.
+- La suite frontend falla en carga de dos tablas vs una esperada, parámetros de
+  página/vista, refresco/concurrencia, conservación de datos/selección, franjas,
+  paginación y mensajes HTTP 400/503/500. Algunos tests parecen desactualizados
+  respecto de las dos listas; otros requieren diagnóstico de comportamiento.
+- Se eliminaron previamente 165 líneas de pruebas de asignaciones y buena parte
+  de los casos de ListaPedidos. No se restauraron ni borraron en este trabajo.
+- Estos archivos de producción NO se editaron aquí: no eran necesarios para
+  compilar y el documento prohíbe corregir asuntos ajenos sin ampliar el alcance.
+
+ARCHIVOS MODIFICADOS O CREADOS EN ESTA TAREA
+
+Backend:
+  backend/package.json (solo script db:migrate:devoluciones agregado aquí)
+  backend/scripts/migrarPedidosDevueltos.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoServicio.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoRutas.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoRutas.spec.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoRepositorio.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoRepositorio.spec.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoMigracion.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoSincronizador.ts
+  backend/src/modulos/pedidosDevueltos/pedidoDevueltoSincronizador.spec.ts
+  backend/src/modulos/historial/sincronizadorHistorial.ts
+    (solo punto de integración acotado en el ciclo existente, sin timer nuevo;
+     detector desactivado hasta disponer de evidencia operativa)
+
+Frontend:
+  frontend/src/app/app.routes.ts (solo detalle de devolución agregado aquí)
+  frontend/src/app/app.spec.ts (expectativa de navegación del módulo)
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.interface.ts
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.service.ts
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.service.spec.ts
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.component.ts
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.component.html
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.component.css
+  frontend/src/app/funcionalidades/pedidos-devueltos/pedidos-devueltos.component.spec.ts
+
+Documentación:
+  documentacion/Recuperacion Pedidos Devueltos - 2026-09-16.txt
+
+Actualización de la pantalla de devoluciones: al entrar, buscar, cambiar vista/
+página, confirmar y volver a enfocar la ventana. Sin un intervalo nuevo. No se
+promete actualización instantánea multiusuario en esta pantalla sin recarga.
+
+PENDIENTE NECESARIO PARA TERMINAR
+
+Proporcionar un folio real que Susana haya cerrado con F5 DESPUÉS del despacho
+local y cuya mercancía todavía deba volver físicamente. Verificar por SELECT
+el evento, su fecha y su relación inequívoca con el snapshot; si es posible,
+comparar una muestra antes/después de la operación realizada por el usuario.
+Validar también un caso real de factura anulada antes de habilitar ese flujo.
+Después se puede activar la detección automática conservando este modelo y UI.
+No publicar hasta resolver estas verificaciones y decidir qué hacer con las
+regresiones heredadas de asignación/ListaPedidos.

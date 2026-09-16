@@ -35,7 +35,6 @@
   .tabla-articulos th, .tabla-articulos td { width: auto; }
 }
 @media (max-width: 540px) { .paginacion { justify-content: space-between; } }
-.estado-actualizacion { margin: 0; color: var(--gris-600); font-size: .78rem; text-align: right; }
 .aviso-actualizacion { margin: 0; padding: .55rem .7rem; border-radius: .45rem; background: #fff4d6; color: #6a4a00; font-size: .82rem; }
 .pagina-detalle { width: min(100% - 2rem, 1400px); }
 @media (max-width: 680px) { .pagina-detalle { width: min(100% - 1rem, 1400px); } }

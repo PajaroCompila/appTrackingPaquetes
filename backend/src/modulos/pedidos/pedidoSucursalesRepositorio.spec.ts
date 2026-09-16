@@ -65,4 +65,44 @@ describe('PedidoSucursalesRepositorio', () => {
       'R1:TPRO01:F1', 'R1:TSPS01:F1',
     ]);
   });
+
+  it('mantiene separadas las consultas de pedidos normales y especiales', async () => {
+    const crear = vi.fn(async (): Promise<IPedidoRepositorio> => ({
+      buscarPedidos: vi.fn().mockImplementation(async (filtros) => ({
+        pedidos: [], pagina: 1, cantidadPorPagina: 25,
+        totalRegistros: filtros.clasificacion === 'especial' ? 7 : 19,
+        hayMas: false,
+      })),
+      obtenerDetallePedido: vi.fn(),
+    }));
+    const repositorio = new PedidoSucursalesRepositorio([configuracion('TSPS01')], crear);
+
+    const [normales, especiales] = await Promise.all([
+      repositorio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25, clasificacion: 'normal' }),
+      repositorio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25, clasificacion: 'especial' }),
+    ]);
+
+    expect(normales.totalRegistros).toBe(19);
+    expect(especiales.totalRegistros).toBe(7);
+    expect(crear).toHaveBeenCalledTimes(2);
+  });
+
+  it('conserva la ultima respuesta valida cuando una sucursal falla temporalmente', async () => {
+    const buscarPedidos = vi.fn()
+      .mockResolvedValueOnce({ pedidos: [], pagina: 1, cantidadPorPagina: 25,
+        totalRegistros: 12, hayMas: false })
+      .mockRejectedValueOnce(new Error('Falla temporal'));
+    const repositorio = new PedidoSucursalesRepositorio(
+      [configuracion('TSPS01')],
+      vi.fn(async (): Promise<IPedidoRepositorio> => ({
+        buscarPedidos, obtenerDetallePedido: vi.fn(),
+      })),
+    );
+
+    const primera = await repositorio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+    const segunda = await repositorio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+
+    expect(primera.totalRegistros).toBe(12);
+    expect(segunda.totalRegistros).toBe(12);
+  });
 });

@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
 import { ActivatedRoute, Router, RouterLink, type ParamMap } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, Subject, catchError, exhaustMap, filter, finalize, map, merge, tap, timer } from 'rxjs';
+import { EMPTY, Subject, catchError, exhaustMap, filter, finalize, forkJoin, map, merge, of, tap, timer } from 'rxjs';
 import type { MensajeError } from '../../compartido/error-api.interface';
 import { obtenerMensajeError } from '../../compartido/manejar-error-http';
 import type { Almacen } from './almacen.interface';
@@ -23,6 +24,7 @@ import {
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { PedidosNotificacionesService } from '../../compartido/notificaciones/pedidos-notificaciones.service';
+import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -49,9 +51,17 @@ const limiteSlaCriticaMs = 10 * 60 * 1000;
 type VistaPedidos = 'articulos' | 'pedido';
 type EstadoTiempoSla = 'ok' | 'advertencia' | 'critica';
 
+interface GrupoPedidos {
+  clave: 'normales' | 'especiales';
+  titulo: string;
+  pedidos: PedidoResumen[];
+  pagina: number;
+  totalRegistros: number;
+}
+
 @Component({
   selector: 'app-lista-pedidos',
-  imports: [CommonModule, FormsModule, RouterLink, CodigoArticuloInventarioDirective],
+  imports: [CommonModule, FormsModule, RouterLink, CodigoArticuloInventarioDirective, PaginacionComponent, SelectorAlmacenesDirective],
   templateUrl: './lista-pedidos.component.html',
   styleUrl: './lista-pedidos.component.css',
 })
@@ -76,11 +86,14 @@ export class ListaPedidosComponent implements OnInit {
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
+  public readonly pedidosEspeciales = signal<PedidoResumen[]>([]);
   public readonly vista = signal<VistaPedidos>('articulos');
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly pagina = signal(1);
+  public readonly paginaEspeciales = signal(1);
   public readonly hayMas = signal(false);
   public readonly totalRegistros = signal(0);
+  public readonly totalRegistrosEspeciales = signal(0);
   public readonly cargando = signal(true);
   public readonly actualizando = signal(false);
   public readonly ultimaActualizacion = signal<Date | null>(null);
@@ -100,6 +113,10 @@ export class ListaPedidosComponent implements OnInit {
   public readonly mensajeAsignacion = signal('');
   public readonly mensajeAsignacionEsError = signal(false);
   public readonly ahoraSlaMs = signal(Date.now());
+  public readonly gruposPedidos = computed<GrupoPedidos[]>(() => [
+    { clave: 'normales', titulo: 'Pedidos Normales', pedidos: this.pedidos(), pagina: this.pagina(), totalRegistros: this.totalRegistros() },
+    { clave: 'especiales', titulo: 'Pedidos Especiales', pedidos: this.pedidosEspeciales(), pagina: this.paginaEspeciales(), totalRegistros: this.totalRegistrosEspeciales() },
+  ]);
 
   public ngOnInit(): void {
     this.cargarAlmacenes();
@@ -159,7 +176,6 @@ export class ListaPedidosComponent implements OnInit {
       ? [...new Set([...actuales, codigoAlmacen])]
       : actuales.filter((codigo) => codigo !== codigoAlmacen);
     this.guardarFiltros();
-    void this.actualizarRuta(1);
   }
 
   public quitarAlmacen(codigoAlmacen: string): void {
@@ -169,7 +185,6 @@ export class ListaPedidosComponent implements OnInit {
   public limpiarAlmacenes(): void {
     this.filtrosFormulario.codigosAlmacen = [];
     this.guardarFiltros();
-    void this.actualizarRuta(1);
   }
 
   public resumenAlmacenes(): string {
@@ -204,6 +219,13 @@ export class ListaPedidosComponent implements OnInit {
     }
   }
 
+  public irPagina(grupo: 'normales' | 'especiales', pagina: number): void {
+    if (this.cargando()) return;
+    if (grupo === 'normales') this.pagina.set(pagina);
+    else this.paginaEspeciales.set(pagina);
+    void this.actualizarRuta(this.pagina());
+  }
+
   public reintentar(): void {
     this.actualizarAhora.next(false);
   }
@@ -228,12 +250,9 @@ export class ListaPedidosComponent implements OnInit {
 
   public valorAsignacionVisible(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    const clave = identidad ? claveArticuloAsignado(identidad) : '';
-    const usuarioAsignado = (clave && this.asignacionesDesbloqueadas().has(clave)
-      ? this.seleccionesAsignacion().get(clave)
-      : this.asignacionActual(pedido, articulo)?.usuarioAsignado)
-      ?? (identidad ? this.seleccionesAsignacion().get(clave) : '')
-      ?? (this.esTommyCircunvalacion(pedido) ? 'tlopez' : '');
+    const usuarioAsignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado
+      ?? (identidad ? this.seleccionesAsignacion().get(claveArticuloAsignado(identidad)) : '')
+      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     return usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)
       ? usuarioAsignado
       : '';
@@ -290,8 +309,7 @@ export class ListaPedidosComponent implements OnInit {
     usuarioAsignado: string,
   ): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    if (!identidad || !this.puedeAsignar()
-      || (this.asignacionConfirmada(pedido, articulo) && !this.asignacionDesbloqueada(pedido, articulo))
+    if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
       || this.asignacionGuardando(pedido, articulo)) return;
     if (usuarioAsignado
       && !this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)) return;
@@ -307,14 +325,12 @@ export class ListaPedidosComponent implements OnInit {
       const nombre = this.asignacionActual(pedido, articulo)?.nombreAsignado;
       return nombre ? [nombre] : [];
     }))];
-    if (responsables.length === 0) return 'Sin asignar';
-    return responsables.join(', ');
+    return responsables.length === 0 ? 'Sin asignar' : responsables.join(', ');
   }
 
   public asignacionDesbloqueada(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    return Boolean(identidad
-      && this.asignacionesDesbloqueadas().has(claveArticuloAsignado(identidad)));
+    return Boolean(identidad && this.asignacionesDesbloqueadas().has(claveArticuloAsignado(identidad)));
   }
 
   public desbloquearAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
@@ -324,11 +340,8 @@ export class ListaPedidosComponent implements OnInit {
     const clave = claveArticuloAsignado(identidad);
     this.seleccionesAsignacion.update((selecciones) => {
       const nuevas = new Map(selecciones);
-      if (this.usuariosAsignables().some(({ usuario }) => usuario === actual.usuarioAsignado)) {
-        nuevas.set(clave, actual.usuarioAsignado!);
-      } else {
-        nuevas.delete(clave);
-      }
+      if (this.usuariosAsignables().some(({ usuario }) => usuario === actual.usuarioAsignado)) nuevas.set(clave, actual.usuarioAsignado!);
+      else nuevas.delete(clave);
       return nuevas;
     });
     this.asignacionesDesbloqueadas.update((actuales) => new Set([...actuales, clave]));
@@ -338,11 +351,9 @@ export class ListaPedidosComponent implements OnInit {
   public puedeConfirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
     const identidad = this.identidadAsignacion(pedido, articulo);
     const actual = this.asignacionActual(pedido, articulo);
-    if (!identidad || !actual?.actualizadoEn || !this.asignacionDesbloqueada(pedido, articulo)
-      || this.asignacionGuardando(pedido, articulo)) return false;
+    if (!identidad || !actual?.actualizadoEn || !this.asignacionDesbloqueada(pedido, articulo) || this.asignacionGuardando(pedido, articulo)) return false;
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
-    return Boolean(seleccion && seleccion !== actual.usuarioAsignado
-      && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
+    return Boolean(seleccion && seleccion !== actual.usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
   }
 
   public puedeGuardarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
@@ -352,11 +363,8 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public guardarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
-    if (this.asignacionConfirmada(pedido, articulo)) {
-      this.confirmarReasignacion(pedido, articulo);
-      return;
-    }
-    this.confirmarAsignacion(pedido, articulo);
+    if (this.asignacionConfirmada(pedido, articulo)) this.confirmarReasignacion(pedido, articulo);
+    else this.confirmarAsignacion(pedido, articulo);
   }
 
   public confirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
@@ -368,8 +376,7 @@ export class ListaPedidosComponent implements OnInit {
     this.asignacionesGuardando.update((actuales) => new Set([...actuales, clave]));
     this.versionAsignaciones += 1;
     this.asignacionesService.reasignar(identidad, usuarioAsignado, actual.actualizadoEn)
-      .pipe(takeUntilDestroyed(this.destruirRef))
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
         next: ({ datos }) => {
           this.asignaciones.update((asignaciones) => new Map(asignaciones).set(clave, datos));
           this.bloquearAsignacion(clave);
@@ -380,13 +387,10 @@ export class ListaPedidosComponent implements OnInit {
         error: (error: unknown) => {
           const asignacionActual = this.obtenerAsignacionDesdeError(error, identidad);
           if (asignacionActual?.actualizadoEn) {
-            this.asignaciones.update((asignaciones) =>
-              new Map(asignaciones).set(clave, asignacionActual));
+            this.asignaciones.update((asignaciones) => new Map(asignaciones).set(clave, asignacionActual));
             this.bloquearAsignacion(clave);
             this.mensajeAsignacion.set('La asignación cambió. Revise el responsable actual.');
-          } else {
-            this.mensajeAsignacion.set('No fue posible guardar la reasignación.');
-          }
+          } else this.mensajeAsignacion.set('No fue posible guardar la reasignación.');
           this.mensajeAsignacionEsError.set(true);
           this.finalizarGuardadoAsignacion(clave);
         },
@@ -401,7 +405,7 @@ export class ListaPedidosComponent implements OnInit {
     if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
       || this.asignacionGuardando(pedido, articulo)) return false;
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad))
-      ?? (this.esTommyCircunvalacion(pedido) ? 'tlopez' : '');
+      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     return Boolean(seleccion
       && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
   }
@@ -414,7 +418,7 @@ export class ListaPedidosComponent implements OnInit {
     if (!identidad || !this.puedeConfirmarAsignacion(pedido, articulo)) return;
     const clave = claveArticuloAsignado(identidad);
     const usuarioAsignado = this.seleccionesAsignacion().get(clave)
-      ?? (this.esTommyCircunvalacion(pedido) ? 'tlopez' : '');
+      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     if (!usuarioAsignado) return;
     this.asignacionesGuardando.update((actuales) => new Set([...actuales, clave]));
     this.mensajeAsignacion.set('');
@@ -530,16 +534,7 @@ export class ListaPedidosComponent implements OnInit {
           this.transfiriendo.set(false);
           this.actualizarAhora.next(false);
         },
-        error: (error: { status?: number; error?: { codigo?: string; mensaje?: string } }) => {
-          if (error.status === 409 && error.error?.codigo === 'LINEA_YA_TRANSFERIDA') {
-            this.limpiarSeleccionTransferencia();
-            this.mensajeTransferencia.set(
-              'Una de las partidas seleccionadas ya fue transferida por otro usuario.',
-            );
-            this.transfiriendo.set(false);
-            this.actualizarAhora.next(false);
-            return;
-          }
+        error: (error: { error?: { mensaje?: string } }) => {
           this.mensajeTransferencia.set(
             error.error?.mensaje || 'No pudimos transferir los artículos. Probá de nuevo.',
           );
@@ -616,8 +611,19 @@ export class ListaPedidosComponent implements OnInit {
         if (mostrarCargaInicial) this.cargando.set(true);
         else this.actualizando.set(true);
         if (!esAutomatica) this.error.set(null);
-        return this.pedidosService.obtenerPedidos(filtrosConsulta).pipe(
-          map((respuesta) => ({ respuesta, esAutomatica, filtrosConsulta })),
+        return forkJoin({
+          normales: this.pedidosService.obtenerPedidos({
+            ...filtrosConsulta,
+            pagina: this.pagina(),
+            clasificacion: 'normal',
+          }).pipe(catchError(() => of(null))),
+          especiales: this.pedidosService.obtenerPedidos({
+            ...filtrosConsulta,
+            pagina: this.paginaEspeciales(),
+            clasificacion: 'especial',
+          }).pipe(catchError(() => of(null))),
+        }).pipe(
+          map((respuestas) => ({ respuestas, esAutomatica, filtrosConsulta })),
           catchError((error: unknown) => {
             if (this.primeraConsulta) {
               this.pedidos.set([]);
@@ -640,19 +646,35 @@ export class ListaPedidosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta: { datos, paginacion, horaServidor }, esAutomatica, filtrosConsulta }) => {
-      if (!esAutomatica && datos.length === 0 && this.pagina() > 1) {
+    ).subscribe(({ respuestas, esAutomatica, filtrosConsulta }) => {
+      const normales = respuestas.normales;
+      const especiales = respuestas.especiales;
+      if (!normales && !especiales) {
+        if (this.primeraConsulta || !esAutomatica) this.error.set(obtenerMensajeError(null, 'listado'));
+        this.cargando.set(false);
+        this.actualizando.set(false);
+        this.primeraConsulta = false;
+        return;
+      }
+      if (normales && !esAutomatica && normales.datos.length === 0 && this.pagina() > 1) {
         void this.actualizarRuta(this.pagina() - 1);
         return;
       }
-      this.reconciliarSeleccionTransferencia(datos);
-      this.notificaciones.procesarRespuesta(datos, filtrosConsulta, !esAutomatica);
-      this.pedidos.set(datos);
-      this.sincronizarRelojSla(horaServidor);
-      this.cargarAsignaciones(datos);
-      this.pagina.set(paginacion.pagina);
-      this.hayMas.set(paginacion.hayMas);
-      this.totalRegistros.set(paginacion.totalRegistros ?? datos.length);
+      if (normales) {
+        this.reconciliarSeleccionTransferencia(normales.datos);
+        this.notificaciones.procesarRespuesta(normales.datos, filtrosConsulta, !esAutomatica);
+        this.pedidos.set(normales.datos);
+        this.cargarAsignaciones(normales.datos);
+        this.pagina.set(normales.paginacion.pagina);
+        this.hayMas.set(normales.paginacion.hayMas);
+        this.totalRegistros.set(normales.paginacion.totalRegistros ?? normales.datos.length);
+      }
+      if (especiales) {
+        this.pedidosEspeciales.set(especiales.datos);
+        this.paginaEspeciales.set(especiales.paginacion.pagina);
+        this.totalRegistrosEspeciales.set(especiales.paginacion.totalRegistros ?? especiales.datos.length);
+        this.cargarAsignaciones(especiales.datos);
+      }
       this.ultimaActualizacion.set(new Date());
       this.cargando.set(false);
       this.actualizando.set(false);
@@ -691,6 +713,7 @@ export class ListaPedidosComponent implements OnInit {
     const parametros: Record<string, string | number | string[]> = {
       pagina,
       cantidadPorPagina: filtros.cantidadPorPagina,
+      paginaEspeciales: this.paginaEspeciales(),
     };
     for (const [nombre, valor] of Object.entries(filtros)) {
       if (nombre !== 'pagina' && nombre !== 'cantidadPorPagina' && valor) {
@@ -724,6 +747,8 @@ export class ListaPedidosComponent implements OnInit {
     this.pagina.set(
       Number.isInteger(paginaSolicitada) && paginaSolicitada > 0 ? paginaSolicitada : 1,
     );
+    const paginaEspecialSolicitada = Number(parametros.get('paginaEspeciales') ?? guardados.pagina);
+    this.paginaEspeciales.set(Number.isInteger(paginaEspecialSolicitada) && paginaEspecialSolicitada > 0 ? paginaEspecialSolicitada : 1);
   }
 
   private guardarFiltros(): void {
@@ -806,7 +831,7 @@ export class ListaPedidosComponent implements OnInit {
     this.asignacionesService.obtenerUsuarios()
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
-        next: ({ datos, puedeAsignar, puedeAsignarTodos, puedeReasignar }) => {
+        next: ({ datos, puedeAsignar, puedeAsignarTodos }) => {
           const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
           const asignaTodos = puedeAsignarTodos
             && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR' || usuarioActual === 'gcruz');
@@ -819,7 +844,6 @@ export class ListaPedidosComponent implements OnInit {
               : [];
           this.usuariosAsignables.set(visibles);
           this.puedeAsignarTodos.set(asignaTodos);
-          this.puedeReasignar.set(Boolean(puedeReasignar));
           this.puedeAsignar.set(puedeAsignar && this.puedeAsignarPedidos() && visibles.length > 0);
           this.usuariosAsignablesCargados = true;
           this.cargarAsignaciones(this.pedidos());
@@ -828,7 +852,6 @@ export class ListaPedidosComponent implements OnInit {
           this.usuariosAsignables.set([]);
           this.puedeAsignar.set(false);
           this.puedeAsignarTodos.set(false);
-          this.puedeReasignar.set(false);
           this.usuariosAsignablesCargados = false;
         },
       });
@@ -846,14 +869,12 @@ export class ListaPedidosComponent implements OnInit {
     consulta
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
-        next: ({ datos, horaServidor }) => {
+        next: ({ datos }) => {
           if (versionConsulta !== this.versionAsignaciones) return;
-          this.sincronizarRelojSla(horaServidor);
           const actuales = new Map(this.asignaciones());
           const selecciones = new Map(this.seleccionesAsignacion());
           datos.forEach((asignacion) => {
             const clave = claveArticuloAsignado(asignacion);
-            if (this.asignacionesDesbloqueadas().has(clave)) return;
             actuales.set(clave, asignacion);
             if (asignacion.usuarioAsignado) selecciones.delete(clave);
             else if (this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
@@ -866,40 +887,6 @@ export class ListaPedidosComponent implements OnInit {
         },
         error: () => undefined,
       });
-  }
-
-  private identidadAsignacion(
-    pedido: PedidoResumen,
-    articulo: ArticuloPedidoResumen,
-  ): IdentidadArticuloAsignacion | null {
-    const idOrigen = pedido.idOrigen.trim();
-    const identificadorDetalle = articulo.identificadorDetalle?.trim();
-    return idOrigen && identificadorDetalle ? { idOrigen, identificadorDetalle } : null;
-  }
-
-  private esTommyCircunvalacion(pedido: PedidoResumen): boolean {
-    return this.esUsuarioTommy()
-      && pedido.idOrigen.toUpperCase().startsWith('R1:TCIR01:');
-  }
-
-  private esUsuarioTommy(): boolean {
-    return this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
-      || (this.usuariosAsignables().length === 1
-        && this.usuariosAsignables()[0]?.usuario.trim().toLowerCase() === 'tlopez');
-  }
-
-  private finalizarGuardadoAsignacion(clave: string): void {
-    this.asignacionesGuardando.update((actuales) => {
-      const nuevos = new Set(actuales);
-      nuevos.delete(clave);
-      return nuevos;
-    });
-  }
-
-  private eliminarSeleccionAsignacion(clave: string): void {
-    const selecciones = new Map(this.seleccionesAsignacion());
-    selecciones.delete(clave);
-    this.seleccionesAsignacion.set(selecciones);
   }
 
   private bloquearAsignacion(clave: string): void {
@@ -934,6 +921,40 @@ export class ListaPedidosComponent implements OnInit {
     const entradaMs = Date.parse(fecha);
     if (!Number.isFinite(entradaMs)) return null;
     return Math.max(0, this.ahoraSlaMs() - entradaMs);
+  }
+
+  private identidadAsignacion(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+  ): IdentidadArticuloAsignacion | null {
+    const idOrigen = pedido.idOrigen.trim();
+    const identificadorDetalle = articulo.identificadorDetalle?.trim();
+    return idOrigen && identificadorDetalle ? { idOrigen, identificadorDetalle } : null;
+  }
+
+  private esTommyCircunvalacion(pedido: PedidoResumen): boolean {
+    return this.esUsuarioTommy()
+      && pedido.idOrigen.toUpperCase().startsWith('R1:TCIR01:');
+  }
+
+  private esUsuarioTommy(): boolean {
+    return this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
+      || (this.usuariosAsignables().length === 1
+        && this.usuariosAsignables()[0]?.usuario.trim().toLowerCase() === 'tlopez');
+  }
+
+  private finalizarGuardadoAsignacion(clave: string): void {
+    this.asignacionesGuardando.update((actuales) => {
+      const nuevos = new Set(actuales);
+      nuevos.delete(clave);
+      return nuevos;
+    });
+  }
+
+  private eliminarSeleccionAsignacion(clave: string): void {
+    const selecciones = new Map(this.seleccionesAsignacion());
+    selecciones.delete(clave);
+    this.seleccionesAsignacion.set(selecciones);
   }
 
   private obtenerAsignacionDesdeError(

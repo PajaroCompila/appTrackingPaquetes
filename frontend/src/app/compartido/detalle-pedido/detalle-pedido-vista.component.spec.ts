@@ -17,7 +17,7 @@ describe('DetallePedidoVistaComponent', () => {
     contexto: 'Consulta', titulo: 'Detalle del pedido', descripcion: 'Descripción contextual',
     etiquetaEstado: 'Pendiente', severidadEstado: 'advertencia',
     etiquetaRetorno: 'Regresar al listado', tituloInformacion: 'Información operativa',
-    etiquetaArticulos: 'Artículos del pedido', soloConsulta: true,
+    etiquetaArticulos: 'Artículos del pedido',
   };
   const pedido: PedidoDetalleVisual = {
     idOrigen: 'R1:F1', numeroPedido: '001234', vendedor: null,
@@ -91,9 +91,10 @@ describe('DetallePedidoVistaComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Impreso');
   });
 
-  it('imprime una sola vez y guarda el indicador del artículo seleccionado', () => {
+  it('abre la vista previa sin mostrar una confirmación adicional', () => {
     vi.useFakeTimers();
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const confirmar = vi.spyOn(window, 'confirm');
     fixture.componentRef.setInput('pedido', pedido);
     fixture.detectChanges();
     const checks = fixture.nativeElement.querySelectorAll(
@@ -108,10 +109,10 @@ describe('DetallePedidoVistaComponent', () => {
     fixture.detectChanges();
 
     expect(imprimir).toHaveBeenCalledOnce();
-    expect(registrarImpresiones).toHaveBeenCalledWith([
-      { idOrigen: 'R1:F1', identificadorDetalle: '2' },
-    ]);
-    expect(fixture.nativeElement.querySelectorAll('.indicador-impreso-detalle')).toHaveLength(2);
+    expect(confirmar).not.toHaveBeenCalled();
+    expect(registrarImpresiones).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelectorAll('.indicador-impreso-detalle')).toHaveLength(1);
+    confirmar.mockRestore();
     imprimir.mockRestore();
     vi.useRealTimers();
   });

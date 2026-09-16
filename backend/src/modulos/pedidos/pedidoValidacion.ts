@@ -27,6 +27,8 @@ export const esquemaFiltrosPedidos = z
     pagina: enteroConsulta(1),
     cantidadPorPagina: enteroConsulta(25, 100),
     vista: z.enum(['articulos', 'pedido']).default('articulos'),
+    clasificacion: z.enum(['normal', 'especial']).optional(),
+    orden: z.enum(['asc', 'desc']).default('asc'),
   })
   .strict()
   .refine(

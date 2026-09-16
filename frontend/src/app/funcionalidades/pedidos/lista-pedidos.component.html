@@ -23,7 +23,7 @@
     </div>
     <div class="campo campo-amplio">
       <span id="etiqueta-almacenes" class="etiqueta-campo">Almacenes</span>
-      <details class="selector-multiple">
+        <details class="selector-multiple" appSelectorAlmacenes>
         <summary aria-labelledby="etiqueta-almacenes">{{ resumenAlmacenes() }}</summary>
         <fieldset>
           <legend class="solo-lectores">Seleccionar almacenes</legend>
@@ -136,7 +136,14 @@
         [attr.role]="mensajeAsignacionEsError() ? 'alert' : 'status'"
       >{{ mensajeAsignacion() }}</p>
     }
-    @if (vista() === 'articulos') { <div class="panel tabla-contenedor" role="tabpanel">
+    @for (grupo of gruposPedidos(); track grupo.clave) {
+      <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-' + grupo.clave">
+        <h2 [id]="'titulo-' + grupo.clave">{{ grupo.titulo }}</h2>
+        @if (grupo.pedidos.length === 0) {
+          <div class="panel grupo-sin-resultados" role="status">
+            No hay {{ grupo.clave === 'normales' ? 'pedidos normales' : 'pedidos especiales' }} en esta página.
+          </div>
+        } @else if (vista() === 'articulos') { <div class="panel tabla-contenedor" role="tabpanel">
       <table>
         <caption class="solo-lectores">Listado de pedidos encontrados</caption>
         <thead>
@@ -153,7 +160,7 @@
             <th class="columna-asignado" scope="col">Asignado a</th>
           </tr>
         </thead>
-        @for (pedido of pedidos(); track pedido.idOrigen + ':' + (pedido.articulos[0]?.identificadorDetalle ?? $index)) {
+        @for (pedido of grupo.pedidos; track pedido.idOrigen + ':' + (pedido.articulos[0]?.identificadorDetalle ?? $index)) {
           <tbody class="grupo-pedido">
             @for (articulo of pedido.articulos; track claveArticulo(articulo, $index)) {
               @let estadoSla = estadoTiempoSla(pedido);
@@ -277,7 +284,7 @@
         <table>
           <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Vendedor</th><th>Asignado a</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
           <tbody>
-            @for (pedido of pedidos(); track pedido.idOrigen) {
+            @for (pedido of grupo.pedidos; track pedido.idOrigen) {
               @let estadoSla = estadoTiempoSla(pedido);
               <tr [class.fila-sla-ok]="estadoSla === 'ok'"
                 [class.fila-sla-advertencia]="estadoSla === 'advertencia'"
@@ -301,16 +308,16 @@
           </tbody>
         </table>
       </div>
+        }
+        <app-paginacion
+          [paginaActual]="grupo.pagina"
+          [totalRegistros]="grupo.totalRegistros"
+          [cantidadPorPagina]="filtrosFormulario.cantidadPorPagina"
+          [etiquetaRegistros]="vista() === 'articulos' ? 'partidas' : 'pedidos'"
+          [deshabilitada]="cargando()"
+          (paginaSeleccionada)="irPagina(grupo.clave, $event)"
+        />
+      </section>
     }
   }
-
-  <nav class="paginacion" aria-label="Paginación de pedidos">
-    <button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">
-      Anterior
-    </button>
-    <span aria-live="polite">Página {{ pagina() }} · {{ totalRegistros() }} {{ vista() === 'articulos' ? 'partidas' : 'pedidos' }}</span>
-    <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="!hayMas() || cargando()">
-      Siguiente
-    </button>
-  </nav>
 </section>

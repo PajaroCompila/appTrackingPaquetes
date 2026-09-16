@@ -1,0 +1,182 @@
+<section class="pagina vista-pedidos vista-devueltos" aria-labelledby="titulo-pedidos-devueltos">
+  @if (idOrigen()) {
+    <a class="boton boton-secundario regresar-devueltos" [routerLink]="retorno()"><i class="pi pi-arrow-left" aria-hidden="true"></i> Regresar a pedidos devueltos</a>
+    @if (detalle(); as pedido) {
+      <div class="panel encabezado-pagina">
+        <div><p class="sobrelinea">Pedido devuelto</p><h1 id="titulo-pedidos-devueltos">Pedido #{{ pedido.numeroPedido }}</h1><p>{{ pedido.nombreVendedor || '—' }}</p></div>
+        <span class="etiqueta-estado">{{ pedido.estado }}</span>
+      </div>
+      <div class="panel datos-devolucion">
+        <div><small>Origen</small><strong>{{ pedido.origenPedido || '—' }}</strong></div>
+        <div><small>Vendedor responsable</small><strong>{{ pedido.nombreVendedor || '—' }}</strong></div>
+        <div><small>Fecha despacho original</small><strong>{{ fecha(pedido.fechaDespacho) }}</strong></div>
+        <div><small>Fecha cancelación</small><strong>{{ fecha(pedido.fechaCancelacion) }}</strong></div>
+        <div><small>Motivo técnico</small><strong>{{ pedido.motivo || '—' }}</strong></div>
+        <div><small>Cancelado por</small><strong>{{ pedido.canceladoPor || 'No disponible' }}</strong></div>
+        <div><small>Progreso</small><strong>{{ progreso(pedido) }}</strong></div>
+        @if (pedido.fechaDevolucionCompleta) {<div><small>Devolución completa</small><strong>{{ fecha(pedido.fechaDevolucionCompleta) }}</strong></div>}
+      </div>
+      <div class="acciones-devolucion">
+        <button class="boton boton-primario" type="button" (click)="confirmarDevolucion()" [disabled]="seleccion().size === 0 || confirmando() || actualizando()">Confirmar devolución ({{ seleccion().size }})</button>
+      </div>
+      <div class="panel tabla-contenedor tabla-detalle-devueltos"><table>
+        <thead><tr><th class="columna-seleccion"><span class="solo-lectores">Seleccionar</span></th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Estado</th><th>Recibido por</th><th>Fecha/hora recepción</th></tr></thead>
+        <tbody>@for (linea of pedido.lineas; track linea.identificadorDetalle) {
+          <tr><td class="columna-seleccion"><input class="seleccion-linea" type="checkbox" [attr.aria-label]="'Seleccionar ' + linea.codigoArticulo" [checked]="estaSeleccionada(pedido, linea)" [disabled]="!puedeConfirmar(linea) || confirmando()" (change)="alternarLinea(pedido, linea)" /></td>
+            <td class="codigo-articulo" [title]="linea.codigoArticulo || ''"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
+            <td><span class="texto-dos-lineas" [title]="linea.descripcion || ''">{{ linea.descripcion || '—' }}</span></td><td>{{ linea.cantidad }}</td><td>{{ linea.codigoAlmacen }}</td>
+            <td><span class="etiqueta-estado">{{ linea.estado }}</span></td><td>{{ linea.recibidoPor || '—' }}</td><td>{{ fecha(linea.recibidoEn) }}</td>
+          </tr>
+        }</tbody>
+      </table></div>
+    } @else if (cargando()) {<div class="panel estado-interfaz" role="status">Cargando pedido…</div>}
+    @if (error()) {<p class="texto-error" role="alert">{{ error() }}</p>}
+    @if (mensaje()) {<p class="mensaje-devolucion" role="status">{{ mensaje() }}</p>}
+  } @else {
+  <div class="bloque-superior-operativo">
+    <div class="encabezado-pagina">
+      <div>
+        <p class="sobrelinea">Pedidos</p>
+        <h1 id="titulo-pedidos-devueltos">Pedidos devueltos</h1>
+        <p>Controlá los productos que deben regresar físicamente a sus bodegas.</p>
+      </div>
+    </div>
+
+    <form class="panel filtros" (ngSubmit)="buscar()">
+      <div class="campo">
+        <label for="numeroPedidoDevuelto">Número de pedido</label>
+        <input id="numeroPedidoDevuelto" name="numeroPedido" inputmode="numeric" maxlength="20" [(ngModel)]="filtros.numeroPedido" />
+      </div>
+      <div class="campo">
+        <label for="fechaDesdeDevuelto">Fecha desde</label>
+        <input id="fechaDesdeDevuelto" name="fechaDesde" type="date" [(ngModel)]="filtros.fechaDesde" />
+      </div>
+      <div class="campo">
+        <label for="fechaHastaDevuelto">Fecha hasta</label>
+        <input id="fechaHastaDevuelto" name="fechaHasta" type="date" [(ngModel)]="filtros.fechaHasta" />
+      </div>
+      <div class="campo campo-amplio campo-almacenes">
+        <span id="etiqueta-almacenes-devueltos" class="etiqueta-campo">Almacenes</span>
+        <details class="selector-multiple" appSelectorAlmacenes>
+          <summary aria-labelledby="etiqueta-almacenes-devueltos">{{ resumenAlmacenes() }}</summary>
+          <fieldset>
+            <legend class="solo-lectores">Seleccionar almacenes</legend>
+            <div class="opciones-almacenes">
+              @for (almacen of almacenes(); track almacen.codigoAlmacen) {
+                <label class="opcion-almacen">
+                  <input type="checkbox" [checked]="estaSeleccionado(almacen.codigoAlmacen)"
+                    (change)="alternarAlmacen(almacen.codigoAlmacen, $any($event.target).checked)" />
+                  <span class="datos-almacen"><strong>{{ almacen.codigoAlmacen }}</strong><small>{{ almacen.nombreAlmacen }}</small></span>
+                </label>
+              }
+            </div>
+            @if (filtros.codigosAlmacen.length > 0) {
+              <button class="limpiar-seleccion" type="button" (click)="limpiarAlmacenes()">Limpiar selección</button>
+            }
+          </fieldset>
+        </details>
+        @if (filtros.codigosAlmacen.length > 0) {
+          <div class="etiquetas-almacenes" aria-label="Almacenes seleccionados">
+            @for (codigoAlmacen of filtros.codigosAlmacen; track codigoAlmacen) {
+              <span class="etiqueta-almacen">
+                {{ codigoAlmacen }}
+                <button type="button" (click)="alternarAlmacen(codigoAlmacen, false)"
+                  [attr.aria-label]="'Quitar ' + nombreAlmacen(codigoAlmacen)">×</button>
+              </span>
+            }
+          </div>
+        }
+        @if (errorAlmacenes()) { <small class="texto-error">No pudimos cargar las bodegas.</small> }
+      </div>
+      <div class="campo">
+        <label for="cantidadDevueltos">Pedidos por página</label>
+        <select id="cantidadDevueltos" name="cantidadPorPagina" [(ngModel)]="filtros.cantidadPorPagina">
+          <option [ngValue]="25">25</option>
+          <option [ngValue]="50">50</option>
+          <option [ngValue]="100">100</option>
+        </select>
+      </div>
+      <div class="acciones-filtros">
+        <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
+        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
+      </div>
+    </form>
+  </div>
+
+  @if (ultimaActualizacion()) {
+    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'HH:mm:ss' }}</p>
+  }
+
+  <div class="pestanas-historial" role="tablist" aria-label="Forma de ver devoluciones">
+    <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
+      [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+    <button type="button" role="tab" id="pestana-articulos" [attr.aria-selected]="vista() === 'articulos'"
+      [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+  </div>
+
+  @if (vista() === 'articulos') {
+    <div class="acciones-devolucion">
+      <button class="boton boton-primario" type="button" (click)="confirmarDevolucion()" [disabled]="seleccion().size === 0 || confirmando() || actualizando()">Confirmar devolución ({{ seleccion().size }})</button>
+    </div>
+  }
+  @if (mensaje()) {<p class="mensaje-devolucion" role="status">{{ mensaje() }}</p>}
+
+  @if (cargando()) {
+    <div class="panel estado-interfaz" role="status"><p>Cargando pedidos devueltos…</p></div>
+  } @else if (error()) {
+    <div class="panel estado-interfaz estado-error" role="alert"><h2>Error</h2><p>{{ error() }}</p></div>
+  } @else if (devoluciones().length === 0) {
+    <div class="panel estado-interfaz" role="status">
+      <h2>Sin resultados</h2>
+      <p>No hay pedidos devueltos con los filtros seleccionados.</p>
+    </div>
+  } @else if (vista() === 'pedido') {
+    <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
+      <table class="tabla-pedido-devuelto">
+        <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Vendedor responsable</th><th>Fecha cancelación</th><th>Progreso devolución</th><th>Estado</th><th>Ver detalle</th></tr></thead>
+        <tbody>
+          @for (pedido of devoluciones(); track pedido.idClave) {
+            <tr>
+              <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+              <td data-label="Artículos">{{ pedido.totalLineas ?? pedido.lineas.length }}</td>
+              <td data-label="Bodegas">{{ bodegas(pedido) }}</td>
+              <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
+              <td data-label="Fecha cancelación">{{ fecha(pedido.fechaCancelacion) }}</td>
+              <td data-label="Progreso devolución">{{ progreso(pedido) }}</td>
+              <td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estado }}</span></td>
+              <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]">Ver detalle</a></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="panel tabla-contenedor tabla-articulos-devueltos" role="tabpanel" aria-labelledby="pestana-articulos">
+      <table>
+        <thead><tr><th class="columna-seleccion"><span class="solo-lectores">Seleccionar</span></th><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Vendedor responsable</th><th>Fecha cancelación</th><th>Estado</th><th>Recibido por</th><th>Ver detalle</th></tr></thead>
+        <tbody>
+          @for (pedido of devoluciones(); track pedido.idClave) {
+            @for (linea of pedido.lineas; track linea.identificadorDetalle) {
+              <tr>
+                <td class="columna-seleccion"><input class="seleccion-linea" type="checkbox" [attr.aria-label]="'Seleccionar ' + linea.codigoArticulo + ' del pedido ' + pedido.numeroPedido" [checked]="estaSeleccionada(pedido, linea)" [disabled]="!puedeConfirmar(linea) || confirmando()" (change)="alternarLinea(pedido, linea)" /></td>
+                <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
+                <td class="codigo-articulo" data-label="Código"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
+                <td data-label="Descripción"><span class="texto-dos-lineas">{{ linea.descripcion || '—' }}</span></td>
+                <td data-label="Cantidad">{{ linea.cantidad }}</td>
+                <td data-label="Bodega destino">{{ linea.codigoAlmacen || '—' }}</td>
+                <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
+                <td data-label="Fecha cancelación">{{ fecha(pedido.fechaCancelacion) }}</td>
+                <td data-label="Estado"><span class="etiqueta-estado">{{ linea.estado }}</span></td>
+                <td data-label="Recibido por">{{ linea.recibidoPor || '—' }}</td>
+                <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]">Ver detalle</a></td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <app-paginacion [paginaActual]="pagina()" [totalRegistros]="totalRegistros()" [cantidadPorPagina]="filtros.cantidadPorPagina" [deshabilitada]="actualizando()" [etiquetaRegistros]="vista() === 'pedido' ? 'pedidos' : 'partidas'" (paginaSeleccionada)="irPagina($event)" />
+  }
+</section>

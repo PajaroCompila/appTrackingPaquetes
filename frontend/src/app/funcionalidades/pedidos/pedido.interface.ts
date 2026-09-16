@@ -64,6 +64,8 @@ export interface FiltrosPedidos {
   pagina: number;
   cantidadPorPagina: 25 | 50 | 100;
   vista?: 'articulos' | 'pedido';
+  clasificacion?: 'normal' | 'especial';
+  orden?: 'asc' | 'desc';
 }
 
 export type TipoCambioPedido = 'AGREGADO' | 'ELIMINADO' | 'CANTIDAD' | 'BODEGA';

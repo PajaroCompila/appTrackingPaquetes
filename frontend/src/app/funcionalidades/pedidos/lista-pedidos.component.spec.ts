@@ -18,7 +18,6 @@ const respuestaLista = {
     codigoVendedor: 30, nombreVendedor: 'Vendedor original',
     codigosAlmacen: ['COD-COLA'], nombresBodega: 'Bodega Principal SPS',
     fechaHoraPedido: '2026-07-30T12:55:00',
-    fechaEntradaCola: '2026-08-03T12:00:00.000Z',
     codigoEstadoVenta: 'A', codigoSincronizacion: 'N',
     articulos: [{
       identificadorDetalle: '1', codigoArticulo: '001234', descripcion: 'Artículo visible', cantidad: 2,
@@ -42,7 +41,6 @@ describe('ListaPedidosComponent', () => {
     obtenerUsuarios: ReturnType<typeof vi.fn>;
     consultar: ReturnType<typeof vi.fn>;
     guardar: ReturnType<typeof vi.fn>;
-    reasignar: ReturnType<typeof vi.fn>;
   };
   const usuarioSesion = signal<UsuarioSesion>({
     usuarioId: '1', nombreUsuario: 'admin', nombreVisible: 'Administrador',
@@ -98,7 +96,6 @@ describe('ListaPedidosComponent', () => {
       obtenerUsuarios: vi.fn().mockReturnValue(of({
         puedeAsignar: true,
         puedeAsignarTodos: true,
-        puedeReasignar: true,
         datos: [
           { usuario: 'mperez', nombre: 'Marcos Perez' },
           { usuario: 'gcruz', nombre: 'Gregorio Cruz' },
@@ -112,20 +109,13 @@ describe('ListaPedidosComponent', () => {
       consultar: vi.fn().mockReturnValue(of({ datos: [{
         idOrigen: 'R1:F1', identificadorDetalle: '1',
         usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
-        asignadoEn: '2026-08-03T12:00:00.000Z',
         actualizadoEn: '2026-08-03T12:00:00',
-      }], horaServidor: '2026-08-03T12:00:00.000Z' })),
+      }] })),
       guardar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
         ...linea,
         usuarioAsignado,
         nombreAsignado: usuarioAsignado === 'mperez' ? 'Marcos Perez' : null,
-        asignadoEn: '2026-08-03T12:00:00.000Z',
         actualizadoEn: '2026-08-03T12:01:00',
-      } })),
-      reasignar: vi.fn().mockImplementation((linea, usuarioAsignado) => of({ datos: {
-        ...linea, usuarioAsignado, nombreAsignado: 'Marcos Perez',
-        asignadoEn: '2026-08-03T12:00:00.000Z',
-        actualizadoEn: '2026-08-03T12:02:00Z',
       } })),
     };
     enrutador = { navigate: vi.fn().mockResolvedValue(true), url: '/pedidos?pagina=1' };
@@ -155,16 +145,6 @@ describe('ListaPedidosComponent', () => {
   afterEach(() => {
     fixture?.destroy();
     vi.useRealTimers();
-  });
-
-  it('resalta visualmente el nombre del bodeguero confirmado', () => {
-    fixture.detectChanges();
-    fixture.detectChanges();
-
-    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    expect(selector.disabled).toBe(true);
-    expect(selector.classList).toContain('selector-asignado-confirmado');
-    expect(selector.options[selector.selectedIndex]?.text).toBe('Gregorio Cruz');
   });
 
   it('carga pedidos, catálogo y los nuevos datos operativos', () => {
@@ -240,7 +220,6 @@ describe('ListaPedidosComponent', () => {
       queryParams: {
         pagina: 1, cantidadPorPagina: 25,
         fechaDesde: '2026-08-03', fechaHasta: '2026-08-03',
-        vista: 'articulos',
       },
     }));
   });
@@ -572,18 +551,14 @@ describe('ListaPedidosComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const botonAsignar = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
-    const botonReasignar = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
+    const boton = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
     expect(componente.asignacionActual(pedido, pedido.articulos[0])).toMatchObject({
       usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
     });
     expect(selector).toBeTruthy();
     expect(selector.options).toHaveLength(1);
     expect(selector.disabled).toBe(true);
-    expect(botonAsignar.textContent).toContain('Asignar');
-    expect(botonAsignar.disabled).toBe(true);
-    expect(botonReasignar.textContent).toContain('Reasignar');
-    expect(botonReasignar.disabled).toBe(false);
+    expect(boton.disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
     expect(asignacionesService.consultar).toHaveBeenCalledWith([
       { idOrigen: 'R1:F1', identificadorDetalle: '1' },
@@ -597,153 +572,6 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
-  it('descarta una selección si R1 reemplaza la identidad de la partida durante el refresco', async () => {
-    pedidosService.obtenerPedidos
-      .mockReturnValueOnce(of(respuestaLista))
-      .mockReturnValueOnce(of({
-        ...respuestaLista,
-        datos: [{
-          ...respuestaLista.datos[0],
-          articulos: [{ ...respuestaLista.datos[0].articulos[0], identificadorDetalle: '2' }],
-        }],
-      }));
-    fixture.detectChanges();
-    const pedido = componente.pedidos()[0];
-    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
-
-    await vi.advanceTimersByTimeAsync(15000);
-
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
-    expect(componente.pedidos()[0]?.articulos[0]?.identificadorDetalle).toBe('2');
-  });
-
-  it('cambia automaticamente el semaforo en 05:00 y 10:00 usando la hora del servidor', async () => {
-    vi.setSystemTime(new Date('2026-08-03T12:04:59.000Z'));
-    asignacionesService.consultar.mockImplementation(() => of({ datos: [{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
-      asignadoEn: '2026-08-03T12:00:00.000Z',
-      actualizadoEn: '2026-08-03T12:00:00.000Z',
-    }], horaServidor: new Date().toISOString() }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-
-    const fila = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
-    expect(fila.classList).toContain('fila-sla-ok');
-    expect(fila.classList).not.toContain('fila-sla-advertencia');
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('04:59');
-
-    await vi.advanceTimersByTimeAsync(1000);
-    fixture.detectChanges();
-    expect(fila.classList).toContain('fila-sla-advertencia');
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('05:00');
-
-    vi.setSystemTime(new Date('2026-08-03T12:09:59.000Z'));
-    componente.ahoraSlaMs.set(Date.now());
-    fixture.detectChanges();
-    expect(fila.classList).toContain('fila-sla-advertencia');
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('09:59');
-
-    await vi.advanceTimersByTimeAsync(1000);
-    fixture.detectChanges();
-    expect(fila.classList).toContain('fila-sla-critica');
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('10:00');
-  });
-
-  it('muestra el tiempo desde que entra a la cola aunque todavía no tenga asignación', () => {
-    asignacionesService.consultar.mockReturnValue(of({ datos: [{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: null, nombreAsignado: null, asignadoEn: null, actualizadoEn: null,
-    }], horaServidor: '2026-08-03T12:00:00.000Z' }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-
-    const fila = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('00:00');
-    expect(fila.classList).toContain('fila-sla-ok');
-  });
-
-  it('recupera el tiempo persistido al reconstruir la pantalla', () => {
-    vi.setSystemTime(new Date('2026-08-03T12:07:00.000Z'));
-    asignacionesService.consultar.mockImplementation(() => of({ datos: [{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
-      asignadoEn: '2026-08-03T12:00:00.000Z',
-      actualizadoEn: '2026-08-03T12:03:00.000Z',
-    }], horaServidor: new Date().toISOString() }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('07:00');
-    expect(fixture.nativeElement.querySelector('tbody tr').classList)
-      .toContain('fila-sla-advertencia');
-
-    fixture.destroy();
-    fixture = TestBed.createComponent(ListaPedidosComponent);
-    componente = fixture.componentInstance;
-    fixture.detectChanges();
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent).toContain('07:00');
-    expect(fixture.nativeElement.querySelector('tbody tr').classList)
-      .toContain('fila-sla-advertencia');
-  });
-
-  it('formatea mas de una hora sin crear consultas por segundo', async () => {
-    vi.setSystemTime(new Date('2026-08-03T13:05:23.000Z'));
-    asignacionesService.consultar.mockImplementation(() => of({ datos: [{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
-      asignadoEn: '2026-08-03T12:00:00.000Z',
-      actualizadoEn: '2026-08-03T12:00:00.000Z',
-    }], horaServidor: new Date().toISOString() }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-    const consultasIniciales = asignacionesService.consultar.mock.calls.length;
-
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent)
-      .toContain('01:05:23');
-    await vi.advanceTimersByTimeAsync(1000);
-    fixture.detectChanges();
-    expect(asignacionesService.consultar).toHaveBeenCalledTimes(consultasIniciales);
-    expect(fixture.nativeElement.querySelector('.tiempo-sla').textContent)
-      .toContain('01:05:24');
-  });
-
-  it('actualiza cien contadores con el mismo reloj y sin solicitudes adicionales', async () => {
-    vi.setSystemTime(new Date('2026-08-03T12:02:00.000Z'));
-    const articulos = Array.from({ length: 100 }, (_, indice) => ({
-      identificadorDetalle: String(indice + 1),
-      codigoArticulo: `A-${indice + 1}`,
-      descripcion: `Articulo ${indice + 1}`,
-      cantidad: 1,
-      codigoAlmacen: 'BSPS01',
-      nombreAlmacen: 'Bodega principal',
-    }));
-    pedidosService.obtenerPedidos.mockReturnValue(of({
-      ...respuestaLista,
-      datos: [{ ...respuestaLista.datos[0], articulos }],
-    }));
-    asignacionesService.consultar.mockImplementation((lineas) => of({
-      datos: lineas.map((linea: { idOrigen: string; identificadorDetalle: string }) => ({
-        ...linea,
-        usuarioAsignado: 'gcruz',
-        nombreAsignado: 'Gregorio Cruz',
-        asignadoEn: '2026-08-03T12:00:00.000Z',
-        actualizadoEn: '2026-08-03T12:00:00.000Z',
-      })),
-      horaServidor: new Date().toISOString(),
-    }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-    const consultasIniciales = asignacionesService.consultar.mock.calls.length;
-
-    expect(fixture.nativeElement.querySelectorAll('.tiempo-sla')).toHaveLength(100);
-    await vi.advanceTimersByTimeAsync(1000);
-    fixture.detectChanges();
-    expect(asignacionesService.consultar).toHaveBeenCalledTimes(consultasIniciales);
-    expect(fixture.nativeElement.querySelectorAll('.tiempo-sla')).toHaveLength(100);
-  });
-
   it('selecciona libremente y solo confirma al pulsar Asignar', () => {
     asignacionesService.consultar.mockReturnValue(of({ datos: [{
       idOrigen: 'R1:F1', identificadorDetalle: '1',
@@ -752,10 +580,8 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
     fixture.detectChanges();
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const boton = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
-    const botonReasignar = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
-    expect(boton.textContent).toContain('Asignar');
-    expect(botonReasignar.disabled).toBe(true);
+    const boton = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('tbody tr').classList).not.toContain('fila-asignada');
 
     selector.value = 'mperez';
@@ -771,12 +597,8 @@ describe('ListaPedidosComponent', () => {
       { idOrigen: 'R1:F1', identificadorDetalle: '1' }, 'mperez',
     );
     const selectorConfirmado = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const botonConfirmado = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
-    const botonReasignarConfirmado = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
     expect(selectorConfirmado.disabled).toBe(true);
-    expect(botonConfirmado.textContent).toContain('Asignar');
-    expect(botonConfirmado.disabled).toBe(true);
-    expect(botonReasignarConfirmado.disabled).toBe(false);
+    expect(boton.disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('tbody tr').classList).toContain('fila-asignada');
     expect(fixture.nativeElement.textContent).toContain('Asignación guardada.');
   });
@@ -840,7 +662,6 @@ describe('ListaPedidosComponent', () => {
     asignacionesService.obtenerUsuarios.mockReturnValue(of({
       puedeAsignar: true,
       puedeAsignarTodos: false,
-      puedeReasignar: true,
       datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
     }));
     pedidosService.obtenerPedidos.mockReturnValue(of({
@@ -868,66 +689,6 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
-  it('no preselecciona a Tommy en pedidos ajenos a Circunvalación', () => {
-    usuarioSesion.set({
-      usuarioId: '2', nombreUsuario: 'tlopez', nombreVisible: 'Tommy López',
-      codigoRol: 'CONSULTA', codigoAlmacen: null, debeCambiarContrasena: false,
-    });
-    asignacionesService.obtenerUsuarios.mockReturnValue(of({
-      puedeAsignar: true,
-      puedeAsignarTodos: false,
-      puedeReasignar: true,
-      datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
-    }));
-    pedidosService.obtenerPedidos.mockReturnValue(of({
-      ...respuestaLista,
-      datos: [{ ...respuestaLista.datos[0], idOrigen: 'R1:TSPS01:F1' }],
-    }));
-    asignacionesService.consultar.mockReturnValue(of({ datos: [{
-      idOrigen: 'R1:TSPS01:F1', identificadorDetalle: '1',
-      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
-    }] }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-
-    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    const asignar = fixture.nativeElement.querySelector('.boton-asignar') as HTMLButtonElement;
-    expect(selector.value).toBe('');
-    expect(asignar.disabled).toBe(true);
-    asignar.click();
-    expect(asignacionesService.guardar).not.toHaveBeenCalled();
-  });
-
-  it('muestra Artículos primero y reasigna solamente al confirmar', () => {
-    const pedido = respuestaLista.datos[0];
-    fixture.detectChanges();
-    fixture.detectChanges();
-    const pestanas = [...fixture.nativeElement.querySelectorAll('.pestanas-vistas button')] as HTMLButtonElement[];
-    expect(pestanas.map(({ textContent }) => textContent?.trim())).toEqual(['Artículos', 'Pedido']);
-    expect(pestanas[0]?.getAttribute('aria-selected')).toBe('true');
-
-    const reasignar = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
-    expect(reasignar.textContent).toContain('Reasignar');
-    reasignar.click();
-    fixture.detectChanges();
-    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    selector.value = 'mperez';
-    selector.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-    expect(asignacionesService.reasignar).not.toHaveBeenCalled();
-
-    const asignar = fixture.nativeElement.querySelector('.boton-asignar:not(.boton-reasignar)') as HTMLButtonElement;
-    expect(asignar.textContent).toContain('Asignar');
-    expect(asignar.disabled).toBe(false);
-    asignar.click();
-    expect(asignacionesService.reasignar).toHaveBeenCalledWith(
-      { idOrigen: pedido.idOrigen, identificadorDetalle: '1' },
-      'mperez', '2026-08-03T12:00:00',
-    );
-    expect(componente.asignacionActual(pedido, pedido.articulos[0])?.asignadoEn)
-      .toBe('2026-08-03T12:00:00.000Z');
-  });
-
   it.each([
     ['acalix', 'Ana Calix'],
     ['jlara', 'Jorge Lara'],
@@ -939,7 +700,6 @@ describe('ListaPedidosComponent', () => {
     asignacionesService.obtenerUsuarios.mockReturnValue(of({
       puedeAsignar: true,
       puedeAsignarTodos: false,
-      puedeReasignar: true,
       datos: [
         { usuario: 'jlara', nombre: 'Jorge Lara' },
         { usuario: 'acalix', nombre: 'Ana Calix' },
@@ -955,7 +715,6 @@ describe('ListaPedidosComponent', () => {
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
     expect(componente.puedeAsignar()).toBe(true);
     expect(componente.puedeAsignarTodos()).toBe(false);
-    expect(componente.puedeReasignar()).toBe(true);
     expect([...selector.options].map(({ value, text }) => ({ value, text }))).toEqual([
       { value: '', text: 'Sin asignar' },
       { value: 'jlara', text: 'Jorge Lara' },
@@ -976,140 +735,6 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
     expect((fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement).disabled)
       .toBe(false);
-  });
-
-  it.each([
-    ['jlara', 'Jorge Lara', 'jlara', 'Jorge Lara', 'acalix', 'R1:F1'],
-    ['acalix', 'Ana Calix', 'acalix', 'Ana Calix', 'jlara', 'R1:F1'],
-    ['tlopez', 'Tommy López', 'gcruz', 'Gregorio Cruz', 'tlopez', 'R1:TCIR01:F1'],
-  ])('%s desbloquea y confirma exactamente una reasignación dentro de su lista', async (
-    nombreUsuario, nombreVisible, asignadoActual, nombreAsignadoActual, nuevoAsignado, idOrigen,
-  ) => {
-    usuarioSesion.set({
-      usuarioId: '2', nombreUsuario, nombreVisible,
-      codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null, debeCambiarContrasena: false,
-    });
-    const datos = nombreUsuario === 'tlopez'
-      ? [{ usuario: 'tlopez', nombre: 'Tommy López' }]
-      : [
-        { usuario: 'jlara', nombre: 'Jorge Lara' },
-        { usuario: 'acalix', nombre: 'Ana Calix' },
-      ];
-    asignacionesService.obtenerUsuarios.mockReturnValue(of({
-      puedeAsignar: true, puedeAsignarTodos: false, puedeReasignar: true, datos,
-    }));
-    pedidosService.obtenerPedidos.mockReturnValue(of({
-      ...respuestaLista,
-      datos: [{ ...respuestaLista.datos[0], idOrigen }],
-    }));
-    asignacionesService.consultar.mockReturnValue(of({ datos: [{
-      idOrigen, identificadorDetalle: '1',
-      usuarioAsignado: asignadoActual, nombreAsignado: nombreAsignadoActual,
-      asignadoEn: '2026-08-03T12:00:00.000Z',
-      actualizadoEn: '2026-08-03T12:01:00.000Z',
-    }], horaServidor: '2026-08-03T12:10:00.000Z' }));
-    fixture.detectChanges();
-    fixture.detectChanges();
-
-    const botonDesbloquear = fixture.nativeElement.querySelector('.boton-reasignar') as HTMLButtonElement;
-    expect(botonDesbloquear).toBeTruthy();
-    expect(botonDesbloquear.disabled).toBe(false);
-    botonDesbloquear.click();
-    fixture.detectChanges();
-    expect(asignacionesService.reasignar).not.toHaveBeenCalled();
-
-    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
-    expect(selector.disabled).toBe(false);
-    expect([...selector.options].map(({ value }) => value)).toEqual([
-      '', ...datos.map(({ usuario }) => usuario),
-    ]);
-    selector.value = nuevoAsignado;
-    selector.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-    expect(asignacionesService.reasignar).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(15000);
-    fixture.detectChanges();
-    expect(selector.value).toBe(nuevoAsignado);
-    expect(asignacionesService.reasignar).not.toHaveBeenCalled();
-
-    const botonConfirmar = fixture.nativeElement.querySelector(
-      '.boton-asignar:not(.boton-reasignar)',
-    ) as HTMLButtonElement;
-    expect(botonConfirmar.disabled).toBe(false);
-    botonConfirmar.click();
-    fixture.detectChanges();
-
-    expect(asignacionesService.reasignar).toHaveBeenCalledTimes(1);
-    expect(asignacionesService.reasignar).toHaveBeenCalledWith(
-      { idOrigen, identificadorDetalle: '1' }, nuevoAsignado, '2026-08-03T12:01:00.000Z',
-    );
-    expect(componente.asignacionActual(
-      { ...respuestaLista.datos[0], idOrigen }, respuestaLista.datos[0].articulos[0],
-    )?.asignadoEn).toBe('2026-08-03T12:00:00.000Z');
-    expect((fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement).disabled)
-      .toBe(true);
-    const selectorTransferencia = fixture.nativeElement.querySelector(
-      '.selector-transferencia input',
-    ) as HTMLInputElement;
-    expect(selectorTransferencia.disabled).toBe(false);
-    selectorTransferencia.click();
-    fixture.detectChanges();
-    const botonTransferir = fixture.nativeElement.querySelector(
-      '.acciones-transferencia .boton-primario',
-    ) as HTMLButtonElement;
-    expect(botonTransferir.disabled).toBe(false);
-    botonTransferir.click();
-    expect(pedidosService.despacharLineas).toHaveBeenCalledOnce();
-  });
-
-  it('retira la partida al recibir la confirmación sin esperar el siguiente refresco', () => {
-    const respuestaTransferencia = new Subject<{
-      datos: { transferidas: { idOrigen: string; identificadorDetalle: string }[];
-        omitidas: never[]; rechazadas: never[] };
-    }>();
-    const refrescoPosterior = new Subject<typeof respuestaLista>();
-    pedidosService.obtenerPedidos
-      .mockReturnValueOnce(of(respuestaLista))
-      .mockReturnValueOnce(refrescoPosterior.asObservable());
-    pedidosService.despacharLineas.mockReturnValue(respuestaTransferencia.asObservable());
-    fixture.detectChanges();
-    const pedido = componente.pedidos()[0];
-    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
-
-    componente.transferir();
-    componente.transferir();
-    expect(pedidosService.despacharLineas).toHaveBeenCalledOnce();
-    expect(componente.transfiriendo()).toBe(true);
-    expect(componente.pedidos()).toHaveLength(1);
-
-    respuestaTransferencia.next({ datos: {
-      transferidas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
-      omitidas: [], rechazadas: [],
-    } });
-
-    expect(componente.transfiriendo()).toBe(false);
-    expect(componente.pedidos()).toEqual([]);
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
-    expect(componente.mensajeTransferencia()).toContain('1 artículo');
-  });
-
-  it('refresca de inmediato y explica cuando otro usuario ya transfirió la partida', () => {
-    pedidosService.despacharLineas.mockReturnValue(throwError(() => new HttpErrorResponse({
-      status: 409,
-      error: { codigo: 'LINEA_YA_TRANSFERIDA',
-        mensaje: 'Una de las partidas seleccionadas ya fue transferida por otro usuario.' },
-    })));
-    fixture.detectChanges();
-    const consultasAntes = pedidosService.obtenerPedidos.mock.calls.length;
-    const pedido = componente.pedidos()[0];
-    componente.alternarSeleccionTransferencia(pedido, pedido.articulos[0], 0, true);
-
-    componente.transferir();
-
-    expect(componente.mensajeTransferencia()).toContain('transferida por otro usuario');
-    expect(componente.lineasSeleccionadasTransferencia().size).toBe(0);
-    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(consultasAntes + 1);
   });
 
   it.each([

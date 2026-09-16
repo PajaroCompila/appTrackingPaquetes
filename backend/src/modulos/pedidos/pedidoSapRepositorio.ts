@@ -2,6 +2,7 @@ import sql from 'mssql';
 import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 import type { DetallePedido, FiltrosPedidos, PaginaPedidos, PedidoResumen } from './pedido.interface.js';
 import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from './gruposClienteSap.js';
+import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoSla.js';
 
 interface FilaSap {
   docEntry: number; docNum: number; nombreVendedor: string | null;
@@ -20,7 +21,8 @@ export interface IPedidoSapRepositorio {
 }
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
-const usuariosSapExcluidosSla = new Set(['TALLER01', 'SVENTA10', 'SVENTA11', 'SVENTA12']);
+const USUARIOS_SAP_EXCLUIDOS_SLA = ['TALLER01', 'SVENTA10', 'SVENTA11', 'SVENTA12'] as const;
+const usuariosSapExcluidosSla = new Set<string>(USUARIOS_SAP_EXCLUIDOS_SLA);
 
 export function esUsuarioSapExcluidoSla(codigoUsuario: string | null | undefined): boolean {
   return usuariosSapExcluidosSla.has(codigoUsuario?.trim().toUpperCase() ?? '');
@@ -32,6 +34,15 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
     const parametros = codigos.map((_, i) => `@codigoAlmacen${i}`);
     const filtroBodega = codigos.length ? `AND linea.[WhsCode] IN (${parametros.join(', ')})` : '';
     const cantidadConsulta = filtros.cantidadPorPagina + 1;
+    const coincidenciaVendedorEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
+      `UPPER(ISNULL(v.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
+    const coincidenciaUsuarioEspecial = `UPPER(ISNULL(creador.[USER_CODE], '')) IN (${USUARIOS_SAP_EXCLUIDOS_SLA
+      .map((_, indice) => `@usuarioEspecial${indice}`).join(', ')})`;
+    const coincidenciaEspecial = `(${coincidenciaVendedorEspecial} OR ${coincidenciaUsuarioEspecial})`;
+    const filtroClasificacion = filtros.clasificacion === 'especial'
+      ? `AND ${coincidenciaEspecial}`
+      : filtros.clasificacion === 'normal' ? `AND NOT ${coincidenciaEspecial}` : '';
+    const orden = filtros.orden === 'desc' ? 'DESC' : 'ASC';
     const resultado = await consultarSap<FilaSap>(`
         SELECT o.[DocEntry] AS docEntry, o.[DocNum] AS docNum,
           v.[SlpName] AS nombreVendedor,
@@ -64,7 +75,8 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
           AND (@fechaHasta IS NULL OR o.[DocDate] < DATEADD(day, 1, @fechaHasta))
           AND EXISTS (SELECT 1 FROM [dbo].[RDR1] linea WHERE linea.[DocEntry] = o.[DocEntry]
             AND linea.[LineStatus] = @estadoAbierto AND linea.[OpenQty] > 0 ${filtroBodega})
-        ORDER BY o.[DocDate] ASC, o.[DocTime] ASC, o.[DocEntry] ASC
+          ${filtroClasificacion}
+        ORDER BY o.[DocDate] ${orden}, o.[DocTime] ${orden}, o.[DocEntry] ${orden}
         OFFSET @desplazamiento ROWS FETCH NEXT @cantidadConsulta ROWS ONLY;
       `, (r) => {
       r.input('creadoRetailOne', sql.Char(1), 'N').input('noCancelado', sql.Char(1), 'N')
@@ -72,7 +84,12 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
         .input('fechaDesde', sql.Date, filtros.fechaDesde ?? null).input('fechaHasta', sql.Date, filtros.fechaHasta ?? null)
         .input('desplazamiento', sql.Int, (filtros.pagina - 1) * filtros.cantidadPorPagina)
         .input('cantidadConsulta', sql.Int, cantidadConsulta);
-      codigos.forEach((c, i) => r.input(`codigoAlmacen${i}`, sql.NVarChar(16), c)); return r;
+      codigos.forEach((c, i) => r.input(`codigoAlmacen${i}`, sql.NVarChar(16), c));
+      NOMBRES_VENDEDORES_ESPECIALES.forEach((nombre, indice) =>
+        r.input(`vendedorEspecial${indice}`, sql.NVarChar(30), `%${nombre}%`));
+      USUARIOS_SAP_EXCLUIDOS_SLA.forEach((usuario, indice) =>
+        r.input(`usuarioEspecial${indice}`, sql.NVarChar(30), usuario));
+      return r;
     });
     const cabeceras = resultado.recordset.slice(0, filtros.cantidadPorPagina);
     const pedidos = await this.agregarLineas(cabeceras, codigos);

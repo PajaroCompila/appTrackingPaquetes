@@ -14,6 +14,7 @@ export const esquemaFiltrosHistorial = z
     codigoAlmacen: codigosAlmacen,
     pagina: z.coerce.number().int().min(1).default(1),
     cantidadPorPagina: z.coerce.number().int().min(1).max(100).default(25),
+    clasificacion: z.enum(['normal', 'especial']).optional(),
   })
   .strict()
   .refine(({ fechaDesde, fechaHasta }) => fechaDesde <= fechaHasta, {

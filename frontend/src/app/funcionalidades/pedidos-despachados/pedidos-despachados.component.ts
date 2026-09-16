@@ -1,9 +1,10 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { EMPTY, Subject, catchError, exhaustMap, filter, finalize, map, merge, tap, timer } from 'rxjs';
+import { Subject, catchError, exhaustMap, filter, finalize, forkJoin, map, merge, of, tap, timer } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 import type {
@@ -18,6 +19,7 @@ import { esFechaCalendarioValida, guardarFiltrosSesion, leerFiltrosSesion, obten
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
+import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -42,6 +44,14 @@ interface RespuestaListadoDespachados {
   };
 }
 
+interface GrupoDespachados {
+  clave: 'normales' | 'especiales';
+  titulo: string;
+  pedidos: Despachado[];
+  pagina: number;
+  totalRegistros: number;
+}
+
 const claveFiltrosDespachados = 'pedidosDespachados';
 const intervaloActualizacionDespachadosMs = 15000;
 type VistaDespachados = 'articulos' | 'pedido';
@@ -52,7 +62,8 @@ const filtrosIniciales = (): FiltrosDespachados => ({
 
 @Component({
   selector: 'app-pedidos-despachados',
-  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent, CodigoArticuloInventarioDirective],
+  imports: [FormsModule, RouterLink, DetallePedidoVistaComponent, CodigoArticuloInventarioDirective,
+    PaginacionComponent, SelectorAlmacenesDirective],
   templateUrl: './pedidos-despachados.component.html',
   styleUrl: '../pedidos/lista-pedidos.component.css',
 })
@@ -69,10 +80,19 @@ export class PedidosDespachadosComponent implements OnInit {
   private actualizacionManualPendiente = false;
   public filtros = filtrosIniciales();
   public readonly pagina = signal(1);
+  public readonly paginaEspeciales = signal(1);
   public readonly hayMas = signal(false);
   public readonly totalRegistros = signal(0);
+  public readonly totalRegistrosEspeciales = signal(0);
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly pedidos = signal<Despachado[]>([]);
+  public readonly pedidosEspeciales = signal<Despachado[]>([]);
+  public readonly grupos = computed<GrupoDespachados[]>(() => [
+    { clave: 'normales', titulo: 'Pedidos Normales', pedidos: this.pedidos(),
+      pagina: this.pagina(), totalRegistros: this.totalRegistros() },
+    { clave: 'especiales', titulo: 'Pedidos Especiales', pedidos: this.pedidosEspeciales(),
+      pagina: this.paginaEspeciales(), totalRegistros: this.totalRegistrosEspeciales() },
+  ]);
   public readonly vista = signal<VistaDespachados>('articulos');
   public readonly idOrigen = signal<string | null>(null);
   public readonly cargando = signal(true);
@@ -90,7 +110,6 @@ export class PedidosDespachadosComponent implements OnInit {
       etiquetaRetorno: 'Regresar a pedidos despachados',
       tituloInformacion: 'Información de entrega',
       etiquetaArticulos: 'Artículos despachados del pedido',
-      soloConsulta: true,
       permitirImpresion: false,
       aviso: pedido?.esParcial === true
         ? 'Despacho parcial: este pedido todavía conserva líneas pendientes.'
@@ -147,13 +166,14 @@ export class PedidosDespachadosComponent implements OnInit {
     this.actualizarAhora.next(false);
   }
 
-  private consultarListado() {
+  private consultarListado(clasificacion: 'normal' | 'especial', pagina: number) {
     let parametros = new HttpParams()
-      .set('pagina', this.pagina())
+      .set('pagina', pagina)
       .set('cantidadPorPagina', this.filtros.cantidadPorPagina)
       .set('fechaDesde', this.filtros.fechaDesde)
       .set('fechaHasta', this.filtros.fechaHasta)
-      .set('vista', this.vista());
+      .set('vista', this.vista())
+      .set('clasificacion', clasificacion);
     if (this.filtros.numeroPedido.trim()) {
       parametros = parametros.set('numeroPedido', this.filtros.numeroPedido.trim());
     }
@@ -180,14 +200,11 @@ export class PedidosDespachadosComponent implements OnInit {
         if (!this.haCargado || !esAutomatica) this.cargando.set(true);
         else this.actualizando.set(true);
         if (!esAutomatica) this.error.set(false);
-        return this.consultarListado().pipe(
-          map((respuesta) => ({ respuesta, esAutomatica })),
-          catchError(() => {
-            if (!this.haCargado || !esAutomatica) {
-              this.marcarError();
-            }
-            return EMPTY;
-          }),
+        return forkJoin({
+          normales: this.consultarListado('normal', this.pagina()).pipe(catchError(() => of(null))),
+          especiales: this.consultarListado('especial', this.paginaEspeciales()).pipe(catchError(() => of(null))),
+        }).pipe(
+          map((respuestas) => ({ respuestas, esAutomatica })),
           finalize(() => {
             this.consultaEnCurso = false;
             this.cargando.set(false);
@@ -200,24 +217,37 @@ export class PedidosDespachadosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta }) => {
-      const paginacion = respuesta.paginacion;
-      this.hayMas.set(Boolean(paginacion?.hayMas));
-      this.totalRegistros.set(paginacion?.totalRegistros ?? respuesta.datos.length);
+    ).subscribe(({ respuestas, esAutomatica }) => {
+      if (!respuestas.normales && !respuestas.especiales) {
+        if (!this.haCargado || !esAutomatica) this.marcarError();
+        return;
+      }
+      if (respuestas.normales) {
+        const paginacion = respuestas.normales.paginacion;
+        this.hayMas.set(Boolean(paginacion?.hayMas));
+        this.totalRegistros.set(paginacion?.totalRegistros ?? respuestas.normales.datos.length);
+        this.pedidos.set(respuestas.normales.datos);
+      }
+      if (respuestas.especiales) {
+        const paginacion = respuestas.especiales.paginacion;
+        this.totalRegistrosEspeciales.set(
+          paginacion?.totalRegistros ?? respuestas.especiales.datos.length,
+        );
+        this.pedidosEspeciales.set(respuestas.especiales.datos);
+      }
       this.error.set(false);
       this.ultimaActualizacion.set(new Date());
       this.haCargado = true;
-      this.finalizarCarga(respuesta.datos);
     });
   }
 
-  public buscar(): void { this.guardarFiltros(); this.actualizarListado(1); }
-  public limpiarFiltros(): void { this.filtros = filtrosIniciales(); this.actualizarListado(1); }
-  public cambiarCantidadPorPagina(): void { this.actualizarListado(1); }
+  public buscar(): void { this.guardarFiltros(); this.actualizarListado(1, 1); }
+  public limpiarFiltros(): void { this.filtros = filtrosIniciales(); this.actualizarListado(1, 1); }
+  public cambiarCantidadPorPagina(): void { this.actualizarListado(1, 1); }
   public cambiarVista(vista: VistaDespachados): void {
     if (this.vista() === vista) return;
     this.vista.set(vista);
-    this.actualizarListado(1);
+    this.actualizarListado(1, 1);
   }
   public estaSeleccionado(codigo: string): boolean { return this.filtros.codigosAlmacen.includes(codigo); }
   public alternarAlmacen(codigo: string, seleccionado: boolean): void {
@@ -225,13 +255,11 @@ export class PedidosDespachadosComponent implements OnInit {
       ? [...new Set([...this.filtros.codigosAlmacen, codigo])]
       : this.filtros.codigosAlmacen.filter((actual) => actual !== codigo);
     this.guardarFiltros();
-    this.actualizarListado(1);
   }
   public quitarAlmacen(codigo: string): void { this.alternarAlmacen(codigo, false); }
   public limpiarAlmacenes(): void {
     this.filtros.codigosAlmacen = [];
     this.guardarFiltros();
-    this.actualizarListado(1);
   }
   public nombreAlmacen(codigo: string): string {
     return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigo)?.nombreAlmacen || codigo;
@@ -241,8 +269,13 @@ export class PedidosDespachadosComponent implements OnInit {
     return cantidad === 0 ? 'Todos los almacenes'
       : cantidad === 1 ? this.filtros.codigosAlmacen[0]! : `${cantidad} almacenes seleccionados`;
   }
-  public paginaAnterior(): void { if (this.pagina() > 1 && !this.cargando()) this.actualizarListado(this.pagina() - 1); }
-  public paginaSiguiente(): void { if (this.hayMas() && !this.cargando()) this.actualizarListado(this.pagina() + 1); }
+  public irPagina(grupo: 'normales' | 'especiales', pagina: number): void {
+    if (this.cargando()) return;
+    this.actualizarListado(
+      grupo === 'normales' ? pagina : this.pagina(),
+      grupo === 'especiales' ? pagina : this.paginaEspeciales(),
+    );
+  }
 
   public responsablesPedido(pedido: Despachado): string {
     const responsables = pedido.responsablesAsignados ?? [...new Set(pedido.articulos
@@ -268,14 +301,16 @@ export class PedidosDespachadosComponent implements OnInit {
     return pedido.modificado ? pedido.modificadoPor?.trim() || 'No disponible' : '—';
   }
 
-  private actualizarListado(pagina: number): void {
-    this.pagina.set(pagina); this.guardarFiltros(); this.actualizarUrl();
+  private actualizarListado(pagina: number, paginaEspeciales: number): void {
+    this.pagina.set(pagina); this.paginaEspeciales.set(paginaEspeciales);
+    this.guardarFiltros(); this.actualizarUrl();
     this.cargando.set(true); this.error.set(false); this.actualizarAhora.next(false);
   }
 
   private actualizarUrl(): void {
     const queryParams: Record<string, string | number | string[]> = {
       pagina: this.pagina(), cantidadPorPagina: this.filtros.cantidadPorPagina,
+      paginaEspeciales: this.paginaEspeciales(),
       fechaDesde: this.filtros.fechaDesde, fechaHasta: this.filtros.fechaHasta,
       vista: this.vista(),
     };
@@ -299,13 +334,16 @@ export class PedidosDespachadosComponent implements OnInit {
     };
     this.vista.set(parametros.get('vista') === 'pedido' ? 'pedido' : 'articulos');
     this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados['pagina']) || 1));
+    this.paginaEspeciales.set(Math.max(1,
+      Number(parametros.get('paginaEspeciales') ?? guardados['paginaEspeciales']) || 1));
     this.guardarFiltros(); this.actualizarUrl();
   }
 
   private guardarFiltros(): void {
     this.filtrosGlobales.actualizar({ fechaDesde: this.filtros.fechaDesde,
       fechaHasta: this.filtros.fechaHasta, codigosAlmacen: this.filtros.codigosAlmacen });
-    guardarFiltrosSesion(claveFiltrosDespachados, { ...this.filtros, pagina: this.pagina() });
+    guardarFiltrosSesion(claveFiltrosDespachados, { ...this.filtros, pagina: this.pagina(),
+      paginaEspeciales: this.paginaEspeciales() });
   }
 
   private cargarAlmacenes(): void {

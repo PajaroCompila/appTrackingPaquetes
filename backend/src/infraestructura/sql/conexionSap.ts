@@ -3,11 +3,18 @@ import { obtenerConfiguracionSap } from '../../configuracion/configuracionBaseDa
 import { crearPoolSql } from './crearPoolSql.js';
 
 let poolSap: sql.ConnectionPool | undefined;
+let conexionEnCurso: Promise<sql.ConnectionPool> | undefined;
 let reintentarDespues = 0;
 const demoraReintentoMs = 30_000;
 
 export async function obtenerPoolSap(): Promise<sql.ConnectionPool> {
   if (poolSap?.connected) return poolSap;
+  if (!conexionEnCurso) conexionEnCurso = conectarPoolSap();
+  try { return await conexionEnCurso; }
+  finally { conexionEnCurso = undefined; }
+}
+
+async function conectarPoolSap(): Promise<sql.ConnectionPool> {
   if (reintentarDespues > Date.now()) {
     throw new Error('SAP no está disponible temporalmente.');
   }
@@ -26,6 +33,7 @@ export async function obtenerPoolSap(): Promise<sql.ConnectionPool> {
 }
 
 export async function cerrarConexionSap(): Promise<void> {
+  if (conexionEnCurso) await conexionEnCurso.catch(() => undefined);
   const poolActual = poolSap;
   poolSap = undefined;
   reintentarDespues = 0;

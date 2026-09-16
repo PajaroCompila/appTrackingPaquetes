@@ -10,6 +10,8 @@ import { HistorialR1Repositorio } from './historialR1Repositorio.js';
 import { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
+import { EntregaSapRepositorio } from './entregaSapRepositorio.js';
+import { esIdentidadEntregaSap } from './entregaSap.interface.js';
 
 let conciliacionEnCurso: Promise<number> | null = null;
 
@@ -19,6 +21,7 @@ export class HistorialServicio {
     private readonly repositorioConsulta?: HistorialR1Repositorio,
     private readonly asignacionRepositorio = new AsignacionRepositorio(),
     private readonly seguimientoRepositorio?: SeguimientoPedidoRepositorio,
+    private readonly entregasRepositorio = new EntregaSapRepositorio(),
   ) {}
 
   public async sincronizar(): Promise<number> {
@@ -56,29 +59,40 @@ export class HistorialServicio {
   public async buscar(filtros: FiltrosHistorial): Promise<PaginaHistorial> {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
-    const [resultadoR1, resultadoSap] = await Promise.allSettled([
+    const [resultadoR1, resultadoSap, resultadoEntregas] = await Promise.allSettled([
       (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscar(filtrosAcumulados),
       this.repositorio.buscarHistorial(filtrosAcumulados),
+      this.entregasRepositorio.buscar(filtrosAcumulados),
     ]);
-    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected') {
+    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected'
+      && resultadoEntregas.status === 'rejected') {
       throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
         'El historial no está disponible temporalmente.');
     }
     const r1 = resultadoR1.status === 'fulfilled' ? resultadoR1.value : null;
     const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
-    const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? [])]
-      .sort((a, b) => (b.validadoDetectadoEn ?? b.despachadoEn ?? b.fechaHoraPedido ?? '')
-        .localeCompare(a.validadoDetectadoEn ?? a.despachadoEn ?? a.fechaHoraPedido ?? '')
+    const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
+    const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? []), ...(entregas?.registros ?? [])]
+      .sort((a, b) => (b.entregaSap?.fechaEntrega ?? b.validadoDetectadoEn ?? b.despachadoEn ?? b.fechaHoraPedido ?? '')
+        .localeCompare(a.entregaSap?.fechaEntrega ?? a.validadoDetectadoEn ?? a.despachadoEn ?? a.fechaHoraPedido ?? '')
         || a.idOrigen.localeCompare(b.idOrigen));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
     await this.agregarResponsablesPedidos(registros);
     if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar(registros);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
-      hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
+      totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
+      hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };
   }
 
-  public async obtener(idOrigen: string): Promise<PedidoHistorial | null> {
+  public async obtener(idOrigen: string, rol?: string): Promise<PedidoHistorial | null> {
+    if (esIdentidadEntregaSap(idOrigen)) {
+      const entrega = await this.entregasRepositorio.obtener(idOrigen, rol);
+      if (entrega && (rol !== 'ADMINISTRADOR' || entrega.estadoHistorial !== 'Entregado, Sin factura')) {
+        delete entrega.auditoriaSap;
+      }
+      return entrega;
+    }
     const consulta = idOrigen.startsWith('SAP:')
       ? this.repositorio.obtenerHistorial(idOrigen)
       : (this.repositorioConsulta ?? new HistorialR1Repositorio()).obtener(idOrigen);
@@ -93,17 +107,20 @@ export class HistorialServicio {
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
-    const [resultadoR1, resultadoSap] = await Promise.allSettled([
+    const [resultadoR1, resultadoSap, resultadoEntregas] = await Promise.allSettled([
       (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscarArticulos(filtrosAcumulados),
       this.repositorio.buscarArticulosHistorial(filtrosAcumulados),
+      this.entregasRepositorio.buscarArticulos(filtrosAcumulados),
     ]);
-    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected') {
+    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected'
+      && resultadoEntregas.status === 'rejected') {
       throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
         'El historial no está disponible temporalmente.');
     }
     const r1 = resultadoR1.status === 'fulfilled' ? resultadoR1.value : null;
     const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
-    const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? [])]
+    const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
+    const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? []), ...(entregas?.registros ?? [])]
       .sort((a, b) => (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '')
         || b.idOrigen.localeCompare(a.idOrigen)
         || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));
@@ -112,7 +129,8 @@ export class HistorialServicio {
     await this.agregarResponsablesArticulos(registros);
     if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicarArticulos(registros);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
-      hayMas: Boolean(r1?.hayMas || sap?.hayMas || todos.length > inicio + registros.length) };
+      totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
+      hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };
   }
 
   private async agregarResponsablesPedidos(pedidos: PedidoHistorial[]): Promise<void> {

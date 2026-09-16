@@ -7,10 +7,11 @@ import { LineaDespachoOrigenRepositorio } from './lineaDespachoOrigenRepositorio
 import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
 import { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
+import { ConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
 
 export const despachoRutas = Router();
 const repositorio = new DespachoRepositorio();
-const servicio = new DespachoServicio(repositorio, new LineaDespachoOrigenRepositorio());
+const servicio = new DespachoServicio(repositorio, new LineaDespachoOrigenRepositorio(), undefined, new ConciliacionEntregaPedido());
 const seguimientoRepositorio = new SeguimientoPedidoRepositorio();
 const idOrigen = z.string().regex(/^(R1|SAP):.{1,140}$/);
 const identidadDetalle = z.string().regex(/^\d{1,20}$/);
@@ -27,6 +28,7 @@ export const esquemaFiltrosDespachados = z.object({
   pagina: z.coerce.number().int().min(1).default(1),
   cantidadPorPagina: z.coerce.number().int().min(1).max(100).default(25),
   vista: z.enum(['articulos', 'pedido']).default('articulos'),
+  clasificacion: z.enum(['normal', 'especial']).optional(),
 }).strict().refine(({ fechaDesde, fechaHasta }) =>
   !fechaDesde || !fechaHasta || fechaDesde <= fechaHasta, {
   message: 'La fecha inicial no puede ser posterior a la fecha final.',

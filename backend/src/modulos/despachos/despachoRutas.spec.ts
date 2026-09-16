@@ -19,4 +19,11 @@ describe('esquemaFiltrosDespachados', () => {
     })).toThrow();
     expect(() => esquemaFiltrosDespachados.parse({ codigoAlmacen: 'BODEGA;DROP' })).toThrow();
   });
+
+  it('acepta la clasificación de pedidos normales y especiales', () => {
+    expect(esquemaFiltrosDespachados.parse({ codigoAlmacen: [], clasificacion: 'especial' }))
+      .toMatchObject({ clasificacion: 'especial' });
+    expect(esquemaFiltrosDespachados.parse({ codigoAlmacen: [], clasificacion: 'normal' }))
+      .toMatchObject({ clasificacion: 'normal' });
+  });
 });

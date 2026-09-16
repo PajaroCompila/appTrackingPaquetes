@@ -36,7 +36,7 @@ describe('rutas de pedidos', () => {
       pagina: 1, cantidadPorPagina: 25, cantidadDevuelta: 0, totalRegistros: 0, hayMas: false,
     });
     expect(repositorio.buscarPedidos).toHaveBeenCalledWith({
-      pagina: 1, cantidadPorPagina: 25, codigosAlmacen: [], vista: 'articulos',
+      pagina: 1, cantidadPorPagina: 25, codigosAlmacen: [], vista: 'articulos', orden: 'asc',
     });
   });
 

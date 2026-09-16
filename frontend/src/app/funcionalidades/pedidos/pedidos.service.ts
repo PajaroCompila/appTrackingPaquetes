@@ -18,6 +18,8 @@ export class PedidosService {
       .set('pagina', filtros.pagina)
       .set('cantidadPorPagina', filtros.cantidadPorPagina)
       .set('vista', filtros.vista ?? 'articulos');
+    if (filtros.clasificacion) parametros = parametros.set('clasificacion', filtros.clasificacion);
+    if (filtros.orden) parametros = parametros.set('orden', filtros.orden);
 
     const filtrosOpcionales: [string, string | undefined][] = [
       ['numeroPedido', filtros.numeroPedido],

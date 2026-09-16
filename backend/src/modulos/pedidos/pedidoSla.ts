@@ -1,12 +1,13 @@
 import type { PedidoResumen } from './pedido.interface.js';
 
-const nombresVendedoresEspeciales = new Set([
+export const NOMBRES_VENDEDORES_ESPECIALES = [
   'ELIASAR',
   'ELISAAR',
   'JENSY',
   'NAHUM',
   'NAUN',
-]);
+] as const;
+const nombresVendedoresEspeciales = new Set<string>(NOMBRES_VENDEDORES_ESPECIALES);
 
 function palabrasNormalizadas(valor: string | null | undefined): string[] {
   return (valor ?? '')

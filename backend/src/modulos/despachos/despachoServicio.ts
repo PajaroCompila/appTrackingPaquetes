@@ -7,12 +7,14 @@ import {
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 import { puedeVerAlmacen } from '../usuarios/accesoAlmacenes.js';
 import { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
+import type { IConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
 
 export class DespachoServicio {
   public constructor(
     private readonly despachoRepositorio: IDespachoRepositorio,
     private readonly origenRepositorio: LineaDespachoOrigenRepositorio,
     private readonly asignacionRepositorio = new AsignacionRepositorio(),
+    private readonly conciliacionEntregas?: IConciliacionEntregaPedido,
   ) {}
 
   public async transferir(identidades: IdentidadLineaDespacho[], usuarioId: string,
@@ -29,7 +31,16 @@ export class DespachoServicio {
       throw new ErrorAplicacion(409, 'LINEA_YA_TRANSFERIDA',
         'Una de las partidas seleccionadas ya fue transferida por otro usuario.');
     }
-    const lineas = await this.origenRepositorio.obtenerLineas(identidades);
+    let lineas = await this.origenRepositorio.obtenerLineas(identidades);
+    if (this.conciliacionEntregas) {
+      const pendientes = await this.conciliacionEntregas.aplicar(lineas.map(l => ({ ...l.pedido, articulos: [l.articulo] })));
+      lineas = lineas.flatMap(l => {
+        const pedido = pendientes.find(p => p.idOrigen === l.idOrigen
+          && p.articulos.some(a => a.identificadorDetalle === l.identificadorDetalle));
+        const articulo = pedido?.articulos.find(a => a.identificadorDetalle === l.identificadorDetalle);
+        return pedido && articulo ? [{ ...l, pedido, articulo }] : [];
+      });
+    }
     if (usuario && lineas.some(({ articulo }) => !puedeVerAlmacen(usuario, articulo.codigoAlmacen))) {
       throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
         'No tiene acceso a la bodega de uno de los artículos seleccionados.');

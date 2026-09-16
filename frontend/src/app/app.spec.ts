@@ -7,11 +7,13 @@ import { routes } from './app.routes';
 import type { UsuarioSesion } from './funcionalidades/autenticacion/autenticacion.interface';
 import { AutenticacionService } from './funcionalidades/autenticacion/autenticacion.service';
 import { PedidosNotificacionesService } from './compartido/notificaciones/pedidos-notificaciones.service';
+import { PedidosNotificacionesGlobalesService } from './compartido/notificaciones/pedidos-notificaciones-globales.service';
 
 describe('App', () => {
   let usuario: WritableSignal<UsuarioSesion | null>;
 
   beforeEach(async () => {
+    window.localStorage.removeItem('pedidos-bodega:sonido-notificaciones');
     usuario = signal<UsuarioSesion | null>({
       usuarioId: '1', nombreUsuario: 'operador', nombreVisible: 'Operador de bodega',
       codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: 'BSPS01', debeCambiarContrasena: false,
@@ -24,8 +26,13 @@ describe('App', () => {
           usuario,
           cerrarSesion: () => of(undefined),
         } },
+        { provide: PedidosNotificacionesGlobalesService, useValue: { iniciar: vi.fn() } },
       ],
     }).compileComponents();
+  });
+
+  afterEach(() => {
+    window.localStorage.removeItem('pedidos-bodega:sonido-notificaciones');
   });
 
   it('muestra la identidad de la aplicación', () => {
@@ -42,15 +49,17 @@ describe('App', () => {
     fixture.detectChanges();
     const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
 
-    expect(enlaces).toHaveLength(3);
+    expect(enlaces).toHaveLength(4);
     expect(enlaces.map((enlace) => enlace.getAttribute('aria-label'))).toEqual([
       'Pedidos pendientes',
       'Pedidos despachados',
+      'Pedidos devueltos',
       'Historial',
     ]);
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
       '/pedidos',
       '/pedidos-despachados',
+      '/pedidos-devueltos',
       '/historial-validados',
     ]);
     expect(fixture.nativeElement.querySelector('a[href="/dashboard"]')).toBeNull();
@@ -168,5 +177,26 @@ describe('App', () => {
     campana.click();
     document.body.click();
     expect(fixture.componentInstance.panelNotificacionesAbierto()).toBe(false);
+  });
+
+  it('permite activar y desactivar el sonido desde el encabezado', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const boton = fixture.nativeElement.querySelector(
+      '.control-sonido-notificaciones',
+    ) as HTMLButtonElement;
+
+    expect(boton.getAttribute('aria-label')).toBe('Desactivar sonido de notificaciones');
+    expect(boton.getAttribute('aria-pressed')).toBe('true');
+    expect(boton.querySelector('.pi-volume-up')).not.toBeNull();
+
+    boton.click();
+    fixture.detectChanges();
+
+    expect(boton.getAttribute('aria-label')).toBe('Activar sonido de notificaciones');
+    expect(boton.getAttribute('aria-pressed')).toBe('false');
+    expect(boton.querySelector('.pi-volume-up')).not.toBeNull();
+    expect(boton.querySelector('.marca-sonido-silenciado.pi-times')).not.toBeNull();
+    expect(window.localStorage.getItem('pedidos-bodega:sonido-notificaciones')).toBe('0');
   });
 });

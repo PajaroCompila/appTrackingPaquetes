@@ -16,7 +16,10 @@ describe('validación de filtros de pedidos', () => {
   });
 
   it('interpreta la ausencia de almacenes como todos', () => {
-    expect(esquemaFiltrosPedidos.parse({}).codigosAlmacen).toEqual([]);
+    const filtros = esquemaFiltrosPedidos.parse({});
+    expect(filtros.codigosAlmacen).toEqual([]);
+    expect(filtros.orden).toBe('asc');
+    expect(esquemaFiltrosPedidos.parse({ orden: 'desc' }).orden).toBe('desc');
   });
 
   it('rechaza códigos inválidos, demasiado largos o demasiadas selecciones', () => {

@@ -1,6 +1,10 @@
 import type { PedidoResumen } from '../pedidos/pedido.interface';
+import type { AuditoriaEntregaSap, EntregaSapPublica, EstadoEntregaSap } from './entrega-sap.interface';
 
 export interface HistorialValidado extends PedidoResumen {
+  estadoHistorial?: EstadoEntregaSap;
+  entregaSap?: EntregaSapPublica;
+  auditoriaSap?: AuditoriaEntregaSap;
   estadoLocal: 'VALIDADO' | 'DESPACHADO';
   despachadoEn: string | null;
   validadoDetectadoEn: string | null;
@@ -13,11 +17,14 @@ export interface RespuestaHistorial {
     pagina: number;
     cantidadPorPagina: number;
     cantidadDevuelta: number;
+    totalRegistros?: number;
     hayMas: boolean;
   };
 }
 
 export interface ArticuloHistorial {
+  estadoHistorial?: EstadoEntregaSap;
+  entregaSap?: EntregaSapPublica;
   idOrigen: string;
   identificadorDetalle: string | null;
   numeroPedido: string;

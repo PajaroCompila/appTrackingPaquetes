@@ -1,0 +1,22 @@
+<nav class="paginacion paginacion-numerada" aria-label="Paginación">
+  <button type="button" class="control-pagina" [disabled]="paginaActual() <= 1 || deshabilitada()" (click)="irA(paginaActual() - 1)">Anterior</button>
+  <div class="numeros-pagina">
+    @for (elemento of paginas(); track $index) {
+      @if (elemento === 'separador') {
+        <span class="separador" aria-hidden="true">…</span>
+      } @else {
+        <button
+          type="button"
+          class="numero-pagina"
+          [class.actual]="elemento === paginaActual()"
+          [attr.aria-current]="elemento === paginaActual() ? 'page' : null"
+          [attr.aria-label]="'Ir a la página ' + elemento"
+          [disabled]="deshabilitada()"
+          (click)="irA(elemento)"
+        >{{ elemento }}</button>
+      }
+    }
+  </div>
+  <button type="button" class="control-pagina" [disabled]="paginaActual() >= totalPaginas() || deshabilitada()" (click)="irA(paginaActual() + 1)">Siguiente</button>
+  <span class="total-paginas" aria-live="polite">Página {{ paginaActual() }} de {{ totalPaginas() }} · {{ totalRegistros() }} {{ etiquetaRegistros() }}</span>
+</nav>

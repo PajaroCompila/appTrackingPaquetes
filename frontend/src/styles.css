@@ -53,14 +53,15 @@ h6 {
 button { font-size: 14px; font-weight: 600; }
 label { font-size: 13px; font-weight: 600; }
 @media print {
-  @page { size: 80mm 297mm; margin: 3mm; }
-  html, body { width: 74mm; min-width: 0; margin: 0; padding: 0; background: #fff; }
-  .estructura-aplicacion { display: block !important; width: 74mm !important; min-height: 0 !important; }
+  @page { size: 80mm 297mm; margin: 2mm 2mm 2mm 5mm; }
+  html, body { width: 52.14mm; min-width: 0; margin: 0; padding: 0; background: #fff; }
+  body { zoom: 1.4; }
+  .estructura-aplicacion { display: block !important; width: 52.14mm !important; min-height: 0 !important; }
   .barra-lateral, .barra-superior { display: none !important; }
-  .area-aplicacion, main, .pagina { width: 74mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
+  .area-aplicacion, main, .pagina { width: 52.14mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
   body * { visibility: hidden !important; }
   app-vista-impresion-pedido, app-vista-impresion-pedido * { visibility: visible !important; }
-  app-vista-impresion-pedido { display: block !important; position: absolute !important; left: 50% !important; top: 0; width: 74mm; max-width: 74mm; transform: translateX(-50%); font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  app-vista-impresion-pedido { display: block !important; position: absolute !important; left: 0 !important; top: 0; width: 52.14mm; max-width: 52.14mm; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 }
 button, input, select { font: inherit; }
 button, a, input, select { -webkit-tap-highlight-color: transparent; }

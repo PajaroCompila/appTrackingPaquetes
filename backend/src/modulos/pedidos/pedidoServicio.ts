@@ -11,6 +11,7 @@ import type { IDespachoRepositorio } from '../despachos/despachoRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from './seguimientoPedidoRepositorio.js';
 import { aplicarExclusionSlaPorVendedor } from './pedidoSla.js';
+import type { IConciliacionEntregaPedido } from './conciliacionEntregaPedido.js';
 
 interface EstadoCacheSap {
   resultado?: PaginaPedidos;
@@ -25,15 +26,22 @@ export class PedidoServicio {
     private readonly pedidoSapRepositorio: IPedidoSapRepositorio = new PedidoSapRepositorio(),
     private readonly despachoRepositorio?: IDespachoRepositorio,
     private readonly seguimientoRepositorio?: SeguimientoPedidoRepositorio,
+    private readonly conciliacionEntregas?: IConciliacionEntregaPedido,
   ) {}
 
   public async buscarPedidos(filtros: FiltrosPedidos): Promise<PaginaPedidos> {
     try {
       const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
-      const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
+      let compensacion = 0;
+      if (this.conciliacionEntregas?.cantidadACompensar) {
+        try { compensacion = await this.conciliacionEntregas.cantidadACompensar(filtros); }
+        catch { console.warn('No fue posible calcular la compensación local de pendientes.'); }
+      }
+      // Traer una cabecera adicional por cada relación local evita que una página
+      // quede vacía o salte pedidos al retirar filas entregadas antes del slice.
+      const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada + compensacion };
       const claveCacheSap = this.crearClaveCacheSap(filtrosAcumulados);
       const estadoCacheSap = this.obtenerEstadoCacheSap(claveCacheSap);
-      const sapAnterior = estadoCacheSap.resultado ?? null;
       const actualizacionSap = this.actualizarSapEnSegundoPlano(
         claveCacheSap,
         filtrosAcumulados,
@@ -47,15 +55,19 @@ export class PedidoServicio {
         console.warn('La fuente RetailOne no estuvo disponible durante la consulta.');
       }
 
-      const sap = sapAnterior ?? (retailOne ? null : await actualizacionSap);
+      const sap = estadoCacheSap.resultado ?? (retailOne ? null : await actualizacionSap);
       if (!retailOne && !sap) {
         throw new ErrorDependenciaDatos();
       }
       const lineasDespachadas = this.despachoRepositorio
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
-      const pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
+      let pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
       aplicarExclusionSlaPorVendedor(pedidosOrigen);
+      if (filtros.clasificacion) {
+        const especiales = filtros.clasificacion === 'especial';
+        pedidosOrigen = pedidosOrigen.filter((pedido) => Boolean(pedido.excluidoSla) === especiales);
+      }
       if (this.seguimientoRepositorio) {
         await this.seguimientoRepositorio.registrarYAplicar(
           pedidosOrigen,
@@ -63,6 +75,13 @@ export class PedidoServicio {
         );
       }
       aplicarExclusionSlaPorVendedor(pedidosOrigen);
+      const pedidosAntesConciliacion = pedidosOrigen;
+      if (this.conciliacionEntregas) {
+        try { pedidosOrigen = await this.conciliacionEntregas.aplicar(pedidosOrigen); }
+        catch { console.warn('No fue posible consultar la conciliación local; se conservan los pendientes.'); }
+      }
+      const cabecerasConciliadas = pedidosAntesConciliacion.length - pedidosOrigen.length;
+      const factorOrden = filtros.orden === 'desc' ? -1 : 1;
       const unificados = pedidosOrigen
         .map((pedido) => ({ ...pedido, articulos: pedido.articulos.filter((articulo) => {
           const identidad = articulo.identificadorDetalle?.trim();
@@ -70,8 +89,9 @@ export class PedidoServicio {
             && !lineasDespachadas.has(claveLineaDespachada(pedido.idOrigen, '*'))
             && !lineasDespachadas.has(claveLineaDespachada(pedido.idOrigen, identidad));
         }) }))
-        .filter((pedido) => pedido.articulos.length > 0).sort((a, b) =>
-        (a.fechaHoraPedido ?? '\uffff').localeCompare(b.fechaHoraPedido ?? '\uffff') || a.idOrigen.localeCompare(b.idOrigen));
+        .filter((pedido) => pedido.articulos.length > 0).sort((a, b) => factorOrden * (
+          (a.fechaHoraPedido ?? '\uffff').localeCompare(b.fechaHoraPedido ?? '\uffff')
+          || a.idOrigen.localeCompare(b.idOrigen)));
       const registros = filtros.vista === 'pedido'
         ? unificados
         : unificados.flatMap((pedido) => pedido.articulos.map((articulo) => ({
@@ -82,7 +102,8 @@ export class PedidoServicio {
         })));
       const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
       const pedidos = registros.slice(inicio, inicio + filtros.cantidadPorPagina);
-      const totalRegistros = registros.length;
+      const totalOrigen = (retailOne?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0);
+      const totalRegistros = Math.max(registros.length, totalOrigen - cabecerasConciliadas);
       return { pedidos, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
         totalRegistros, hayMas: Boolean(retailOne?.hayMas || sap?.hayMas
           || inicio + pedidos.length < totalRegistros),
@@ -104,6 +125,8 @@ export class PedidoServicio {
       codigoEstadoVenta: filtros.codigoEstadoVenta ?? null,
       codigoSincronizacion: filtros.codigoSincronizacion ?? null,
       vista: filtros.vista ?? 'articulos',
+      clasificacion: filtros.clasificacion ?? null,
+      orden: filtros.orden ?? 'asc',
       pagina: filtros.pagina,
       cantidadPorPagina: filtros.cantidadPorPagina,
     });
@@ -135,9 +158,8 @@ export class PedidoServicio {
         return resultado;
       })
       .catch(() => {
-        estado.resultado = undefined;
         console.warn('La fuente SAP no estuvo disponible durante la consulta en segundo plano.');
-        return null;
+        return estado.resultado ?? null;
       })
       .finally(() => {
         estado.actualizacion = undefined;
@@ -161,6 +183,19 @@ export class PedidoServicio {
         throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
       }
       aplicarExclusionSlaPorVendedor([pedido.cabecera]);
+      if (this.conciliacionEntregas && !esSap) {
+        const resumen = { ...pedido.cabecera, articulos: pedido.partidas.map(p => ({
+          identificadorDetalle: p.numeroPartida, firmaConciliacion: p.firmaConciliacion,
+          codigoArticulo: p.codigoArticulo, codigoAlmacen: p.codigoAlmacen,
+          descripcion: p.descripcionArticulo, cantidad: p.cantidadSolicitada, nombreAlmacen: p.nombreAlmacen,
+        })) };
+        const [pendiente] = await this.conciliacionEntregas.aplicar([resumen]);
+        pedido.cabecera.articulos = pendiente?.articulos ?? [];
+        pedido.partidas = pedido.partidas.flatMap(p => {
+          const a = pendiente?.articulos.find(a => a.identificadorDetalle === p.numeroPartida);
+          return a ? [{ ...p, cantidadSolicitada: a.cantidad }] : [];
+        });
+      }
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido.cabecera]);
       aplicarExclusionSlaPorVendedor([pedido.cabecera]);
       return pedido;

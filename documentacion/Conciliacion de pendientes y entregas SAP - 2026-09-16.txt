@@ -1,0 +1,293 @@
+CONCILIACION DE PENDIENTES Y ENTREGAS SAP
+Validación del 16 de septiembre de 2026
+
+Repositorio trabajado:
+C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+No se modificó ni se publicó el repositorio antiguo appPedidosBodega.
+Se conservaron los cambios previos presentes en el árbol de trabajo.
+
+1. POR QUE 101475685 SEGUIA APARECIENDO
+
+La entrega 40968 estaba correctamente incorporada al historial local, pero la
+cola de pedidos consultaba las fuentes de pendientes y únicamente excluía las
+líneas transferidas localmente. No consultaba evidencia de entregas SAP para
+retirar partidas R1 que seguían abiertas. El problema no era la detección ODLN.
+
+Antes de la corrección, una consulta reproducida devolvía:
+idOrigen: R1:TSPS01:SPSS03PE390619
+numeroPedido: 101475685
+identificadorDetalle: 1
+artículo: YAM-MODX7
+bodega: TSPS01
+cantidad: 1
+vendedor: SPS Hector Alvi Cedillo
+
+2. REPOSITORIO Y TRAZA DE LA FILA
+
+/api/pedidos -> PedidoControlador -> PedidoServicio
+-> PedidoSucursalesRepositorio -> PedidoRepositorio de TSPS01.
+
+El origen real es R1, no el repositorio de pedidos SAP directos.
+Folio R1: SPSS03PE390619.
+Pedido SAP relacionado: ORDR.DocEntry 961461 / DocNum 101475685.
+El DTO R1 conserva sapDocEntry=null: no inventa ese identificador desde DocNum.
+El número visible proviene de U_SO1_DOCUMENTOSBO; no identifica una entrega.
+
+R1 contiene dos partidas:
+1: YAM-MODX7 / TSPS01 / cantidad 1 / partida SAP del pedido 0.
+2: YAM-PA150 / BSPS03 / cantidad 1 / partida SAP del pedido 1.
+La segunda ya estaba transferida localmente y por eso no aparecía en la
+respuesta operativa anterior. Ambas tienen cobertura comprobada en 40968.
+
+3. CONDICION EXACTA DE PENDIENTE
+
+PedidoRepositorio aplica:
+ISNULL(venta.U_SO1_VERIFICADO,'N') <> 'Y'
+AND venta.U_SO1_TIPO = 'PE'
+AND venta.U_SO1_STATUS = 'A'
+
+Además conserva los filtros existentes de fecha, número, almacenes, estado,
+sincronización y clasificación normal/especial.
+
+Lectura real después de la corrección:
+U_SO1_VERIFICADO = N
+U_SO1_STATUS = A
+U_SO1_FACTURA = Y
+
+Estos campos NO fueron modificados. U_SO1_FACTURA no se usa para ocultarlo.
+
+4. PRIORIDAD R1/SAP
+
+Se conserva el comportamiento vigente: R1 se entrega sin esperar una consulta
+SAP que aún no termina; SAP se actualiza en segundo plano y se incorpora cuando
+está disponible. Si SAP responde mientras R1 está terminando, puede aparecer
+en esa misma respuesta. No se retrasa una respuesta SAP ya disponible.
+
+Esto no resolvía la excepción: el pedido R1 seguía cumpliendo su WHERE. El
+repositorio SAP de pendientes devuelve pedidos directos U_SO1_01RETAILONE=N;
+ORDR 961461 tiene Y. No había una fila SAP alternativa que sustituyera a R1.
+La conciliación ahora se aplica sobre el resultado efectivo, no cambiando
+arbitrariamente la prioridad de las fuentes.
+
+5. CAUSA DE LA PRUEBA QUE FALLABA
+
+La prueba "muestra R1 primero e incorpora SAP en la siguiente consulta" simulaba
+una respuesta SAP inmediatamente resuelta, pero esperaba que no se incorporara
+en esa primera consulta. Su escenario no representaba un SAP tardío.
+
+6. CORRECCION DE ESA PRUEBA
+
+La prueba ahora controla explícitamente cuándo responde SAP: primero comprueba
+la respuesta R1 sin bloquearla; después resuelve SAP y verifica la incorporación
+en la siguiente consulta. La lógica productiva de prioridad no fue cambiada.
+También pasa la prueba existente que exige utilizar una actualización SAP
+terminada durante la misma consulta, sin devolver un artículo anterior.
+
+7. EVIDENCIA PARA RELACIONAR LAS DOS RAMAS
+
+Se localizaron campos estructurados en las partidas R1, no solo en cabeceras:
+U_SO1_DOCUMENTOBASE
+U_SO1_PARTIDABASE
+U_SO1_TIPODOCBASE
+U_SO1_PARTIDASBO
+
+Caso real:
+PE SPSS03PE390619, partida 1:
+DOCUMENTOBASE=SPSS04CO60265, PARTIDABASE=1, TIPODOCBASE=CO.
+CO SPSS04CO60265, partida 1:
+PARTIDASBO=2; cabecera DOCUMENTOSBO=100206148.
+OQUT 160052 / 100206148:
+U_SO1_01FOLIORETAIL1=SPSS04CO60265.
+QUT1 LineNum=2, U_SO1_01NUMPARTIDA=1.
+DLN1 de 6669, LineNum=0:
+BaseType=23, BaseEntry=160052, BaseLine=2.
+Artículo YAM-MODX7, TSPS01, Quantity=InvQty=salida OIVL=1.
+
+La partida 2 del PE apunta a la partida 2 del mismo CO, cuyo PARTIDASBO=3.
+QUT1 LineNum=3 tiene U_SO1_01NUMPARTIDA=2.
+DLN1 de 6669, LineNum=1, BaseLine=3: YAM-PA150, BSPS03, cantidad/salida 1.
+
+8. LLAVE ESTRUCTURADA Y CONTRASTE CON OTROS CASOS
+
+Se usa esa cadena estructurada completa. Comments NO es una llave ni un fallback
+de conciliación. Sus textos no se consultan para decidir una exclusión.
+
+Se contrastó el mismo mapeo en:
+SPSS26PE387544 -> SPSS24CO60099 -> OQUT 160108 / 100206168.
+SPSS03PE390640 -> SPSS05CO60280 -> OQUT 160113 / 100206170.
+En el segundo caso se comprobaron diez líneas, con cantidades distintas,
+partidas R1 y LineNum SAP concordantes. No se afirmó que estas cotizaciones
+tuvieran entregas: únicamente verifican el esquema de referencia estructurada.
+
+Para entregas base17, se exige folio R1 de ORDR, DocNum, UDF de partida R1 y
+PARTIDASBO=BaseLine, además de artículo, bodega y unidades.
+Pedidos SAP directos conservan OpenQty; no se descuenta la entrega dos veces.
+
+9. PROTECCION CONTRA FALSOS POSITIVOS
+
+La conciliación requiere la misma línea lógica y referencias estructuradas,
+base SAP exacta, artículo, bodega y unidades compatibles. Se comprueba salida
+OIVL por documento de entrega, línea, artículo y almacén; CANCELED debe ser N.
+
+Se cuentan todas las referencias PE a la base, incluso pedidos verificados o
+cancelados. Si hay más de un destinatario posible, no se reparte ni se reutiliza
+arbitrariamente la salida. Un mismo artículo/cliente/fecha nunca basta.
+
+Una firma SHA-256 de los campos estructurados, unidades, artículo, almacén y
+cantidad R1 impide aplicar evidencia anterior a una partida modificada. Hasta
+su revalidación, esa versión vuelve a considerarse pendiente de forma segura.
+
+Cada request revisa también la validez actual del documento local de entrega.
+Una cancelación, base distinta o línea retirada de la instantánea SAP no sirve
+como cobertura. Las relaciones desactivadas se conservan localmente para
+consulta; no se borran pedidos ni documentos históricos.
+
+Un fallo R1 durante la sincronización no reemplaza relaciones por un lote vacío.
+Un fallo SAP no inventa cobertura ni borra datos; conserva hechos ya comprobados.
+Un fallo de lectura local conserva la lista de pendientes en vez de vaciarla.
+La transferencia vuelve a validar la cobertura local antes de guardar.
+
+10. CANTIDADES PARCIALES
+
+Se acumula cobertura de entregas válidas por partida, sin modificar el objeto
+original del caché R1. Ejemplo probado: pedido 10, entrega 6 -> pendiente 4.
+Una partida no cubierta del mismo pedido permanece visible.
+El detalle pendiente y el traslado utilizan también la cantidad restante.
+Una selección antigua ya entregada se rechaza sin crear un despacho duplicado.
+
+Esta primera conciliación admite unidades 1:1 comprobadas en ambos sistemas:
+R1 CANTUNIMEDINV=1 y Quantity=InvQty en entrega y documento base SAP.
+Se verificó el factor 1 en cantidades R1 reales 2 y 5, además del caso 1.
+Paquetes/conversiones desconocidas NO se convierten por aproximación ni se
+ocultan automáticamente. Esa restricción deliberada evita falsas coberturas.
+
+Se compensa la lectura de cabeceras con relaciones locales antes de aplicar la
+paginación final, evitando que la eliminación de pedidos entregados deje una
+página vacía o salte pedidos posteriores. Los contadores del caso quedan en 0.
+
+11. RESULTADO FINAL DE 101475685
+
+Validación con el handler real /api/pedidos, fuente R1 real y base local real:
+datos=[]
+totalRegistros=0
+hayMas=false
+
+Se persistieron dos relaciones activas con entrega 6669, partidas R1 1 y 2,
+cantidad cubierta 1 en cada una, tipoRelacion=R1_CO_QUT_DLN.
+El pedido original, sus asignaciones y los datos SAP/R1 se conservaron.
+Los pendientes sin relación 101475829 y 101475831 siguieron devolviendo su fila.
+
+12. RESULTADO DE 40968
+
+Identidad: SAP:PAJARO_AZUL:15:6669.
+Una sola cabecera local para DocEntry 6669.
+Dos artículos, una unidad cada uno.
+Estado: Entregado, Sin factura.
+No se creó un historial adicional para el pedido 101475685.
+No se copiaron responsables R1 a la entrega ni se cambió su auditoría.
+
+ODLN 4432 / 200016780 conserva su historial independiente y tiene cero
+conciliaciones: una entrega sin base no elimina pendientes similares.
+
+13. TIEMPOS Y REFRESCO
+
+Comparación reproducible sobre el handler HTTP real, ejecutado con Supertest
+y la misma fuente R1: ruta de control sin conciliación frente a /api/pedidos
+con conciliación. Identidad administrativa de prueba solo dentro del proceso,
+sin crear sesiones ni modificar seguridad del servidor.
+
+Consulta: 101475685, 2026-09-14, página 1, cantidad 25.
+Antes, ms:   249,100,99,89,124.
+Después, ms: 141,153,134,127,147.
+Mediana caliente excluyendo primera lectura: antes 99,5 ms; después 140,5 ms.
+Estos son tiempos locales medidos, no una garantía para el servidor 153 ni
+para otras cargas/redes. Las primeras muestras no son un contraste frío justo.
+
+/api/pedidos no consulta ODLN/OIVL por fila ni realiza cruces históricos SAP.
+Solo añade lecturas locales de relaciones y los campos de firma a la lectura
+R1 normal. La investigación de vínculos ocurre en el sincronizador por lotes.
+
+R1 tiene compatibility_level=110; sus consultas usan parámetros SQL normales,
+no OPENJSON, y no se cambió su nivel de compatibilidad. OPENJSON se utiliza
+exclusivamente en PedidosBodega, donde ya está soportado.
+
+La pantalla mantiene su polling de 5 segundos. Después de detectar/persistir
+la entrega y su vínculo, la siguiente actualización retira la fila sin reload.
+Una prueba nueva comprueba que conserva filtros, ambas páginas y pestaña, y
+que no vacía Pedidos Especiales al retirar un pendiente normal.
+No se cambió el intervalo preexistente del sincronizador de historial ni se
+promete detectar una entrega antes de que ese sincronizador la consulte.
+
+14. BUILD BACKEND
+
+npm run build: correcto.
+ESLint de todos los archivos backend afectados por esta corrección: correcto.
+
+15. BUILD FRONTEND
+
+npm run build: correcto.
+Persisten advertencias previas de presupuesto CSS en app.css, detalle-pedido-
+vista.component.css y lista-pedidos.component.css. No se editaron esos estilos.
+No hay modificaciones productivas de frontend en esta corrección: solo prueba.
+
+16. PRUEBAS
+
+Backend completo, npm test -- src pruebas:
+40 archivos, 209 pruebas aprobadas, ninguna fallida.
+Se especifican src/pruebas para no volver a ejecutar copias compiladas de dist.
+
+Frontend completo, npm test -- --watch=false:
+26 archivos, 141 pruebas aprobadas, ninguna fallida.
+
+26 pruebas nuevas de conciliación cubren pendiente normal, cobertura completa,
+parcial, partida no cubierta, múltiples entregas, sin documento base, mismo
+artículo sin vínculo, ambigüedad, modificación de firma, base17, base23,
+cancelaciones, salida no comprobada, unidad desconocida, fuente caída, error
+local, detalle parcial, traslado parcial y compensación de paginación.
+También pasan las pruebas existentes de historial, auditoría, permisos,
+asignación, reasignación, selección, cambios de artículos y prioridad R1/SAP.
+
+Validación reproducible con datos reales:
+npm run validar:conciliacion-entregas
+Comprueba el handler, cobertura del caso, historial único, entrega sin base,
+campos R1 sin modificar, otro pendiente normal y tiempos comparables.
+
+17. ESCRITURAS, MIGRACION Y ARCHIVOS
+
+Cero escrituras en SAP y R1. Sus consultas pasan por las funciones SELECT-only
+existentes. No se modificó VERIFICADO, STATUS, FACTURA ni inventario de origen.
+Solo se escribió en la base local PedidosBodega para persistir hechos y vínculos.
+
+Migración local 15 aplicada. Agrega ConciliacionEntregaPedido, índices y
+marca activa; conserva fecha de detección, revisión, evidencia y relaciones
+desactivadas. La migración de entregas anterior sigue intacta.
+Comando idempotente para preparar ambas estructuras locales:
+npm run db:migrate:entregas-sap
+Debe ejecutarse antes de levantar esta versión en otra instalación.
+
+Archivos nuevos de esta corrección:
+backend/src/modulos/pedidos/firmaLineaR1.ts
+backend/src/modulos/pedidos/conciliacionEntregaMigracion.ts
+backend/src/modulos/pedidos/conciliacionEntregaPedido.ts
+backend/src/modulos/pedidos/conciliacionEntregaPedido.spec.ts
+backend/scripts/validarConciliacionEntregas.ts
+documentacion/Conciliacion de pendientes y entregas SAP - 2026-09-16.txt
+
+Archivos existentes ajustados en esta corrección:
+backend/package.json
+backend/scripts/migrarEntregasSap.ts
+backend/src/modulos/historial/entregaSap.interface.ts
+backend/src/modulos/historial/entregaSapFuente.ts
+backend/src/modulos/historial/entregaSapSincronizador.ts
+backend/src/modulos/historial/sincronizadorHistorial.ts
+backend/src/modulos/pedidos/pedido.interface.ts
+backend/src/modulos/pedidos/pedidoRepositorio.ts
+backend/src/modulos/pedidos/pedidoServicio.ts
+backend/src/modulos/pedidos/pedidoRutas.ts
+backend/src/modulos/despachos/lineaDespachoOrigenRepositorio.ts
+backend/src/modulos/despachos/despachoServicio.ts
+backend/src/modulos/despachos/despachoRutas.ts
+backend/pruebas/pedidoServicio.test.ts
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.spec.ts
+
+No se hizo commit, merge ni push. No se actualizó el servidor remoto.

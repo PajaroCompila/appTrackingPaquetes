@@ -6,7 +6,6 @@ import {
   esquemaConsultaAsignaciones,
   esquemaGuardarAsignacion,
   puedeAsignarPedidos,
-  puedeReasignarPedidos,
   resolverTecnicoAsignable,
   tecnicosAsignables,
   usuariosAsignablesParaSesion,
@@ -20,31 +19,6 @@ const usuarioNormal = {
 };
 
 describe('asignaciones de artículos', () => {
-  it('entrega la hora del servidor y conserva la fecha de la primera asignacion', async () => {
-    const asignadoEn = new Date('2026-09-10T15:00:00.000Z');
-    const consultar = vi.fn().mockResolvedValue([{
-      idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz',
-      asignadoEn, actualizadoEn: new Date('2026-09-10T15:04:00.000Z'),
-    }]);
-    const aplicacion = express();
-    aplicacion.use(express.json());
-    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
-      consultar,
-    } as unknown as AsignacionRepositorio));
-
-    const respuesta = await solicitud(aplicacion)
-      .post('/api/pedidos/asignaciones/consultar')
-      .send({ lineas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }] });
-
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body.datos[0].asignadoEn).toBe(asignadoEn.toISOString());
-    expect(Number.isFinite(Date.parse(respuesta.body.horaServidor))).toBe(true);
-    expect(consultar).toHaveBeenCalledWith([
-      { idOrigen: 'R1:F1', identificadorDetalle: '1' },
-    ]);
-  });
-
   it('permite asignar a administradores, gcruz, acalix, jlara y Tommy', () => {
     expect(puedeAsignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'GCRUZ')).toBe(true);
@@ -53,15 +27,6 @@ describe('asignaciones de artículos', () => {
     expect(puedeAsignarPedidos('CONSULTA', 'TLOPEZ')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'otro')).toBe(false);
     expect(puedeAsignarPedidos('CONSULTA', 'otro')).toBe(false);
-  });
-
-  it('permite reasignar al administrador, gcruz, acalix, jlara y Tommy', () => {
-    expect(puedeReasignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
-    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'gcruz')).toBe(true);
-    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'acalix')).toBe(true);
-    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'jlara')).toBe(true);
-    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'tlopez')).toBe(true);
-    expect(puedeReasignarPedidos('OPERADOR_BODEGA', 'otro')).toBe(false);
   });
 
   it('mantiene el catálogo autorizado de siete técnicos', () => {
@@ -164,34 +129,6 @@ describe('asignaciones de artículos', () => {
       ],
       puedeAsignar: true,
       puedeAsignarTodos: false,
-      puedeReasignar: true,
-    });
-  });
-
-  it('expone solamente a Tommy y habilita su permiso de reasignación', async () => {
-    const aplicacion = express();
-    aplicacion.use((peticion, _respuesta, siguiente) => {
-      peticion.user = {
-        usuarioId: '00000000-0000-0000-0000-000000000001',
-        nombreUsuario: 'tlopez',
-        nombreVisible: 'Tommy López',
-        codigoRol: 'OPERADOR_BODEGA',
-        codigoAlmacen: 'TCIR01',
-        sesionId: 'sesion-prueba',
-        debeCambiarContrasena: false,
-      };
-      siguiente();
-    });
-    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({} as AsignacionRepositorio));
-
-    const respuesta = await solicitud(aplicacion).get('/api/pedidos/asignaciones/usuarios');
-
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual({
-      datos: [{ usuario: 'tlopez', nombre: 'Tommy López' }],
-      puedeAsignar: true,
-      puedeAsignarTodos: false,
-      puedeReasignar: true,
     });
   });
 
@@ -221,7 +158,6 @@ describe('asignaciones de artículos', () => {
       datos: tecnicosAsignables,
       puedeAsignar: true,
       puedeAsignarTodos: true,
-      puedeReasignar: true,
     });
   });
 
@@ -335,107 +271,6 @@ describe('asignaciones de artículos', () => {
       mensaje: 'Este pedido/artículo ya fue asignado.',
       datos: { usuarioAsignado: 'mperez', nombreAsignado: 'Marcos Perez' },
     });
-  });
-
-  it('reasigna con versión esperada y rechaza una versión que ya cambió', async () => {
-    const actualizadaEn = new Date('2026-09-09T15:00:00.000Z');
-    const asignacion = { idOrigen: 'R1:F1', identificadorDetalle: '1',
-      usuarioAsignado: 'gcruz', nombreAsignado: 'Gregorio Cruz', actualizadoEn: new Date() };
-    const reasignar = vi.fn()
-      .mockResolvedValueOnce({ asignacion, actualizada: true })
-      .mockResolvedValueOnce({ asignacion, actualizada: false });
-    const aplicacion = express();
-    aplicacion.use(express.json());
-    aplicacion.use((peticion, _respuesta, siguiente) => { peticion.user = {
-      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'sistemas',
-      nombreVisible: 'Sistemas', codigoRol: 'ADMINISTRADOR', codigoAlmacen: null,
-      sesionId: 'sesion-prueba', debeCambiarContrasena: false,
-    }; siguiente(); });
-    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
-      reasignar,
-    } as unknown as AsignacionRepositorio));
-    const cuerpo = { idOrigen: 'R1:F1', identificadorDetalle: '1', usuarioAsignado: 'gcruz',
-      actualizadoEn: actualizadaEn.toISOString() };
-
-    const guardada = await solicitud(aplicacion).patch('/api/pedidos/asignaciones/reasignar').send(cuerpo);
-    const conflicto = await solicitud(aplicacion).patch('/api/pedidos/asignaciones/reasignar').send(cuerpo);
-
-    expect(guardada.status).toBe(200);
-    expect(conflicto.status).toBe(409);
-    expect(reasignar).toHaveBeenCalledWith(expect.objectContaining({ idOrigen: 'R1:F1' }),
-      expect.objectContaining({ usuario: 'gcruz' }), expect.any(String), actualizadaEn);
-  });
-
-  it.each([
-    ['jlara', 'Jorge Lara', 'acalix', 'R1:F1'],
-    ['acalix', 'Ana Calix', 'jlara', 'R1:F1'],
-    ['tlopez', 'Tommy López', 'tlopez', 'SAP:101'],
-  ])('autoriza una sola reasignación válida para %s', async (
-    nombreUsuario, nombreVisible, usuarioAsignado, idOrigen,
-  ) => {
-    const actualizadoEn = '2026-09-11T15:00:00.000Z';
-    const reasignar = vi.fn().mockResolvedValue({
-      actualizada: true,
-      asignacion: {
-        idOrigen,
-        identificadorDetalle: '1',
-        usuarioAsignado,
-        nombreAsignado: nombreVisible,
-        asignadoEn: new Date('2026-09-11T14:50:00.000Z'),
-        actualizadoEn: new Date('2026-09-11T15:01:00.000Z'),
-      },
-    });
-    const aplicacion = express();
-    aplicacion.use(express.json());
-    aplicacion.use((peticion, _respuesta, siguiente) => {
-      peticion.user = {
-        usuarioId: '00000000-0000-0000-0000-000000000001',
-        nombreUsuario,
-        nombreVisible,
-        codigoRol: 'OPERADOR_BODEGA',
-        codigoAlmacen: nombreUsuario === 'tlopez' ? 'TCIR01' : null,
-        sesionId: 'sesion-prueba',
-        debeCambiarContrasena: false,
-      };
-      siguiente();
-    });
-    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
-      reasignar,
-    } as unknown as AsignacionRepositorio));
-
-    const respuesta = await solicitud(aplicacion)
-      .patch('/api/pedidos/asignaciones/reasignar')
-      .send({ idOrigen, identificadorDetalle: '1', usuarioAsignado, actualizadoEn });
-
-    expect(respuesta.status).toBe(200);
-    expect(reasignar).toHaveBeenCalledOnce();
-  });
-
-  it('mantiene bloqueada la reasignación para usuarios no autorizados', async () => {
-    const reasignar = vi.fn();
-    const aplicacion = express();
-    aplicacion.use(express.json());
-    aplicacion.use((peticion, _respuesta, siguiente) => {
-      peticion.user = {
-        usuarioId: '00000000-0000-0000-0000-000000000001',
-        nombreUsuario: 'otro', nombreVisible: 'Otro usuario', codigoRol: 'OPERADOR_BODEGA',
-        codigoAlmacen: null, sesionId: 'sesion-prueba', debeCambiarContrasena: false,
-      };
-      siguiente();
-    });
-    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({
-      reasignar,
-    } as unknown as AsignacionRepositorio));
-
-    const respuesta = await solicitud(aplicacion)
-      .patch('/api/pedidos/asignaciones/reasignar')
-      .send({
-        idOrigen: 'R1:F1', identificadorDetalle: '1', usuarioAsignado: 'gcruz',
-        actualizadoEn: '2026-09-11T15:00:00.000Z',
-      });
-
-    expect(respuesta.status).toBe(403);
-    expect(reasignar).not.toHaveBeenCalled();
   });
 
   it('valida identidades estables y exige un técnico para confirmar', () => {

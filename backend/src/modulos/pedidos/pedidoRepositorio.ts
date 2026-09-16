@@ -9,6 +9,8 @@ import type {
   PartidaPedido,
   PedidoResumen,
 } from './pedido.interface.js';
+import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoSla.js';
+import { COLUMNAS_REFERENCIA_LINEA_R1, firmaLineaR1, type ReferenciaLineaR1 } from './firmaLineaR1.js';
 
 interface FilaPedido {
   folioPedido: string;
@@ -24,7 +26,7 @@ interface FilaPedido {
   totalRegistros: number;
 }
 
-interface FilaPartida {
+interface FilaPartida extends ReferenciaLineaR1 {
   numeroPartida: number | null;
   codigoArticulo: string | null;
   descripcionArticulo: string | null;
@@ -34,7 +36,7 @@ interface FilaPartida {
   codigoEstadoEntrega: string | null;
 }
 
-interface FilaArticuloResumen {
+interface FilaArticuloResumen extends ReferenciaLineaR1 {
   folioPedido: string;
   numeroPartida: number | null;
   codigoArticulo: string | null;
@@ -76,6 +78,7 @@ function mapearPedido(fila: FilaPedido, codigoFuente = ''): PedidoResumen {
 
 function mapearPartida(fila: FilaPartida): PartidaPedido {
   return {
+    firmaConciliacion: firmaLineaR1(fila, fila.codigoArticulo, fila.codigoAlmacen, fila.cantidadSolicitada),
     numeroPartida: fila.numeroPartida === null ? null : String(fila.numeroPartida),
     codigoArticulo: normalizarTexto(fila.codigoArticulo),
     descripcionArticulo: normalizarTexto(fila.descripcionArticulo),
@@ -116,6 +119,12 @@ export class PedidoRepositorio implements IPedidoRepositorio {
               WHERE detalle.[U_SO1_FOLIO] = venta.[Name]
                 AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})
             )` : '';
+    const coincidenciaEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
+      `UPPER(ISNULL(vendedor.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
+    const condicionClasificacion = filtros.clasificacion === 'especial'
+      ? `AND ${coincidenciaEspecial}`
+      : filtros.clasificacion === 'normal' ? `AND NOT ${coincidenciaEspecial}` : '';
+    const orden = filtros.orden === 'desc' ? 'DESC' : 'ASC';
 
     try {
       const resultado = await consultarSistemaOrigen<FilaPedido>(`
@@ -175,11 +184,12 @@ export class PedidoRepositorio implements IPedidoRepositorio {
             AND (@codigoEstadoVenta IS NULL OR venta.[U_SO1_STATUS] = @codigoEstadoVenta)
             AND (@codigoSincronizacion IS NULL OR venta.[U_SO1_SINCRONIZADO] = @codigoSincronizacion)
             ${condicionAlmacenes}
+            ${condicionClasificacion}
           ORDER BY
             CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN 1 ELSE 0 END,
-            venta.[U_SO1_FECHA] ASC,
-            venta.[U_SO1_HORA] ASC,
-            venta.[Name] ASC
+            venta.[U_SO1_FECHA] ${orden},
+            venta.[U_SO1_HORA] ${orden},
+            venta.[Name] ${orden}
           OFFSET @desplazamiento ROWS
           FETCH NEXT @cantidadConsulta ROWS ONLY
           OPTION (RECOMPILE);
@@ -194,6 +204,9 @@ export class PedidoRepositorio implements IPedidoRepositorio {
           .input('cantidadConsulta', sql.Int, cantidadConsulta);
         codigosAlmacen.forEach((codigoAlmacen, indice) => {
           solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigoAlmacen);
+        });
+        NOMBRES_VENDEDORES_ESPECIALES.forEach((nombre, indice) => {
+          solicitud.input(`vendedorEspecial${indice}`, sql.NVarChar(30), `%${nombre}%`);
         });
         return solicitud;
       }, this.proveedorPool);
@@ -212,6 +225,7 @@ export class PedidoRepositorio implements IPedidoRepositorio {
               detalle.[U_SO1_NUMEROARTICULO] AS codigoArticulo,
               detalle.[U_SO1_DESCRIPCION] AS descripcion,
               detalle.[U_SO1_CANTIDAD] AS cantidad,
+              ${COLUMNAS_REFERENCIA_LINEA_R1},
               detalle.[U_SO1_ALMACEN] AS codigoAlmacen,
               almacen.[U_SO1_NOMBREALMACEN] AS nombreAlmacen
             FROM [dbo].[@SO1_01VENTADETALLE] AS detalle
@@ -236,6 +250,7 @@ export class PedidoRepositorio implements IPedidoRepositorio {
           pedido.articulos = resultadoArticulos.recordset
             .filter((articulo) => articulo.folioPedido === pedido.folioPedido)
             .map((articulo) => ({
+              firmaConciliacion: firmaLineaR1(articulo, articulo.codigoArticulo, articulo.codigoAlmacen, articulo.cantidad),
               identificadorDetalle: articulo.numeroPartida == null ? null : String(articulo.numeroPartida),
               codigoArticulo: normalizarTexto(articulo.codigoArticulo),
               descripcion: normalizarTexto(articulo.descripcion),
@@ -339,6 +354,7 @@ export class PedidoRepositorio implements IPedidoRepositorio {
             detalle.[U_SO1_NUMEROARTICULO] AS codigoArticulo,
             detalle.[U_SO1_DESCRIPCION] AS descripcionArticulo,
             detalle.[U_SO1_CANTIDAD] AS cantidadSolicitada,
+            ${COLUMNAS_REFERENCIA_LINEA_R1},
             detalle.[U_SO1_ALMACEN] AS codigoAlmacen,
             almacen.[U_SO1_NOMBREALMACEN] AS nombreAlmacen,
             detalle.[U_SO1_STATUSENTREGA] AS codigoEstadoEntrega

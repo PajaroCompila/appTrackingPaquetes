@@ -28,6 +28,7 @@ export interface PedidoResumen {
 }
 
 export interface ArticuloPedidoResumen {
+  firmaConciliacion?: string;
   identificadorDetalle?: string | null;
   transferidoEn?: string | null;
   usuarioTransferencia?: string | null;
@@ -40,6 +41,7 @@ export interface ArticuloPedidoResumen {
 }
 
 export interface PartidaPedido {
+  firmaConciliacion?: string;
   numeroPartida: string | null;
   codigoArticulo: string | null;
   descripcionArticulo: string | null;
@@ -64,6 +66,8 @@ export interface FiltrosPedidos {
   pagina: number;
   cantidadPorPagina: number;
   vista?: 'articulos' | 'pedido';
+  clasificacion?: 'normal' | 'especial';
+  orden?: 'asc' | 'desc';
 }
 
 export type TipoCambioPedido = 'AGREGADO' | 'ELIMINADO' | 'CANTIDAD' | 'BODEGA';
