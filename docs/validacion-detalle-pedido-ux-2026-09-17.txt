@@ -1,0 +1,167 @@
+VALIDACIÓN — DETALLE DEL PEDIDO PENDIENTE
+Fecha: 17/09/2026
+Proyecto: C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+
+Alcance: solicitudes de UX/simetría y ajuste adicional de selección desde encabezados.
+La solicitud adicional reemplaza el botón Seleccionar todos por IMPRIMIR TODO.
+No se realizó commit ni push. HEAD sigue en e774c0fbed39f15adbedb88f9223232e7db3ed05.
+
+1. CAUSA REAL DEL PARPADEO
+En DetallePedidoComponent.cargarAsignaciones se vaciaba el mapa de asignaciones
+antes de cada consulta. Los responsables visibles pasaban a Sin asignar y volvían
+al llegar la respuesta. También se publicaban objetos nuevos aunque el contenido
+del pedido y sus asignaciones fueran idénticos, disparando actualizaciones del hijo.
+No se atribuye el problema a una recarga completa del navegador.
+
+2. REFRESCO SILENCIOSO
+Se mantiene el polling existente de 5 segundos, sin añadir delays ni setTimeout.
+El loader se utiliza únicamente al entrar a un pedido sin datos cargados.
+Los refrescos y reintentos de un detalle ya cargado mantienen los datos visibles.
+No se vacían las asignaciones durante las consultas.
+Solo se publican pedidos/asignaciones cuando cambia su contenido.
+Las consultas lentas del detalle y de responsables no se superponen; se conserva
+el refresco pendiente para ejecutarlo al terminar la petición en curso.
+Se descartan respuestas anteriores a una transferencia, cambio de pedido o
+actualización de responsables emitida por el modal existente.
+El estado de impresión continúa consultándose aunque el pedido no haya cambiado.
+
+3. ESTADO DE INTERACCIÓN
+Impresión y transferencia usan selecciones independientes, identificadas por
+idOrigen + identificadorDetalle. No se mezclan los contadores.
+Se conservan las bodegas seleccionadas/desactivadas, las filas que continúan
+presentes, el scroll, el modal abierto y el usuario temporal elegido en él.
+Se eliminan de la selección las líneas retiradas o que ya no sean visibles/válidas,
+respetando el comportamiento del filtro interno existente.
+Una transferencia fallida conserva selección y datos para permitir reintentar.
+
+4. IDENTIDAD ESTABLE DE FILAS
+La clave real es `${idOrigen}:${numeroPartida.trim()}`.
+@for conserva los nodos de filas con esa identidad cuando cambia su contenido.
+El índice solo queda como fallback para datos sin identificador real; esas líneas
+no son transferibles sin identidad válida.
+
+5. BADGE
+El contador N artículos está inmediatamente a la derecha de Artículos del pedido,
+en la misma línea cuando el ancho lo permite, con separación de .65rem.
+Se conservan fondo, borde, padding, tipografía y dimensiones de la insignia previa.
+La línea Bodegas del pedido / Seleccionar bodegas / chips no cambia de comportamiento.
+
+6. DISTRIBUCIÓN FINAL
+Izquierda: ARTÍCULOS y, debajo, Artículos del pedido [N artículos].
+Derecha: Transferir a despachados (N) | Imprimir seleccionados (N).
+Se quitó el botón Seleccionar todos en el detalle pendiente.
+Ambos botones siguen siendo acciones explícitas; los encabezados solo seleccionan.
+El botón de transferencia conserva las clases globales boton / boton-primario
+utilizadas por Pedidos de bodega, incluidos sus colores, borde, hover y disabled.
+La selección de transferencia reproduce el selector circular de la pantalla
+principal: círculo blanco, borde #8199b2 y marcado #287052 con check blanco.
+No se modifica la pantalla principal para obtener esta coincidencia.
+En anchos pequeños los botones se acomodan en filas ordenadas, sin reducir texto.
+
+7. SELECCIÓN Y HABILITACIÓN
+TRANSFERIR TODO alterna todas las líneas visibles transferibles, respetando las
+restricciones operativas existentes. La selección individual sigue funcionando.
+IMPRIMIR TODO reutiliza seleccionarTodos(): alterna únicamente las casillas de
+impresión visibles y permitidas. No imprime ni registra auditoría por sí mismo.
+Al desmarcar una fila disminuye inmediatamente el contador correspondiente.
+Con cero líneas de transferencia el botón está deshabilitado; con una o más
+líneas válidas se habilita con el azul corporativo existente.
+Durante operaciones incompatibles se bloquean los controles para evitar duplicados.
+
+8. OPERACIÓN EXISTENTE REUTILIZADA
+PedidosService.despacharLineas, exactamente el mismo servicio de la pantalla principal.
+POST /api/pedidos-despachados con { lineas: [{ idOrigen, identificadorDetalle }] }.
+No se agregan endpoints, estados de despacho ni reglas de negocio en backend.
+Los roles autorizados se corresponden con el endpoint existente:
+ADMINISTRADOR y OPERADOR_BODEGA. Se conserva puedeOperarPartida sin ampliar permisos.
+El servidor sigue resolviendo transferencia, omisiones y rechazos.
+
+9. RESULTADO DE LA TRANSFERENCIA
+Se retiran inmediatamente solo las líneas reconocidas como transferidas por el
+backend. Después se solicita un refresco silencioso del detalle.
+No se utiliza window.location.reload ni navegación automática.
+Si quedan partidas pendientes, el usuario permanece en el mismo detalle.
+Si se transfieren todas, se reutiliza el estado vacío existente:
+Este pedido no tiene artículos.
+Un 404 en el refresco posterior no reemplaza ese estado por un error global.
+
+10. ARCHIVOS DE ESTE AJUSTE
+Modificados:
+frontend/src/app/funcionalidades/pedidos/detalle-pedido.component.ts
+frontend/src/app/funcionalidades/pedidos/detalle-pedido.component.html
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.ts
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.html
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.css
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-herramientas.component.spec.ts
+
+Nuevos:
+frontend/src/app/compartido/detalle-pedido/encabezado-articulos-detalle.component.ts
+frontend/src/app/compartido/detalle-pedido/encabezado-articulos-detalle.component.html
+frontend/src/app/compartido/detalle-pedido/encabezado-articulos-detalle.component.css
+frontend/src/app/compartido/detalle-pedido/controles-seleccion-detalle.component.ts
+frontend/src/app/funcionalidades/pedidos/detalle-pedido-ux.component.spec.ts
+docs/validacion-detalle-pedido-ux-2026-09-17.txt
+
+La única modificación de la prueba previa de herramientas cambia el control
+clickeado: del botón eliminado al encabezado IMPRIMIR TODO. Mantiene las mismas
+expectativas de selección; representa el nuevo requisito solicitado.
+Los componentes nuevos encapsulan exclusivamente el encabezado y los controles
+del detalle pendiente, sin aumentar presupuestos CSS ni alterar estilos globales.
+
+11. VALIDACIÓN
+Frontend npm run build: correcto.
+Advertencias de presupuesto CSS, sin errores: detalle compartido 7.86 kB,
+ListaPedidos 7.92 kB y app 7.76 kB. No se aumentaron presupuestos.
+ESLint de los archivos de implementación/pruebas involucrados: correcto.
+git diff --check: correcto.
+
+Pruebas focalizadas:
+npm test -- --watch=false --include='**/detalle-pedido*.spec.ts'
+  --include='**/lista-pedidos-reasignacion.component.spec.ts'
+82 pruebas correctas, 5 archivos correctos. Incluye 24 pruebas nuevas de este ajuste.
+
+Suite general frontend:
+npm test -- --watch=false
+211 pruebas: 201 correctas y 10 fallos previos en lista-pedidos.component.spec.ts.
+No se modificó ese archivo ni ListaPedidos en este ajuste.
+Persisten exactamente los fallos de la línea base: dos listas/columnas, parámetros
+de página/vista, número de consultas de ambas listas, concurrencia, reintento,
+franjas duplicadas por las dos listas, interacción de paginación y HTTP 400/503/500.
+No se presenta la suite completa como verde.
+
+Edge real sobre el frontend de http://192.168.10.169:4400, con respuestas API y
+sesión de prueba interceptadas en un contexto aislado, sin escribir en la base real.
+Esto valida interfaz e integración del cliente; no constituye una transferencia
+real en producción ni una comprobación con una sesión operativa real.
+
+Casos comprobados en navegador:
+- Consulta de responsables retenida deliberadamente: datos/nombres permanecen.
+- Polling sin destruir la fila DOM existente ni mostrar skeleton.
+- Selecciones de impresión y transferencia conservadas por separado.
+- Bodega desactivada y scroll conservados.
+- Modal abierto y usuario elegido conservados durante el refresco.
+- Estado Impreso y consulta periódica de impresión conservados.
+- IMPRIMIR TODO y TRANSFERIR TODO seleccionan solo lo visible.
+- Selección individual baja contadores; encabezados permiten desmarcar todo.
+- No existe botón Seleccionar todos en el detalle pendiente.
+- Transferencia usa el POST existente y retira líneas sin navegación/recarga.
+- Transferencia completa reutiliza el estado vacío existente.
+- Responsive a 1920, 1366, 768 y 390 px: sin desbordamiento de página ni botones.
+- Botones alineados, de igual altura, con fuente de 14 px.
+- Capturas revisadas visualmente en escritorio, tablet y móvil.
+- Sin errores JavaScript.
+- Prueba adicional de impresión/asignación/filtro y SLA previo: correcta,
+  también con API controlada y sin escrituras reales.
+
+Evidencia temporal:
+C:\Users\alexander\AppData\Local\Temp\pedidos-devueltos-qa-1789590226543\detalle-ux-169.cjs
+En esa misma carpeta: detalle-ux-169-resultados.json y detalle-ux-1920.png,
+detalle-ux-1366.png, detalle-ux-768.png, detalle-ux-390.png.
+
+12. ALCANCE PRESERVADO
+No se modificaron backend, SAP, R1, otras pantallas, reglas de responsables,
+asignación/reasignación, inventario, SLA, auditoría, impresión real, formato de
+impresión, modal de impresión, filtros globales, sidebar, notificaciones ni sonido.
+Se preservan los cambios pendientes anteriores del repositorio.
+Frontend y backend existentes continúan levantados; ambos respondieron HTTP 200.
+NO COMMIT / NO PUSH.

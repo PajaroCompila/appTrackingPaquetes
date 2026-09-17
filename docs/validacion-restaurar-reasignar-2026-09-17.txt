@@ -1,0 +1,173 @@
+RESTAURACIÓN PUNTUAL DE REASIGNAR — SERVIDOR 169
+Fecha: 17/09/2026
+Repositorio: C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+Rama: main
+HEAD de referencia: e774c0fbed39f15adbedb88f9223232e7db3ed05
+Publicación: SIN COMMIT / SIN PUSH.
+
+1. CAUSA EXACTA
+El backend dejó de enviar puedeReasignar en GET /usuarios y eliminó PATCH
+/reasignar. En el frontend también se eliminó la lectura de ese permiso.
+La señal puedeReasignar permanecía en false y el @if ocultaba el botón.
+Además, se había quitado la excepción que permite editar el combo de una
+asignación desbloqueada y la protección del borrador durante el refresco.
+
+2. CAMBIO QUE LO PROVOCÓ
+El diff entre 059dd77 y e774c0f muestra las eliminaciones descritas en las
+rutas y en ListaPedidos. La regresión está en e774c0f.
+Se restauraron fragmentos puntuales; no se copiaron archivos completos,
+no se revirtió el proyecto y no se utilizaron comandos destructivos.
+
+3. CAPAS AFECTADAS
+Ambas: backend y frontend.
+El método real AsignacionRepositorio.reasignar seguía existiendo.
+Se reutilizó ese método, sin modificar el repositorio SQL.
+
+4. ENDPOINT FINAL
+PATCH /api/pedidos/asignaciones/reasignar
+Cuerpo: idOrigen, identificadorDetalle, usuarioAsignado, actualizadoEn.
+Usa la autenticación y el requisito de contraseña actualizada existentes.
+Valida identidad, catálogo autorizado y versión de la asignación local.
+Devuelve la asignación actualizada; si cambió la versión devuelve 409 y
+el responsable vigente. No crea una asignación cuando no existe la línea.
+Conserva la auditoría existente: actor de sesión y fecha de actualización.
+No recibe el actor desde el cuerpo y no introduce nuevas tablas.
+
+5. CONDICIÓN DE PERMISOS
+ADMINISTRADOR o nombre de usuario normalizado en:
+gcruz, jlara, acalix, tlopez.
+El endpoint de usuarios vuelve a informar puedeReasignar y el frontend
+lo utiliza. Los demás usuarios no reciben acceso a Reasignar.
+Los catálogos vigentes no se ampliaron.
+
+6. ADMINISTRADOR
+Conserva los siete responsables autorizados:
+Marcos Perez, Gregorio Cruz, Olvin Perdomo, Osmar Mencia,
+Manuel A. Perdomo, Orlin Smith, Daniel Velasquez.
+Puede Asignar y Reasignar usando los botones correspondientes.
+
+7. GCRUZ
+Conserva los mismos siete responsables y capacidad de reasignación.
+
+8. JLARA
+Únicamente Jorge Lara y Ana Calix.
+Puede reasignar entre ambos. Las operaciones compartidas entre estos
+usuarios siguen permitidas después de cambiar el responsable.
+
+9. ACALIX
+Únicamente Jorge Lara y Ana Calix.
+Puede reasignar entre ambos, con la misma regla compartida vigente.
+
+10. TLOPEZ
+Conserva únicamente Tommy López en el catálogo de asignación.
+Conserva la restricción vigente a pedidos R1 de Circunvalación:
+idOrigen comienza con R1:TCIR01:.
+Puede tomar para sí una asignación CIR que tenga otro responsable.
+No se ampliaron sus bodegas, su lista ni sus permisos de inventario.
+
+11. ARCHIVOS DE ESTA CORRECCIÓN
+Producción:
+- backend/src/modulos/asignaciones/asignacionRutas.ts
+- frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.ts
+- frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.html
+Pruebas:
+- backend/src/modulos/asignaciones/asignacionRutas.spec.ts
+- frontend/src/app/funcionalidades/pedidos/lista-pedidos-reasignacion.component.spec.ts (nuevo)
+Reporte:
+- docs/validacion-restaurar-reasignar-2026-09-17.txt (este archivo)
+No se modificaron estilos CSS, dimensiones, clases, columnas ni textos.
+El árbol ya contenía trabajo pendiente del control de impresión. Sus 18
+archivos registrados antes de esta tarea conservan exactamente sus hashes
+SHA-256 originales. Esos cambios no forman parte de esta corrección.
+
+12. BACKEND: BUILD Y PRUEBAS
+npm run build: correcto.
+Suite completa npm test: 74 archivos, 443 pruebas aprobadas, cero fallos.
+Pruebas de asignacionRutas: 29 aprobadas.
+Lint de rutas y pruebas relacionadas: correcto.
+Se comprobó el repositorio real contra SQL local dentro de una transacción:
+Asignar -> Reasignar -> rechazo de versión antigua -> rechazo de línea
+inexistente. Se verificaron el actor actualizado y la fecha inicial intacta.
+La prueba terminó con ROLLBACK y SELECT comprobó cero asignaciones de prueba
+restantes. No se modificaron pedidos reales, SAP ni R1.
+
+13. FRONTEND: BUILD Y PRUEBAS
+npm run build: correcto. Continúan avisos de presupuestos CSS existentes.
+Pruebas específicas nuevas de reasignación: 14 aprobadas.
+Lint de TS, HTML y prueba nueva relacionados: correcto.
+Suite completa: 30 archivos; 153 pruebas aprobadas, 10 fallidas de 163.
+Los 10 fallos permanecen en lista-pedidos.component.spec.ts y corresponden
+a los mismos fallos registrados antes de esta corrección:
+- carga pedidos, catálogo y los nuevos datos operativos;
+- busca y limpia filtros reiniciando la página;
+- actualiza periódicamente con filtros aplicados sin perder selección ni modal;
+- no cancela ni superpone una consulta que tarda más que el intervalo;
+- conserva los datos ante un error temporal y vuelve a intentar;
+- crea una franja completa para el primer, intermedio y último artículo;
+- habilita la navegación según página y hayMás;
+- manejo HTTP 400;
+- manejo HTTP 503;
+- manejo HTTP 500.
+No se modificó esa prueba heredada ni la lógica ajena a reasignación para
+ocultar los fallos. La suite frontend general NO está completamente verde.
+
+14. VALIDACIÓN VISUAL EN 169 Y LÍMITE DE LA COMPROBACIÓN
+La app real seguía levantada desde este repositorio en 192.168.10.169:4400.
+Se abrió /pedidos en Edge y se ejecutó el frontend realmente servido por
+169; no se validó solamente el contenido del HTML fuente.
+Para no modificar pedidos reales ni obtener credenciales se interceptaron
+las respuestas API con sesiones y datos controlados para los cinco perfiles.
+Se confirmó en la interfaz renderizada:
+- Asignar | Reasignar visibles para los cinco perfiles autorizados;
+- listas vigentes sin ampliaciones;
+- combo bloqueado cuando la asignación está confirmada;
+- apertura de edición y guardado explícito por Reasignar;
+- conservación del borrador tras el intervalo de 15 segundos;
+- responsable confirmado conservado al recargar en el escenario de prueba;
+- selección para transferencia y botón Transferir habilitados al corresponder;
+- enlace de detalle disponible;
+- ausencia de errores JavaScript en los cinco escenarios.
+Las capturas a 1920 x 1080 fueron inspeccionadas para ADMINISTRADOR, JLARA
+y TLOPEZ. Los botones conservan las clases y CSS existentes; en esa resolución
+miden aproximadamente 101.86 x 30.09 px.
+Evidencia temporal:
+C:\Users\alexander\AppData\Local\Temp\pedidos-devueltos-qa-1789590226543\
+  reasignar-169-resultados.json
+  reasignar-169-sistemas.png
+  reasignar-169-gcruz.png
+  reasignar-169-jlara.png
+  reasignar-169-acalix.png
+  reasignar-169-tlopez.png
+IMPORTANTE: esta validación visual utilizó API simulada. No equivale a una
+prueba manual autenticada de extremo a extremo contra los pedidos reales.
+Una ventana nueva sin simulación redirige a login tanto en 153 como en 169.
+No se pudo comparar visualmente una sesión autenticada del 153.
+Queda pendiente la revisión manual con sesión real proporcionada por el
+usuario; se solicitó que inicie sesión sin compartir su contraseña.
+
+15. COMBO Y BOTONES
+Seleccionar un responsable no envía una escritura ni persiste el cambio.
+Asignar confirma solamente una línea que no tiene responsable.
+En una línea asignada, el primer clic en Reasignar abre la edición del combo
+mediante el mecanismo de desbloqueo existente. No guarda ni libera la fila
+para operaciones que antes estuvieran prohibidas.
+Después de seleccionar un responsable distinto, el siguiente clic en
+Reasignar llama exclusivamente al endpoint restaurado y confirma el cambio.
+Asignar no sustituye al botón Reasignar.
+La función desbloquearAsignacion existente se conserva: abrir edición y
+cambiar responsable continúan siendo operaciones distintas.
+Un refresco periódico conserva el borrador. Recargar completamente sin
+confirmar recupera la asignación persistida, no el borrador sin guardar.
+Un conflicto 409 actualiza el responsable visible y libera el estado de
+guardado. Un error temporal también libera ese estado y permite reintentar.
+
+16. ALCANCE Y PUBLICACIÓN
+No se modificaron Pedidos Devueltos, Historial, Despachados, entregas SAP,
+grupos, filtros, SLA, tiempos, colores, notificaciones, campana, audio,
+impresión, inventario, encabezados, sidebar, usuarios ni tablas ajenas.
+No se alteró puedeOperarArticulo ni la regla de transferencia.
+Se conservaron los trabajos pendientes previos comprobando sus hashes.
+No hubo escrituras SAP/R1. La prueba local de asignación se revirtió.
+No se realizaron commit, push ni merge.
+Pendiente antes de dar por terminada la validación manual solicitada:
+revisar /pedidos en 169 con una sesión real autenticada.

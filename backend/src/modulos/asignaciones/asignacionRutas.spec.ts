@@ -1,16 +1,23 @@
-import express from 'express';
+import express, { type ErrorRequestHandler } from 'express';
+import cookieParser from 'cookie-parser';
 import solicitud from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   crearAsignacionRutas,
   esquemaConsultaAsignaciones,
   esquemaGuardarAsignacion,
   puedeAsignarPedidos,
+  puedeReasignarPedidos,
+  esquemaReasignar,
   resolverTecnicoAsignable,
   tecnicosAsignables,
   usuariosAsignablesParaSesion,
 } from './asignacionRutas.js';
 import type { AsignacionRepositorio } from './asignacionRepositorio.js';
+import { AutenticacionServicio } from '../autenticacion/autenticacionServicio.js';
+import { requerirAutenticacion, requerirContrasenaActualizada } from '../autenticacion/autenticacionMiddleware.js';
+import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
+import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 
 const usuarioNormal = {
   codigoRol: 'OPERADOR_BODEGA',
@@ -129,6 +136,7 @@ describe('asignaciones de artículos', () => {
       ],
       puedeAsignar: true,
       puedeAsignarTodos: false,
+      puedeReasignar: true,
     });
   });
 
@@ -158,6 +166,7 @@ describe('asignaciones de artículos', () => {
       datos: tecnicosAsignables,
       puedeAsignar: true,
       puedeAsignarTodos: true,
+      puedeReasignar: true,
     });
   });
 
@@ -283,5 +292,92 @@ describe('asignaciones de artículos', () => {
     expect(esquemaGuardarAsignacion.safeParse({
       idOrigen: '', identificadorDetalle: '1', usuarioAsignado: 'gcruz',
     }).success).toBe(false);
+  });
+});
+
+describe('reasignación restaurada y autenticada', () => {
+  let usuario: IdentidadAutenticada;
+  const actualizadoEn = '2026-09-17T14:00:00.000Z';
+  const datos = { idOrigen: 'R1:TSPS01:QA', identificadorDetalle: '1', usuarioAsignado: 'mperez', actualizadoEn };
+  const reasignar = vi.fn();
+  const guardar = vi.fn();
+  const app = express();
+  app.use(express.json(), cookieParser());
+  app.use('/api/pedidos/asignaciones', requerirAutenticacion, requerirContrasenaActualizada,
+    crearAsignacionRutas({ reasignar, guardar } as unknown as AsignacionRepositorio));
+  const errores: ErrorRequestHandler = (error, _peticion, respuesta, siguiente) => {
+    if (respuesta.headersSent) { siguiente(error); return; }
+    respuesta.status(error instanceof ErrorAplicacion ? error.estadoHttp : 400).json({ mensaje: error.message });
+  };
+  app.use(errores);
+
+  beforeEach(() => {
+    usuario = { usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'sistemas',
+      nombreVisible: 'Sistemas', codigoRol: 'ADMINISTRADOR', codigoAlmacen: null,
+      sesionId: 'sesion-prueba', debeCambiarContrasena: false };
+    vi.spyOn(AutenticacionServicio.prototype, 'validarToken').mockImplementation(async () => usuario);
+    guardar.mockReset();
+    reasignar.mockReset().mockResolvedValue({ actualizada: true, asignacion: {
+      ...datos, nombreAsignado: 'Marcos Perez', actualizadoEn: new Date('2026-09-17T14:01:00Z'),
+    } });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('sin sesión devuelve 401 y no escribe', async () => {
+    await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').send(datos).expect(401);
+    expect(reasignar).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['sistemas', 'ADMINISTRADOR', 'mperez', 'R1:TSPS01:QA'],
+    ['gcruz', 'OPERADOR_BODEGA', 'osmith', 'R1:TSPS01:QA'],
+    ['jlara', 'OPERADOR_BODEGA', 'acalix', 'R1:TSPS01:QA'],
+    ['acalix', 'OPERADOR_BODEGA', 'jlara', 'R1:TSPS01:QA'],
+    ['tlopez', 'OPERADOR_BODEGA', 'tlopez', 'R1:TCIR01:QA'],
+  ])('restaura %s sin ampliar su catálogo', async (nombreUsuario, codigoRol, destino, idOrigen) => {
+    usuario = { ...usuario, nombreUsuario, codigoRol };
+    expect(puedeReasignarPedidos(codigoRol, nombreUsuario)).toBe(true);
+    const catalogo = await solicitud(app).get('/api/pedidos/asignaciones/usuarios').set('Cookie', 'pb_sesion=token').expect(200);
+    expect(catalogo.body.puedeReasignar).toBe(true);
+    if (nombreUsuario === 'jlara' || nombreUsuario === 'acalix') expect(catalogo.body.datos.map((t: { usuario: string }) => t.usuario)).toEqual(['jlara', 'acalix']);
+    if (nombreUsuario === 'tlopez') expect(catalogo.body.datos.map((t: { usuario: string }) => t.usuario)).toEqual(['tlopez']);
+    const cuerpo = { ...datos, idOrigen, usuarioAsignado: destino };
+    await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token').send(cuerpo).expect(200);
+    expect(reasignar).toHaveBeenCalledWith(cuerpo, expect.objectContaining({ usuario: destino }), usuario.usuarioId, new Date(actualizadoEn));
+    expect(guardar).not.toHaveBeenCalled();
+  });
+
+  it('otro usuario conserva 403 y no accede al repositorio', async () => {
+    usuario = { ...usuario, nombreUsuario: 'otro', codigoRol: 'OPERADOR_BODEGA' };
+    expect(puedeReasignarPedidos(usuario.codigoRol, usuario.nombreUsuario)).toBe(false);
+    await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token').send(datos).expect(403);
+    expect(reasignar).not.toHaveBeenCalled();
+  });
+
+  it.each(['jlara', 'acalix', 'tlopez'])('%s no puede reasignar fuera de su lista', async (nombreUsuario) => {
+    usuario = { ...usuario, nombreUsuario, codigoRol: 'OPERADOR_BODEGA' };
+    await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token')
+      .send({ ...datos, idOrigen: nombreUsuario === 'tlopez' ? 'R1:TCIR01:QA' : datos.idOrigen, usuarioAsignado: 'gcruz' }).expect(400);
+    expect(reasignar).not.toHaveBeenCalled();
+  });
+
+  it('Tommy conserva la restricción de Circunvalación', async () => {
+    usuario = { ...usuario, nombreUsuario: 'tlopez', codigoRol: 'OPERADOR_BODEGA' };
+    await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token')
+      .send({ ...datos, usuarioAsignado: 'tlopez' }).expect(403);
+    expect(reasignar).not.toHaveBeenCalled();
+  });
+
+  it('devuelve 409 y responsable vigente si la versión de la línea ya cambió', async () => {
+    reasignar.mockResolvedValue({ actualizada: false, asignacion: { ...datos, usuarioAsignado: 'gcruz' } });
+    const respuesta = await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token').send(datos).expect(409);
+    expect(respuesta.body).toMatchObject({ exito: false, datos: { usuarioAsignado: 'gcruz' } });
+  });
+
+  it('valida identidad, responsable y versión, sin aceptar suplantar usuario', () => {
+    expect(esquemaReasignar.safeParse(datos).success).toBe(true);
+    for (const cambio of [{ idOrigen: '' }, { identificadorDetalle: '' }, { usuarioAsignado: '' }, { actualizadoEn: 'ayer' }, { usuarioId: 'otra-persona' }]) {
+      expect(esquemaReasignar.safeParse({ ...datos, ...cambio }).success).toBe(false);
+    }
   });
 });

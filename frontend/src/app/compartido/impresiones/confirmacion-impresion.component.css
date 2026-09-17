@@ -1,0 +1,17 @@
+:host { display: contents; }
+dialog {
+  box-sizing: border-box;
+  width: min(26rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+  border: 1px solid #d4dfec;
+  border-radius: 12px;
+  color: #12345a;
+  background: #fff;
+  box-shadow: 0 12px 36px rgb(16 42 76 / 18%);
+}
+dialog::backdrop { background: rgb(17 41 73 / 22%); }
+h2 { margin: 0 0 1.4rem; font-size: 1.1rem; line-height: 1.5; font-weight: 600; }
+.acciones-confirmacion { display: flex; gap: .6rem; justify-content: flex-end; flex-wrap: wrap; }
+.acciones-confirmacion .boton { min-height: 40px; }
+.acciones-confirmacion .boton:focus-visible { outline: 2px solid #20588e; outline-offset: 3px; }
+.error-confirmacion { color: #8c302d; font-size: .85rem; line-height: 1.4; }

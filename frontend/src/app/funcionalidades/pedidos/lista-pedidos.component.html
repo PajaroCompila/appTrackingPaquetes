@@ -252,15 +252,15 @@
                       <button
                         class="boton-asignar"
                         type="button"
-                        [disabled]="!puedeGuardarAsignacion(pedido, articulo)"
-                        (click)="guardarAsignacion(pedido, articulo)"
+                        [disabled]="!puedeConfirmarAsignacion(pedido, articulo)"
+                        (click)="confirmarAsignacion(pedido, articulo)"
                       >Asignar</button>
                       @if (puedeReasignar()) {
                         <button
                           class="boton-asignar boton-reasignar"
                           type="button"
-                          [disabled]="!asignacionConfirmada(pedido, articulo) || asignacionDesbloqueada(pedido, articulo) || asignacionGuardando(pedido, articulo)"
-                          (click)="desbloquearAsignacion(pedido, articulo)"
+                          [disabled]="!asignacionConfirmada(pedido, articulo) || asignacionGuardando(pedido, articulo) || (asignacionDesbloqueada(pedido, articulo) && !puedeConfirmarReasignacion(pedido, articulo))"
+                          (click)="reasignarAsignacion(pedido, articulo)"
                         >Reasignar</button>
                       }
                     </div>
@@ -269,8 +269,8 @@
                       {{ nombreAsignado(pedido, articulo) }}
                     </span>
                   }
-                  <span class="tiempo-sla" [class.tiempo-excluido]="pedido.excluidoSla" title="Tiempo en pedidos de bodega">
-                    @if (!pedido.excluidoSla) { <i class="pi pi-clock" aria-hidden="true"></i> }
+                  <span class="tiempo-sla" title="Tiempo en pedidos de bodega">
+                    <i class="pi pi-clock" aria-hidden="true"></i>
                     {{ tiempoSla(pedido) }}
                   </span>
                 </td>
@@ -295,8 +295,8 @@
                 <td data-label="Fecha y hora">{{ formatearFechaHora(pedido.fechaHoraPedido) }}</td>
                 <td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td>
                 <td data-label="Asignado a">{{ responsablesPedido(pedido) }}
-                  <span class="tiempo-sla" [class.tiempo-excluido]="pedido.excluidoSla">
-                    @if (!pedido.excluidoSla) { <i class="pi pi-clock" aria-hidden="true"></i> }
+                  <span class="tiempo-sla">
+                    <i class="pi pi-clock" aria-hidden="true"></i>
                     {{ tiempoSla(pedido) }}
                   </span></td>
                 <td data-label="Modificado por">{{ modificadoPor(pedido) }}</td>

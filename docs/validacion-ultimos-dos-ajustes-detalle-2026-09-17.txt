@@ -1,0 +1,114 @@
+ÚLTIMOS DOS AJUSTES — DETALLE DEL PEDIDO
+Fecha: 17/09/2026
+Proyecto: appPedidosBodega-ultima-version
+
+1. Archivos modificados en esta solicitud
+   frontend/src/app/compartido/detalle-pedido/controles-seleccion-detalle.component.ts
+   frontend/src/app/funcionalidades/pedidos/detalle-pedido.component.ts
+   frontend/src/app/funcionalidades/pedidos/detalle-pedido-ux.component.spec.ts
+   docs/validacion-ultimos-dos-ajustes-detalle-2026-09-17.txt
+   Los demás cambios pendientes del repositorio corresponden a solicitudes anteriores.
+
+2. Estilo de TRANSFERIR TODO e IMPRIMIR TODO
+   Se conserva el componente existente AccionSeleccionDetalleComponent y la clase
+   accion-seleccion-todo. Se reutilizan los valores visuales de boton-primario:
+   --azul-700 (#1d5289), texto blanco, hover --azul-900 (#10285b), radio .5rem,
+   --transicion-normal, --easing-corporativo y --sombra-interaccion.
+   No se aplica la clase boton, porque agrandaría los controles compactos.
+   No se modifica el selector circular de transferencia de cada partida.
+
+3. Tamaño conservado exactamente
+   Comparación antes/después en Edge, viewport 1366 x 1000, mismos datos simulados:
+   TRANSFERIR TODO: 119.328125 x 19.5 px; fuente 13 px.
+   IMPRIMIR TODO: 103.453125 x 19.5 px; fuente 13 px.
+   Encabezado: 1229.71875 x 42.875 px.
+   Coordenadas, dimensiones y fuente idénticas mediante comparación estricta.
+   Se conservan padding, border, font e inset del contorno visual; no se alteran columnas.
+   Los botones superiores, badge, título y filtro de bodegas no fueron modificados.
+
+4. Hover, active y focus
+   Ambos controles usan el mismo azul normal y blanco que el botón superior.
+   Hover: azul más oscuro y movimiento de 1 px sobre el contorno visual.
+   Active: sensación de presión de 1 px, sin sombra.
+   Focus por teclado: contorno visible #65a8df con separación de 2 px.
+   Se conserva aria-pressed, cursor pointer y disabled.
+   prefers-reduced-motion elimina la transición y el movimiento.
+   Los efectos se comprobaron con estilos calculados en Edge y capturas revisadas.
+
+5. Ruta existente reutilizada
+   /pedidos-despachados/:idOrigen
+   Mismo PedidosDespachadosComponent y misma navegación por segmentos que el enlace
+   Ver detalle de la lista despachada. No se crean componentes, rutas ni endpoints.
+   El parámetro retorno usa /pedidos-despachados, un retorno ya admitido por la pantalla.
+
+6. Identificador
+   idOrigen real de una línea seleccionada y confirmada en datos.transferidas.
+   La respuesta se coteja con la selección efectivamente enviada al backend.
+   Se prueba tanto un identificador compuesto R1 como un identificador directo SAP.
+   No se construye manualmente una URL ni se deducen IDs locales de despacho.
+
+7. Transferencia exitosa
+   Se conserva despacharLineas y se envían solo las partidas seleccionadas autorizadas.
+   Al existir al menos una confirmación válida se limpia la selección de transferencia
+   y se navega mediante Router.navigate al detalle despachado del mismo pedido.
+   La matriz pendiente no se vacía antes de navegar y no se recarga la página.
+   El bloqueo contra doble clic se mantiene durante la petición y la transición Angular.
+   Las partidas no seleccionadas no se transfieren ni se modifican.
+   Respuestas de refresco previas a la operación quedan invalidadas por la revisión existente.
+
+8. Error o transferencia sin confirmación
+   Error backend: no navega, muestra el mensaje existente y rehabilita transferencia.
+   Se conserva la selección válida para reintentar y se consulta el estado actual.
+   Respuesta sin una línea seleccionada confirmada: no navega, rehabilita y refresca.
+   Si Angular cancela o rechaza la navegación después de transferir, se rehabilita
+   la pantalla y se consulta el estado real sin repetir el despacho automáticamente.
+
+9. Detalle despachado
+   Ya tenía permitirImpresion: false y no habilitaba herramientas de pendientes.
+   No fue necesario modificar este componente ni su listado principal.
+   Verificado: sin TRANSFERIR TODO, Transferir a despachados, IMPRIMIR TODO,
+   Imprimir seleccionados, checkboxes de transferencia ni de impresión.
+   Se conservan pedido, vendedor, fecha, artículos, cantidades, bodegas, responsable,
+   fecha de despacho, usuario de despacho y estado parcial/completo.
+   Otro detalle pendiente conserva sus acciones de impresión y transferencia.
+
+10. Validación
+   npm run build: correcto.
+   Persisten tres advertencias ya conocidas de presupuestos CSS:
+   detalle-pedido-vista.component.css, lista-pedidos.component.css y app.css.
+   No se aumentan presupuestos.
+   Pruebas enfocadas: 94 correctas, 6 archivos.
+   Suite frontend completa: 215 pruebas, 205 correctas, 10 fallos heredados en
+   lista-pedidos.component.spec.ts; mismos fallos que la validación anterior.
+   Fallos: conteo de columnas de dos listas; parámetros de página/vista; conteo de
+   consultas periódicas; concurrencia; reintento; franjas de ambas listas;
+   navegación de paginación; expectativas de mensajes HTTP 400, 503 y 500.
+   No se modificaron esas pruebas ni ListaPedidos dentro de esta solicitud.
+   ESLint de los tres archivos TypeScript modificados: correcto.
+   git diff --check: correcto (advertencias de conversión LF/CRLF de cambios anteriores).
+   Navegador Edge real contra frontend 192.168.10.169:4400, APIs interceptadas con
+   datos simulados: casos A/B/C/D/E/F correctos. No equivale a un despacho real.
+   Capturas y resultados de navegador:
+   C:/Users/alexander/AppData/Local/Temp/pedidos-devueltos-qa-1789590226543/
+   detalle-encabezados-botones.png
+   detalle-controles-azules.png
+   detalle-despachado-sin-acciones.png
+   detalle-transferencia-navegacion.json
+
+11. Alcance y publicación
+   No se modificó backend, SAP, R1, asignación/reasignación, impresión/auditoría/modal,
+   SLA, inventario, notificaciones, sidebar, filtros, historial ni Pedidos Devueltos.
+   No se rediseñó la lista despachada ni se alteraron las selecciones masivas existentes.
+   Cero escrituras reales a bases de datos durante estas pruebas.
+   Servicios existentes conservados; no se iniciaron instancias duplicadas.
+   NO se hizo commit. NO se hizo push.
+
+Actualización posterior — color base y publicación
+   Por solicitud posterior del usuario, el color base vuelve a #eaf1f8 con texto
+   --azul-900 y borde #bfd0e0. Hover neutro #dbe9f7 con borde #8caac8.
+   El azul corporativo --azul-700 y texto blanco aparecen al presionar el control
+   o mientras aria-pressed sea true; al desmarcar vuelve el tono suave.
+   Solo se cambiaron colores. Dimensiones idénticas verificadas nuevamente en Edge.
+   Las 28 pruebas de detalle-pedido-ux.component.spec.ts pasaron.
+   El usuario autorizó después hacer commit y subir todos los cambios pendientes
+   a main para descargarlos en el servidor, sin desplegar ni reiniciar servicios.

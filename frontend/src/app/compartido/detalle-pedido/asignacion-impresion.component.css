@@ -1,0 +1,13 @@
+:host { display: contents; }
+dialog { box-sizing: border-box; width: min(34rem, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid #d4dfec; border-radius: 12px; color: #12345a; background: #fff; box-shadow: 0 12px 36px rgb(16 42 76 / 18%); }
+dialog::backdrop { background: rgb(17 41 73 / 22%); }
+h2 { margin: 0 0 .75rem; font-size: 1.15rem; }
+p { font-size: .9rem; line-height: 1.5; }
+ul { max-height: 14rem; overflow: auto; padding: 0; list-style: none; border: 1px solid #dbe5ef; border-radius: 8px; }
+li { display: grid; gap: .25rem; padding: .7rem; border-bottom: 1px solid #e4ebf2; font-size: .85rem; overflow-wrap: anywhere; }
+li:last-child { border: 0; }
+label { display: block; margin-bottom: .35rem; font-size: .85rem; }
+select { box-sizing: border-box; width: 100%; min-height: 40px; padding: .5rem; border: 1px solid #a5bbd2; border-radius: 6px; background: #fff; color: #12345a; font: inherit; }
+.acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; margin-top: 1.2rem; }
+.error-asignacion { color: #8c302d; }
+select:focus-visible, button:focus-visible { outline: 2px solid #20588e; outline-offset: 3px; }

@@ -1,0 +1,23 @@
+<div class="encabezado-articulos">
+  <div class="titulos">
+    <p class="etiqueta-seccion">Artículos</p>
+    <div class="titulo-con-contador">
+      <h2 id="titulo-articulos-detalle">{{ titulo }}</h2>
+      <span class="contador-articulos">{{ cantidad }} {{ cantidad === 1 ? 'artículo' : 'artículos' }}</span>
+    </div>
+  </div>
+  <div class="acciones-articulos-detalle">
+    @if (permitirTransferencia) {
+      <button class="boton boton-primario boton-transferir-detalle" type="button"
+        [disabled]="cantidadTransferencia === 0 || bloqueado" (click)="transferir.emit()">
+        Transferir a despachados ({{ cantidadTransferencia }})
+      </button>
+    }
+    @if (permitirImpresion) {
+      <button class="boton boton-secundario boton-imprimir-detalle" type="button"
+        [disabled]="cantidadImpresion === 0 || bloqueado" (click)="imprimir.emit()">
+        Imprimir seleccionados ({{ cantidadImpresion }})
+      </button>
+    }
+  </div>
+</div>

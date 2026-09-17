@@ -1,0 +1,8 @@
+<dialog #dialogo aria-labelledby="pregunta-impresion" [attr.aria-busy]="guardando" (cancel)="cancelar($event)">
+  <h2 id="pregunta-impresion">¿La impresión o el PDF se generó correctamente?</h2>
+  @if (error) { <p class="error-confirmacion" role="alert">{{ error }}</p> }
+  <div class="acciones-confirmacion">
+    <button type="button" class="boton boton-primario" [disabled]="guardando" (click)="confirmar.emit()">Sí, registrar impresión</button>
+    <button type="button" class="boton boton-secundario" autofocus [disabled]="guardando" (click)="descartar.emit()">No</button>
+  </div>
+</dialog>

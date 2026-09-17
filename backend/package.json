@@ -18,6 +18,7 @@
     "validar:conciliacion-entregas": "tsx scripts/validarConciliacionEntregas.ts",
     "db:corregir-horas-pedidos": "tsx scripts/corregirHorasPedidos.ts",
     "db:migrate:impresiones": "tsx scripts/migrarRegistroImpresiones.ts",
+    "db:migrate:auditoria-impresiones": "tsx scripts/migrarAuditoriaImpresiones.ts",
     "db:migrate:asignaciones": "tsx scripts/migrarAsignacionesArticulos.ts",
     "db:migrate:acceso-almacenes": "tsx scripts/migrarAccesoAlmacenesUsuarios.ts",
     "db:migrate:seguimiento-pedidos": "tsx scripts/migrarSeguimientoPedidos.ts",

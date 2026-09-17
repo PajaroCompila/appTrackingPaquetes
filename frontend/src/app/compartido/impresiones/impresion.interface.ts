@@ -6,6 +6,12 @@ export interface IdentidadArticuloImpresion {
 export interface EstadoImpresionArticulo extends IdentidadArticuloImpresion {
   cantidadImpresiones: number;
   ultimaImpresionEn: string;
+  ultimaImpresionPorUsuarioId?: string | null;
+  ultimaImpresionPor?: string | null;
+}
+
+export interface LineaRegistroImpresion extends IdentidadArticuloImpresion {
+  codigoArticulo: string | null;
 }
 
 export function claveArticuloImpreso(linea: IdentidadArticuloImpresion): string {

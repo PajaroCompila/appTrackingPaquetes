@@ -14,6 +14,11 @@ const esquemaIdentidad = z.object({
 export const esquemaLineasImpresion = z.object({
   lineas: z.array(esquemaIdentidad).min(1).max(500),
 }).strict();
+export const esquemaRegistroImpresion = z.object({
+  lineas: z.array(esquemaIdentidad.extend({
+    codigoArticulo: z.string().trim().min(1).max(100).nullable(),
+  }).strict()).min(1).max(500),
+}).strict();
 
 impresionRutas.post('/consultar', async (solicitud, respuesta, siguiente) => {
   try {
@@ -26,8 +31,9 @@ impresionRutas.post('/consultar', async (solicitud, respuesta, siguiente) => {
 
 impresionRutas.post('/registrar', async (solicitud, respuesta, siguiente) => {
   try {
-    const { lineas } = esquemaLineasImpresion.parse(solicitud.body);
-    const usuario = solicitud.user!;
+    const usuario = solicitud.user;
+    if (!usuario) throw new ErrorAplicacion(401, 'SESION_REQUERIDA', 'Debés iniciar sesión.');
+    const { lineas } = esquemaRegistroImpresion.parse(solicitud.body);
     const esSupervisor = usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
       || usuario.nombreUsuario.trim().toLowerCase() === 'gcruz';
     if (!esSupervisor) {
@@ -39,7 +45,7 @@ impresionRutas.post('/registrar', async (solicitud, respuesta, siguiente) => {
           'Solo la persona asignada puede registrar la impresión de esta partida.');
       }
     }
-    respuesta.json({ datos: await repositorio.registrar(lineas, solicitud.user!.usuarioId) });
+    respuesta.json({ datos: await repositorio.registrar(lineas, usuario.usuarioId) });
   } catch (error) {
     siguiente(error);
   }

@@ -19,10 +19,11 @@ describe('ImpresionesService', () => {
     expect(consulta.request.body).toEqual({ lineas });
     consulta.flush({ datos: [] });
 
-    servicio.registrar(lineas).subscribe();
+    const lineasRegistro = lineas.map((linea) => ({ ...linea, codigoArticulo: 'ART-2' }));
+    servicio.registrar(lineasRegistro).subscribe();
     const registro = http.expectOne((solicitud) => solicitud.url.endsWith('/api/impresiones/registrar'));
     expect(registro.request.method).toBe('POST');
-    expect(registro.request.body).toEqual({ lineas });
+    expect(registro.request.body).toEqual({ lineas: lineasRegistro });
     registro.flush({ datos: [{ ...lineas[0], cantidadImpresiones: 1,
       ultimaImpresionEn: '2026-09-07T21:00:00.000Z' }] });
     http.verify();

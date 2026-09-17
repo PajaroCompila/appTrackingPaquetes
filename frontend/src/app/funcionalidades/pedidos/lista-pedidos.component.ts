@@ -250,7 +250,10 @@ export class ListaPedidosComponent implements OnInit {
 
   public valorAsignacionVisible(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): string {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    const usuarioAsignado = this.asignacionActual(pedido, articulo)?.usuarioAsignado
+    const clave = identidad ? claveArticuloAsignado(identidad) : '';
+    const usuarioAsignado = (clave && this.asignacionesDesbloqueadas().has(clave)
+      ? this.seleccionesAsignacion().get(clave) ?? ''
+      : this.asignacionActual(pedido, articulo)?.usuarioAsignado)
       ?? (identidad ? this.seleccionesAsignacion().get(claveArticuloAsignado(identidad)) : '')
       ?? (this.esUsuarioTommy() ? 'tlopez' : '');
     return usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)
@@ -271,7 +274,6 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public tiempoSla(pedido: PedidoResumen): string {
-    if (pedido.excluidoSla) return 'Excluido';
     const transcurrido = this.tiempoTranscurridoSlaMs(pedido);
     if (transcurrido === null) return '—';
     const segundosTotales = Math.floor(transcurrido / 1000);
@@ -309,7 +311,8 @@ export class ListaPedidosComponent implements OnInit {
     usuarioAsignado: string,
   ): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
+    if (!identidad || !this.puedeAsignar()
+      || (this.asignacionConfirmada(pedido, articulo) && !this.asignacionDesbloqueada(pedido, articulo))
       || this.asignacionGuardando(pedido, articulo)) return;
     if (usuarioAsignado
       && !this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)) return;
@@ -351,9 +354,15 @@ export class ListaPedidosComponent implements OnInit {
   public puedeConfirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
     const identidad = this.identidadAsignacion(pedido, articulo);
     const actual = this.asignacionActual(pedido, articulo);
-    if (!identidad || !actual?.actualizadoEn || !this.asignacionDesbloqueada(pedido, articulo) || this.asignacionGuardando(pedido, articulo)) return false;
+    if (!identidad || !actual?.actualizadoEn || !this.puedeReasignar() || !this.asignacionDesbloqueada(pedido, articulo) || this.asignacionGuardando(pedido, articulo)) return false;
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
     return Boolean(seleccion && seleccion !== actual.usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
+  }
+
+  public reasignarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
+    if (!this.puedeReasignar() || this.asignacionGuardando(pedido, articulo)) return;
+    if (this.asignacionDesbloqueada(pedido, articulo)) this.confirmarReasignacion(pedido, articulo);
+    else this.desbloquearAsignacion(pedido, articulo);
   }
 
   public puedeGuardarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
@@ -831,7 +840,7 @@ export class ListaPedidosComponent implements OnInit {
     this.asignacionesService.obtenerUsuarios()
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe({
-        next: ({ datos, puedeAsignar, puedeAsignarTodos }) => {
+        next: ({ datos, puedeAsignar, puedeAsignarTodos, puedeReasignar }) => {
           const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
           const asignaTodos = puedeAsignarTodos
             && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR' || usuarioActual === 'gcruz');
@@ -844,6 +853,7 @@ export class ListaPedidosComponent implements OnInit {
               : [];
           this.usuariosAsignables.set(visibles);
           this.puedeAsignarTodos.set(asignaTodos);
+          this.puedeReasignar.set(Boolean(puedeReasignar));
           this.puedeAsignar.set(puedeAsignar && this.puedeAsignarPedidos() && visibles.length > 0);
           this.usuariosAsignablesCargados = true;
           this.cargarAsignaciones(this.pedidos());
@@ -852,6 +862,7 @@ export class ListaPedidosComponent implements OnInit {
           this.usuariosAsignables.set([]);
           this.puedeAsignar.set(false);
           this.puedeAsignarTodos.set(false);
+          this.puedeReasignar.set(false);
           this.usuariosAsignablesCargados = false;
         },
       });
@@ -875,6 +886,7 @@ export class ListaPedidosComponent implements OnInit {
           const selecciones = new Map(this.seleccionesAsignacion());
           datos.forEach((asignacion) => {
             const clave = claveArticuloAsignado(asignacion);
+            if (this.asignacionesDesbloqueadas().has(clave)) return;
             actuales.set(clave, asignacion);
             if (asignacion.usuarioAsignado) selecciones.delete(clave);
             else if (this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
@@ -913,7 +925,6 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private tiempoTranscurridoSlaMs(pedido: PedidoResumen): number | null {
-    if (pedido.excluidoSla) return null;
     const valor = pedido.fechaEntradaCola ?? pedido.fechaEntradaOrigen ?? pedido.fechaHoraPedido;
     if (!valor) return null;
     const fecha = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(valor)

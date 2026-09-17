@@ -1,0 +1,19 @@
+<dialog #dialogo aria-labelledby="titulo-asignacion-impresion" [attr.aria-busy]="guardando" (cancel)="cerrar($event)">
+  <h2 id="titulo-asignacion-impresion">Asignar responsable</h2>
+  <p>Estos artículos no tienen bodeguero asignado. Seleccioná un responsable antes de imprimir.</p>
+  <ul aria-label="Artículos sin responsable">
+    @for (articulo of articulos; track articulo.clave) {
+      <li><strong>{{ articulo.codigoAlmacen || 'Sin bodega' }} · {{ articulo.codigo }}</strong><span>{{ articulo.descripcion }}</span></li>
+    }
+  </ul>
+  <label for="responsable-impresion">Asignado a</label>
+  <select id="responsable-impresion" [value]="seleccionado" [disabled]="guardando || usuarios.length === 0" (change)="seleccionado = $any($event.target).value">
+    <option value="">Seleccionar responsable</option>
+    @for (usuario of usuarios; track usuario.usuario) { <option [value]="usuario.usuario">{{ usuario.nombre }}</option> }
+  </select>
+  @if (error) { <p class="error-asignacion" role="alert">{{ error }}</p> }
+  <div class="acciones">
+    <button type="button" class="boton boton-secundario" [disabled]="guardando" (click)="cancelar.emit()">Cancelar</button>
+    <button type="button" class="boton boton-primario" [disabled]="guardando || !seleccionado || usuarios.length === 0" (click)="confirmar.emit(seleccionado)">{{ guardando ? 'Guardando…' : 'Asignar y continuar' }}</button>
+  </div>
+</dialog>

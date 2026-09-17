@@ -1,0 +1,124 @@
+SLA VISUAL DE ESPECIALES Y HERRAMIENTAS DEL DETALLE PENDIENTE
+Fecha: 17/09/2026
+Repositorio: C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+
+CAMBIOS
+1. Pedidos Especiales muestra el mismo contador y las mismas franjas que
+   Pedidos Normales: antes de 5 minutos, de 5 a menos de 10, y desde 10 minutos.
+   Funciona en vistas Artículos y Pedido. Se mantiene el origen de tiempo
+   existente y se conserva la separación y paginación de ambas secciones.
+   La marca excluidoSla y la clasificación backend NO se cambiaron: se dejó
+   de excluirla únicamente del contador y del pintado visual de ListaPedidos.
+   No se modificaron estadísticas internas ni SLA de otras pantallas.
+2. Detalle pendiente incorpora Seleccionar todos / Desmarcar todos.
+   Respeta la selección individual, la identidad de línea y los permisos
+   existentes. Solo selecciona artículos visibles que se pueden imprimir.
+3. Bodegas del pedido se obtiene de sus artículos, con todos sus códigos
+   activos al entrar. Los chips permiten quitar bodegas y el selector permite
+   reincluirlas. Tabla, cantidad de artículos, unidades y selección se actualizan.
+   Un artículo oculto se desmarca; volver a mostrarlo no lo selecciona solo.
+   El refresco conserva bodegas desactivadas, incorpora bodegas nuevas y
+   elimina de la selección las líneas que ya no están disponibles.
+4. Antes de imprimir se consulta la asignación actual de las líneas elegidas.
+   Si todas tienen responsable y permiso de impresión, continúa el flujo previo.
+   Si hay faltantes, abre un modal propio con las bodegas y artículos afectados,
+   el catálogo autorizado de la sesión, Cancelar y Asignar y continuar.
+
+FLUJO
+Entrar -> filtrar bodegas -> seleccionar artículos -> Imprimir seleccionados.
+Sin faltantes: vista previa nativa -> cuadro existente de impresión/PDF ->
+registro existente, solo cuando se confirma dicho cuadro.
+Con faltantes: modal nuevo -> confirmar responsable -> guardar únicamente
+las líneas todavía sin responsable -> continuar el mismo flujo anterior.
+Cancelar o ESC en el modal de asignación: sin escrituras ni impresión.
+El modal no marca artículos como Impreso; el registro posterior continúa
+dependiendo de la confirmación existente de impresión/PDF.
+
+DECISIONES PUNTUALES
+- Las herramientas están habilitadas por una opción exclusiva de la
+  configuración del detalle pendiente. Historial, Despachados y Devueltos
+  no reciben estos controles ni esta validación nueva.
+- Se reutilizan AsignacionesService y los endpoints actuales de consulta,
+  catálogo y guardado. No se agregó ni modificó un endpoint backend.
+- El catálogo y los permisos de asignación siguen siendo los vigentes.
+  No se amplían permisos de impresión sobre líneas de otro responsable.
+- Se consulta otra vez al confirmar: una asignación hecha desde otra sesión
+  no se sobrescribe. Un 409 recupera al responsable ganador; nunca se usa
+  Reasignar desde este flujo de impresión.
+- Las asignaciones se guardan secuencialmente con el endpoint existente.
+  No hay una transacción de lote nueva: si una línea falla después de que
+  otras se guardaron, esas asignaciones se conservan y NO se imprime.
+  El modal lo informa; reintentar consulta de nuevo y omite lo ya asignado.
+- Filtro, selección y confirmación se protegen contra clics repetidos y
+  cambios mientras el flujo está en curso. Si cambian pedido/artículos,
+  se evita continuar con una selección obsoleta.
+- Modal nativo del sistema, sin dependencia comercial nueva. Se conserva
+  la paleta azul/blanco, botones y tabla existentes, agregando solo los
+  estilos necesarios para chips y modal.
+
+ARCHIVOS MODIFICADOS EN ESTA SOLICITUD
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.ts
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.html
+frontend/src/app/funcionalidades/pedidos/lista-pedidos-reasignacion.component.spec.ts
+frontend/src/app/funcionalidades/pedidos/detalle-pedido.component.ts
+frontend/src/app/funcionalidades/pedidos/detalle-pedido.component.html
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.interface.ts
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.ts
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.html
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.css
+frontend/src/app/compartido/detalle-pedido/asignacion-impresion.component.ts (nuevo)
+frontend/src/app/compartido/detalle-pedido/asignacion-impresion.component.html (nuevo)
+frontend/src/app/compartido/detalle-pedido/asignacion-impresion.component.css (nuevo)
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-herramientas.component.spec.ts (nuevo)
+docs/validacion-sla-especiales-detalle-2026-09-17.txt (este reporte)
+Los demás cambios que muestra git status pertenecen al trabajo pendiente
+anterior, no fueron introducidos por esta solicitud.
+
+VALIDACIÓN
+Frontend npm run build: aprobado.
+Backend npm run build: aprobado.
+Frontend pruebas relacionadas: 4 archivos, 58 pruebas aprobadas.
+Backend asignacionRutas: 29 pruebas aprobadas.
+ESLint de componentes, plantillas y pruebas relacionados: aprobado.
+git diff --check: aprobado.
+La compilación frontend informa avisos de presupuesto CSS, no errores:
+detalle 7.80 kB, ListaPedidos 7.92 kB y app 7.76 kB. No se cambiaron presupuestos.
+Suite frontend completa: 177 pruebas aprobadas y los mismos 10 fallos previos
+en lista-pedidos.component.spec.ts; total 187, 31 archivos. No se modificó
+esa prueba heredada para esconder fallos. No se afirma suite completa verde.
+
+EDGE SOBRE 169
+Se ejecutó el frontend realmente servido por 192.168.10.169:4400 en Edge,
+con sesión, respuestas API y pedidos de prueba interceptados. No se
+realizaron escrituras backend reales ni se simuló una impresión física.
+Se comprobó visualmente y mediante interacción:
+- tres colores y contadores en Especiales;
+- vistas Artículos y Pedido;
+- detección automática de bodegas y Seleccionar todos;
+- quitar una bodega reduce filas y contador de impresión;
+- modal muestra solamente los faltantes visibles;
+- Cancelar no escribe ni abre impresión;
+- confirmar guarda solo los faltantes;
+- la vista de impresión no contiene los artículos ocultos;
+- el registro de impresión existente conserva únicamente las líneas elegidas;
+- refresco mantiene el filtro; reincluir bodega recupera filas sin seleccionarlas;
+- sin errores JavaScript.
+Se inspeccionaron las tres capturas resultantes:
+C:\Users\alexander\AppData\Local\Temp\pedidos-devueltos-qa-1789590226543\
+  sla-especiales-169.png
+  detalle-bodegas-169.png
+  asignacion-impresion-169.png
+  detalle-sla-169-resultados.json
+La prueba de navegador es automatizada con API simulada, no una sesión
+manual contra pedidos reales ni una prueba de salida física de impresora.
+
+SERVICIOS Y ALCANCE
+Frontend 4400: levantado, HTTP 200.
+Backend 3280 /api/salud: levantado, HTTP 200.
+Sin cambios de puertos ni procesos duplicados para esta solicitud.
+Sin cambios en autenticación, sidebar, usuarios, notificaciones, inventario,
+historial, despachados, devoluciones, SAP o R1.
+El trabajo pendiente anterior fuera del alcance se conservó; 16 archivos
+previos de impresión fuera de los componentes ampliados mantienen sus
+hashes SHA-256 originales.
+No hubo commit, push ni publicación.

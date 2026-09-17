@@ -11,6 +11,7 @@ export interface ConfiguracionDetallePedido {
   etiquetaArticulos: string;
   aviso?: string | null;
   permitirImpresion?: boolean;
+  herramientasImpresionPendiente?: boolean;
 }
 
 export interface DatoOperativoDetalle {

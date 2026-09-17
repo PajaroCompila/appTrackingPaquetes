@@ -31,8 +31,16 @@ export const esquemaConsultaAsignaciones = z.object({
 export const esquemaGuardarAsignacion = identidad.extend({
   usuarioAsignado: z.string().trim().min(1).max(100),
 }).strict();
+export const esquemaReasignar = esquemaGuardarAsignacion.extend({
+  actualizadoEn: z.iso.datetime({ offset: true }),
+}).strict();
 
 export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
+  return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
+    || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(nombreUsuario.trim().toLowerCase());
+}
+
+export function puedeReasignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
     || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(nombreUsuario.trim().toLowerCase());
 }
@@ -93,6 +101,7 @@ export function crearAsignacionRutas(
       datos,
       puedeAsignar: datos.length > 0,
       puedeAsignarTodos,
+      puedeReasignar: puedeReasignarPedidos(usuario.codigoRol, usuario.nombreUsuario),
     });
   });
 
@@ -131,6 +140,44 @@ export function crearAsignacionRutas(
         respuesta.status(error.estadoHttp).json({ exito: false, mensaje: error.message });
         return;
       }
+      siguiente(error);
+    }
+  });
+
+  rutas.patch('/reasignar', async (solicitud, respuesta, siguiente) => {
+    try {
+      const usuario = solicitud.user;
+      if (!usuario) throw new ErrorAplicacion(401, 'SESION_REQUERIDA', 'Debés iniciar sesión.');
+      if (!puedeReasignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) {
+        respuesta.status(403).json({
+          exito: false,
+          mensaje: 'No tiene permisos para reasignar pedidos.',
+        });
+        return;
+      }
+      const datos = esquemaReasignar.parse(solicitud.body);
+      if (usuario.nombreUsuario.trim().toLowerCase() === 'tlopez'
+        && !datos.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
+        throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
+          'Solo puede asignarse pedidos de Circunvalación.');
+      }
+      const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
+      const resultado = await repositorio.reasignar(
+        datos,
+        tecnico,
+        usuario.usuarioId,
+        new Date(datos.actualizadoEn),
+      );
+      if (!resultado.actualizada) {
+        respuesta.status(409).json({
+          exito: false,
+          mensaje: 'La asignación cambió mientras estaba abierta. Revise el responsable actual.',
+          datos: resultado.asignacion,
+        });
+        return;
+      }
+      respuesta.json({ datos: resultado.asignacion });
+    } catch (error) {
       siguiente(error);
     }
   });

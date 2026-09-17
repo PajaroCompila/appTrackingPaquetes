@@ -4,7 +4,14 @@
     [pedido]="detalleVisual()"
     [cargando]="cargando()"
     [error]="error()"
+    [permitirTransferencia]="permitirTransferencia()"
+    [transfiriendo]="transfiriendo()"
+    [revisionTransferencia]="revisionTransferencia()"
+    [revisionRefresco]="revisionRefresco()"
+    [mensajeTransferencia]="mensajeTransferencia()"
     (regresar)="regresar()"
     (reintentar)="reintentar()"
+    (asignacionesActualizadas)="actualizarAsignaciones($event)"
+    (transferirSeleccionados)="transferirSeleccionados($event)"
   />
 </section>

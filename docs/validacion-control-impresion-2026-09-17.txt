@@ -1,0 +1,200 @@
+CONTROL LOCAL DE ESTADO DE IMPRESIÓN
+Validación: 17/09/2026
+Repositorio: C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+Publicación: NO se realizó commit ni push. HEAD continúa en e774c0f.
+
+RESULTADO
+Se mantiene el diálogo nativo y el comprobante POS existente. Después de cerrar
+el diálogo se pregunta: “¿La impresión o el PDF se generó correctamente?”.
+Únicamente “Sí, registrar impresión” guarda un evento local por línea seleccionada.
+“No” y Escape no registran nada. Una reimpresión descartada conserva el estado
+impreso que la línea ya tenía.
+
+Por autorización expresa del usuario, el cuadro es Angular propio, sin PrimeNG
+ni dependencias comerciales. Conserva los botones, colores y tipografía del sistema.
+
+1. MODELO UTILIZADO
+Se reutiliza dbo.ImpresionArticulo como resumen persistente por pedido/línea:
+cantidadImpresiones, primeraImpresionEn, ultimaImpresionEn e idUltimoUsuario.
+Se agrega únicamente dbo.RegistroImpresionArticulo para conservar cada evento:
+idRegistro, idOrigen, identificadorDetalle, codigoArticulo, usuarioId,
+impresoEn y creadoEn.
+Tiene claves foráneas al resumen y al usuario local, e índice por pedido/línea/fecha.
+La existencia de un resumen con contador positivo representa el estado Impreso.
+No se altera el estado comercial, despacho, facturación ni entrega del pedido.
+No se registra falsamente un destino PDF o impresora: es una salida confirmada
+por el usuario, no una verificación física de la impresora.
+
+Los 21 resúmenes existentes se conservaron. No se inventaron eventos históricos
+para reconstruir usuarios o fechas anteriores que el modelo previo no almacenó.
+El contador puede incluir impresiones anteriores a la incorporación de auditoría;
+los eventos detallados se conservan a partir de esta mejora.
+
+2. ENDPOINTS
+Se reutilizan POST /api/impresiones/consultar y POST /api/impresiones/registrar.
+Consultar recibe identidades de pedido/línea y devuelve contador, última fecha,
+último identificador de usuario y nombre visible obtenido de UsuarioAplicacion.
+Registrar recibe exclusivamente:
+{ lineas: [{ idOrigen, identificadorDetalle, codigoArticulo }] }
+No se creó un endpoint alternativo ni un módulo de historial visual.
+
+3. USUARIO AUTENTICADO Y PERMISOS
+Se exige la sesión pb_sesion mediante el middleware de autenticación existente.
+El usuario del evento proviene de solicitud.user.usuarioId, validado en backend.
+No se acepta usuarioId ni nombreVisible enviados en el cuerpo de la petición.
+El nombre del tooltip se obtiene mediante JOIN a UsuarioAplicacion.
+Se conserva el requisito de contraseña actualizada y la autorización anterior:
+ADMINISTRADOR y gcruz mantienen acceso supervisor; los demás no pueden registrar
+la impresión de una partida asignada a otro usuario. No se cambiaron roles.
+
+4. IDENTIDAD POR LÍNEA
+La identidad es idOrigen + identificadorDetalle, no solamente el código del artículo.
+Dos partidas del mismo artículo siguen siendo líneas independientes.
+Se normalizan espacios y se deduplican identidades dentro de un mismo lote.
+Se captura el lote y sus códigos antes de window.print(); un refresco posterior
+no cambia las líneas del comprobante cuya impresión se está confirmando.
+Al navegar a otro pedido se descarta el cuadro pendiente del pedido anterior.
+
+5. REIMPRESIÓN Y CONCURRENCIA
+Las líneas impresas siguen pudiendo seleccionarse e imprimirse de nuevo.
+Cada confirmación inserta nuevos eventos y aumenta el contador de las líneas
+confirmadas. No sobrescribe ni elimina los eventos anteriores.
+Resumen y auditoría se guardan juntos con transacción, SYSUTCDATETIME y rollback
+ante errores. La primera fecha del resumen no se reemplaza al reimprimir.
+La prueba inicial de solicitudes simultáneas detectó interbloqueos SQL.
+Se corrigieron con sp_getapplock, de ámbito PedidosBodega y propietario Transaction,
+para serializar exclusivamente la breve operación de registro de impresión.
+El bloqueo se libera automáticamente con COMMIT o ROLLBACK; no bloquea SAP/R1
+ni las operaciones de asignación, filtros, inventario o transferencia.
+
+6. CANCELACIÓN Y ERRORES
+window.print() no registra eventos. afterprint únicamente abre la pregunta.
+Ni abrir ni cerrar la vista previa se interpreta como una impresión exitosa.
+“No” y Escape descartan la confirmación sin invocar el endpoint de registro.
+Si una línea ya estaba impresa, responder No no la vuelve Pendiente.
+Un error de registro no marca líneas nuevas como impresas y permite reintentar.
+Se bloquean clics repetidos de confirmación mientras la petición está en curso.
+Una consulta antigua no puede deshacer el resultado de una confirmación posterior.
+Después del guardado se limpian únicamente las líneas de selección confirmadas.
+
+7. REPRESENTACIÓN VISUAL
+Se conserva el indicador verde suave “Impreso” dentro de la columna Imprimir.
+Su tooltip muestra última fecha/hora de Honduras, usuario y cantidad de impresiones.
+Las líneas no impresas conservan el selector habitual sin el indicador Impreso,
+como equivalente visual de Pendiente. No se agrega estado al encabezado.
+El cuadro de confirmación es pequeño, blanco, con borde suave, azul corporativo,
+fondo exterior discreto, foco visible y botones legibles. Se verificó en escritorio
+y móvil, sin desbordamiento del cuadro.
+No se rediseñó el detalle ni se agregaron columnas.
+
+8. ARCHIVOS CON CAMBIOS DE CONTENIDO
+Backend:
+backend/package.json
+backend/scripts/migrarAuditoriaImpresiones.ts                         [nuevo]
+backend/src/modulos/impresiones/impresion.interface.ts
+backend/src/modulos/impresiones/impresionMigracion.ts                  [nuevo]
+backend/src/modulos/impresiones/impresionRepositorio.ts
+backend/src/modulos/impresiones/impresionRepositorio.spec.ts           [nuevo]
+backend/src/modulos/impresiones/impresionRutas.ts
+backend/src/modulos/impresiones/impresionRutas.spec.ts
+
+Frontend:
+frontend/src/app/compartido/impresiones/impresion.interface.ts
+frontend/src/app/compartido/impresiones/impresiones.service.ts
+frontend/src/app/compartido/impresiones/impresiones.service.spec.ts
+frontend/src/app/compartido/impresiones/confirmacion-impresion.component.ts    [nuevo]
+frontend/src/app/compartido/impresiones/confirmacion-impresion.component.html  [nuevo]
+frontend/src/app/compartido/impresiones/confirmacion-impresion.component.css   [nuevo]
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.ts
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.html
+frontend/src/app/compartido/detalle-pedido/detalle-pedido-vista.component.spec.ts
+
+Reporte:
+docs/validacion-control-impresion-2026-09-17.txt                         [nuevo]
+
+frontend/package.json y package-lock.json no tienen diferencias de contenido
+respecto a HEAD; PrimeNG y Angular CDK fueron retirados tras elegir el cuadro propio.
+Git puede mostrar package.json como modificado por diferencias de finales de línea.
+
+9. MIGRACIÓN LOCAL
+Se aplicó la migración 17 en la base autorizada PedidosBodega.
+Comando: npm run db:migrate:auditoria-impresiones, desde backend.
+Depende de la migración 10, que ya existía. Incluye guardia DB_NAME y transacción.
+Se ejecutó una segunda vez: quedó una sola entrada de versión 17 y se conservaron
+los resúmenes y eventos existentes. No se modificaron tablas SAP/R1.
+Antes de instalar este código en otro entorno deberá ejecutarse esta migración
+local allí; esta solicitud no autorizó publicar ni desplegar al servidor.
+
+10. BACKEND BUILD Y PRUEBAS
+npm run build: correcto.
+Suite completa: 74 archivos, 417 pruebas aprobadas, cero fallos.
+Pruebas específicas de impresión: 14 aprobadas.
+ESLint sobre el módulo de impresiones y el script de migración: correcto.
+Se comprobó sesión obligatoria, identidad de usuario del token, rechazo de
+suplantación, permisos anteriores, deduplicación, SQL local, auditoría append-only
+y transacción/bloqueo de concurrencia.
+
+Integración contra las tablas reales PedidosBodega, dentro de una transacción
+externa revertida: dos líneas de tres; reimpresión de la primera por otro usuario;
+contador 2; tres eventos; dos usuarios conservados; tercera línea sin registro.
+Tras ROLLBACK se comprobó cero resúmenes y cero eventos de ese pedido QA.
+
+Prueba de motor SQL con tablas temporales aisladas y la misma consulta del repositorio:
+tres rondas de ocho solicitudes simultáneas, dos líneas y dos usuarios.
+Resultado: contador 24 por línea, 48 eventos, ambos usuarios conservados,
+cero solicitudes fallidas después de la corrección del bloqueo.
+Las tablas temporales se eliminaron al terminar; no quedaron datos QA persistentes.
+
+11. FRONTEND BUILD Y PRUEBAS
+npm run build: correcto.
+Pruebas específicas de detalle/impresión: 17 aprobadas.
+ESLint sobre todos los componentes, plantillas y pruebas modificados: correcto.
+Suite completa: 29 archivos, 139 pruebas aprobadas y 10 fallos anteriores en
+lista-pedidos.component.spec.ts. No se modificó ListaPedidos ni su prueba.
+Por tanto, la suite general frontend NO está totalmente verde.
+
+Los diez fallos heredados corresponden a:
+- carga inicial: la prueba cuenta encabezados de dos tablas como si fueran una;
+- búsqueda/limpieza: expectativa de URL anterior a paginaEspeciales y vista;
+- refresco periódico: expectativa previa al manejo separado de ambas listas;
+- consulta larga: expectativa previa de cantidad/concurrencia de consultas;
+- error temporal: expectativa previa de cantidad de solicitudes al refrescar;
+- franja de artículos: cuenta filas de ambas tablas como si fueran una;
+- paginación: expectativa previa a paginación independiente;
+- HTTP 400, 503 y 500: esperan textos que no coinciden con el tratamiento actual.
+Estos fallos requieren su propia validación funcional; no se cambiaron pruebas
+para ocultarlos ni se corrigió código ajeno al control de impresión.
+
+El build conserva las tres advertencias previas de presupuesto CSS:
+ListaPedidos 7.92 kB, detalle compartido 7.38 kB y app.css 7.76 kB.
+Esos archivos de estilos no fueron modificados por esta mejora.
+
+Validación visual e interacción en Edge:
+No sin registro; dos de tres líneas confirmadas; tercera pendiente; reimpresión;
+último usuario/fecha/contador en tooltip; estado recuperado tras recargar;
+impresión posterior de la tercera; Escape sin registro; cuadro móvil sin desborde.
+Cero errores JavaScript en esos recorridos.
+El diálogo nativo fue simulado para automatizar sus eventos; no se envió papel
+a una impresora física ni se afirmó que JavaScript detectara el destino de salida.
+
+Se verificó que los archivos de VistaImpresionPedido y src/styles.css mantienen
+exactamente el contenido de HEAD. Logo, ancho POS, márgenes, escala, orden por
+bodega y columnas del comprobante no fueron cambiados.
+
+Evidencia de QA local:
+C:\Users\alexander\AppData\Local\Temp\pedidos-devueltos-qa-1789590226543\
+impresion-confirmacion.png
+impresion-confirmacion-movil.png
+impresion-parcial.png
+impresiones-resultados.json
+impresion-pos-sin-cambios.pdf
+impresiones.cjs
+concurrencia-impresiones.mjs
+
+12. SAP/R1 Y PUBLICACIÓN
+Cero escrituras SAP.
+Cero escrituras R1.
+El registro utiliza exclusivamente obtenerPoolPedidosBodega y guardia DB_NAME.
+No se alteraron asignación, reasignación, permisos, SLA, filtros, notificaciones,
+inventario, transferencia, historial ni devoluciones.
+No se realizó commit, push, merge ni despliegue al servidor.

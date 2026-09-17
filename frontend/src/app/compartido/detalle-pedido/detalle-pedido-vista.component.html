@@ -1,4 +1,5 @@
-<section class="detalle-pedido-compartido" aria-labelledby="titulo-detalle-compartido">
+<section class="detalle-pedido-compartido" [class.detalle-pendiente]="configuracion.herramientasImpresionPendiente"
+  aria-labelledby="titulo-detalle-compartido">
   <nav class="migas" aria-label="Navegación del detalle">
     <button
       class="boton-regresar-detalle"
@@ -41,6 +42,7 @@
       </button>
     </div>
   } @else if (pedido; as detalle) {
+    @let visibles = articulosVisibles();
     <header class="tarjeta-detalle cabecera-detalle">
       <div class="cabecera-texto">
         <p class="etiqueta-seccion">{{ configuracion.contexto }}</p>
@@ -73,11 +75,11 @@
       </article>
       <article class="tarjeta-resumen">
         <span class="icono-resumen"><i class="pi pi-box" aria-hidden="true"></i></span>
-        <div><span>Artículos</span><strong>{{ textoArticulos(detalle.articulos.length) }}</strong></div>
+        <div><span>Artículos</span><strong>{{ textoArticulos(visibles.length) }}</strong></div>
       </article>
       <article class="tarjeta-resumen">
         <span class="icono-resumen"><i class="pi pi-sort-numeric-up" aria-hidden="true"></i></span>
-        <div><span>Total de unidades</span><strong>{{ totalUnidades(detalle.articulos) }}</strong></div>
+        <div><span>Total de unidades</span><strong>{{ totalUnidades(visibles) }}</strong></div>
       </article>
     </section>
 
@@ -146,36 +148,77 @@
     }
 
     <section class="tarjeta-detalle panel-articulos" aria-labelledby="titulo-articulos-detalle">
+      @if (configuracion.herramientasImpresionPendiente) {
+        <app-encabezado-articulos-detalle [titulo]="configuracion.etiquetaArticulos" [cantidad]="visibles.length"
+          [cantidadImpresion]="lineasSeleccionadas().size" [cantidadTransferencia]="lineasSeleccionadasTransferencia().size"
+          [bloqueado]="bloqueoHerramientas()"
+          [permitirImpresion]="configuracion.permitirImpresion !== false" [permitirTransferencia]="permitirTransferencia"
+          (transferir)="transferir()" (imprimir)="imprimirSeleccionados()" />
+      } @else {
       <div class="titulo-panel titulo-articulos">
         <div>
           <p class="etiqueta-seccion">Artículos</p>
           <h2 id="titulo-articulos-detalle">{{ configuracion.etiquetaArticulos }}</h2>
         </div>
         <div class="acciones-articulos-detalle">
-          <span class="contador-articulos">{{ textoArticulos(detalle.articulos.length) }}</span>
+          <span class="contador-articulos">{{ textoArticulos(visibles.length) }}</span>
+          @if (configuracion.herramientasImpresionPendiente && configuracion.permitirImpresion !== false) {
+            <button class="boton boton-secundario boton-seleccionar-todos" type="button"
+              [disabled]="visibles.length === 0 || bloqueoHerramientas()" [attr.aria-pressed]="todosSeleccionados()"
+              (click)="seleccionarTodos()">{{ todosSeleccionados() ? 'Desmarcar todos' : 'Seleccionar todos' }}</button>
+          }
           @if (configuracion.permitirImpresion !== false) { <button
             class="boton boton-secundario boton-imprimir-detalle"
             type="button"
-            [disabled]="lineasSeleccionadas().size === 0 || preparandoImpresion()"
+            [disabled]="lineasSeleccionadas().size === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion() || (configuracion.herramientasImpresionPendiente && bloqueoHerramientas())"
             (click)="imprimirSeleccionados()"
           >Imprimir seleccionados ({{ lineasSeleccionadas().size }})</button> }
         </div>
       </div>
+      }
+
+      @if (configuracion.herramientasImpresionPendiente) {
+        <div class="filtro-bodegas-detalle" aria-label="Bodegas del pedido">
+          <strong>Bodegas del pedido</strong>
+          <details>
+            <summary>Seleccionar bodegas</summary>
+            @for (bodega of bodegasDelPedido(); track bodega.codigo) {
+              <label><input type="checkbox" [checked]="bodegasSeleccionadas().has(bodega.codigo)" [disabled]="bloqueoHerramientas()"
+                (change)="cambiarBodega(bodega.codigo, $any($event.target).checked)" /> {{ bodega.codigo }}{{ bodega.nombre ? ' · ' + bodega.nombre : '' }}</label>
+            }
+          </details>
+          @for (bodega of bodegasDelPedido(); track bodega.codigo) {
+            @if (bodegasSeleccionadas().has(bodega.codigo)) {
+              <span class="etiqueta-bodega" [title]="bodega.nombre">{{ bodega.codigo }}
+                <button type="button" [disabled]="bloqueoHerramientas()" [attr.aria-label]="'Quitar bodega ' + bodega.codigo" (click)="cambiarBodega(bodega.codigo, false)">×</button>
+              </span>
+            }
+          }
+        </div>
+      }
 
       @if (mensajeImpresion()) {
         <p class="mensaje-impresion-detalle" role="alert">{{ mensajeImpresion() }}</p>
       }
+      @if (mensajeTransferencia) {
+        <p class="mensaje-impresion-detalle" role="status">{{ mensajeTransferencia }}</p>
+      }
 
-      @if (detalle.articulos.length === 0) {
+      @if (visibles.length === 0) {
         <div class="estado-vacio" role="status">
           <i class="pi pi-inbox" aria-hidden="true"></i>
-          <p>Este pedido no tiene artículos.</p>
+          <p>{{ detalle.articulos.length === 0 ? 'Este pedido no tiene artículos.' : 'No hay artículos en las bodegas seleccionadas.' }}</p>
         </div>
       } @else {
         <div class="tabla-detalle-contenedor" tabindex="0" aria-label="Tabla desplazable de artículos del pedido">
           <table class="tabla-detalle-articulos">
             <thead>
               <tr>
+                @if (configuracion.herramientasImpresionPendiente && permitirTransferencia) {
+                  <th scope="col" class="columna-cantidad"><app-accion-seleccion-detalle etiqueta="TRANSFERIR TODO"
+                    [seleccionados]="todasTransferenciasSeleccionadas()" [bloqueado]="bloqueoHerramientas()"
+                    (seleccionar)="seleccionarTodasTransferencias()" /></th>
+                }
                 @if (tienePartida(detalle.articulos)) { <th scope="col">Partida</th> }
                 <th scope="col">Código</th>
                 <th scope="col">Descripción</th>
@@ -187,13 +230,24 @@
                   <th scope="col">Despachado</th><th scope="col">Usuario</th>
                 }
                 @if (configuracion.permitirImpresion !== false) {
-                  <th scope="col" class="columna-imprimir-detalle">Imprimir</th>
+                  <th scope="col" class="columna-imprimir-detalle">
+                    @if (configuracion.herramientasImpresionPendiente) {
+                      <app-accion-seleccion-detalle etiqueta="IMPRIMIR TODO" [seleccionados]="todosSeleccionados()"
+                        [bloqueado]="bloqueoHerramientas()" (seleccionar)="seleccionarTodos()" />
+                    } @else { Imprimir }
+                  </th>
                 }
               </tr>
             </thead>
             <tbody>
-              @for (articulo of detalle.articulos; track articulo.clave) {
+              @for (articulo of visibles; track articulo.clave) {
                 <tr>
+                  @if (configuracion.herramientasImpresionPendiente && permitirTransferencia) {
+                    <td class="columna-cantidad"><app-selector-transferencia-detalle
+                      [bloqueado]="!puedeTransferir(articulo) || bloqueoHerramientas()" [seleccionado]="seleccionadoTransferencia(articulo)"
+                      [etiqueta]="'Seleccionar ' + valor(articulo.codigo) + ' para transferir'"
+                      (seleccionar)="alternarTransferencia(articulo, $event)" /></td>
+                  }
                   @if (tienePartida(detalle.articulos)) {
                     <td>{{ valor(articulo.numeroPartida) }}</td>
                   }
@@ -223,7 +277,7 @@
                       <label class="selector-impresion-detalle" title="Seleccionar para impresión">
                         <input
                           type="checkbox"
-                          [disabled]="!puedeImprimir(articulo)"
+                          [disabled]="!puedeImprimir(articulo) || (configuracion.herramientasImpresionPendiente && bloqueoHerramientas())"
                           [checked]="estaSeleccionado(articulo)"
                           [attr.aria-label]="'Seleccionar ' + valor(articulo.codigo) + ' para impresión'"
                           (change)="alternarSeleccion(articulo, $any($event.target).checked)"
@@ -231,7 +285,7 @@
                         <span aria-hidden="true">✓</span>
                       </label>
                       @if (estaImpreso(articulo)) {
-                        <span class="indicador-impreso-detalle" title="Este artículo ya fue impreso">
+                        <span class="indicador-impreso-detalle" [title]="informacionImpresion(articulo)" [attr.aria-label]="informacionImpresion(articulo)" tabindex="0">
                           <i class="pi pi-check-circle" aria-hidden="true"></i> Impreso
                         </span>
                       }
@@ -250,4 +304,16 @@
     [articulos]="articulosImpresion()"
     [fechaHora]="fechaHoraImpresion()"
   />
+  <app-confirmacion-impresion
+    [abierta]="confirmarImpresion()"
+    [guardando]="guardandoImpresion()"
+    [error]="errorRegistroImpresion()"
+    (confirmar)="registrarImpresionConfirmada()"
+    (descartar)="descartarRegistroImpresion()"
+  />
+  @if (configuracion.herramientasImpresionPendiente) {
+    <app-asignacion-impresion [abierta]="solicitarResponsable()" [guardando]="asignandoResponsables()"
+      [articulos]="articulosSinResponsable()" [usuarios]="usuariosAsignablesImpresion()" [error]="errorAsignacionImpresion()"
+      (confirmar)="asignarYContinuarImpresion($event)" (cancelar)="cancelarAsignacionImpresion()" />
+  }
 </section>
