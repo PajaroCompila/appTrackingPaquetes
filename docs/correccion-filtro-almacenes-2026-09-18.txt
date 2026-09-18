@@ -1,0 +1,43 @@
+CORRECCIÓN — FILTRO DE BODEGAS EN PEDIDOS NORMALES Y ESPECIALES
+Fecha: 18/09/2026
+
+Diagnóstico de solo lectura:
+El pedido 101476067 de Eliasar tiene TOR-TSP1508 (1 unidad) en BSPS04 y
+V20K (3 unidades) en BSPS03. R1 y SAP coinciden. Durante la revisión estaba
+abierto y no tenía despacho local registrado. La consulta de pendientes
+devuelve correctamente la partida de BSPS04 al seleccionar únicamente BSPS04.
+
+Causa de descoordinación identificada en frontend:
+El selector actualizaba filtros globales utilizados por las notificaciones,
+pero la tabla conservaba filtrosAplicados hasta presionar Buscar.
+
+Corrección:
+- Agregar/quitar bodegas y quitar chips aplica la selección automáticamente.
+- Limpiar selección aplica todos los almacenes permitidos por el backend.
+- Ambas listas y ambas paginaciones usan el filtro nuevo desde la página 1.
+- Se conservan los datos visibles durante consultas y ante fallos temporales.
+- Las respuestas del filtro anterior se descartan mediante revisionFiltros.
+- Consultas en curso se completan sin superposición; después se atiende el filtro pendiente.
+- Si la navegación no cambia la URL, se actualizan igualmente filtrosAplicados.
+- La vista Artículos/Pedido y las reglas de permisos se conservan.
+
+Archivos:
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.ts
+frontend/src/app/funcionalidades/pedidos/lista-pedidos-almacenes.component.spec.ts
+docs/correccion-filtro-almacenes-2026-09-18.txt
+
+Validación:
+Build frontend correcto; mismas tres advertencias CSS conocidas.
+60 pruebas enfocadas correctas: filtro de almacenes, reasignación y detalle pendiente.
+Suite completa frontend: 226 pruebas, 216 correctas y los mismos 10 fallos
+heredados de lista-pedidos.component.spec.ts. No se modificó esa suite heredada.
+ESLint correcto y git diff --check correcto.
+Edge real con APIs simuladas: cambiar de BSPS03 a BSPS03+BSPS04 y luego a
+solo BSPS04 muestra 101476067/TOR-TSP1508 sin presionar Buscar; ambas listas
+reciben solo BSPS04; la vista Pedido conserva el filtro. Cero escrituras reales.
+
+Despliegue:
+Este cambio modifica únicamente frontend. No requiere migraciones ni reinicio
+del backend si la versión anterior 54f12ca ya está instalada. No se modificó
+ni desplegó producción desde este equipo. Preparar el build manteniendo la
+versión operativa; usar el método de publicación existente y conservar rollback.

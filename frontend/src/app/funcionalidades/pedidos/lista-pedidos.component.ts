@@ -80,6 +80,7 @@ export class ListaPedidosComponent implements OnInit {
   private consultaEnCurso = false;
   private actualizacionManualPendiente = false;
   private filtrosAplicados: FiltrosPedidos = { pagina: 1, cantidadPorPagina: 25 };
+  private revisionFiltros = 0;
   private versionAsignaciones = 0;
   private usuariosAsignablesCargados = false;
   private desfaseRelojServidorMs = 0;
@@ -130,6 +131,7 @@ export class ListaPedidosComponent implements OnInit {
         this.restaurarEstadoDesdeUrl(parametros);
         this.guardarFiltros();
         this.filtrosAplicados = this.copiarFiltros(this.construirFiltros());
+        ++this.revisionFiltros;
         const parametrosNormalizados = this.construirParametros(this.pagina());
         if (!this.sonParametrosEquivalentes(parametros, parametrosNormalizados)) {
           void this.enrutador.navigate([], {
@@ -172,10 +174,11 @@ export class ListaPedidosComponent implements OnInit {
 
   public alternarAlmacen(codigoAlmacen: string, seleccionado: boolean): void {
     const actuales = this.filtrosFormulario.codigosAlmacen;
+    if (actuales.includes(codigoAlmacen) === seleccionado) return;
     this.filtrosFormulario.codigosAlmacen = seleccionado
       ? [...new Set([...actuales, codigoAlmacen])]
       : actuales.filter((codigo) => codigo !== codigoAlmacen);
-    this.guardarFiltros();
+    this.aplicarSeleccionAlmacenes();
   }
 
   public quitarAlmacen(codigoAlmacen: string): void {
@@ -183,8 +186,18 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public limpiarAlmacenes(): void {
+    if (this.filtrosFormulario.codigosAlmacen.length === 0) return;
     this.filtrosFormulario.codigosAlmacen = [];
+    this.aplicarSeleccionAlmacenes();
+  }
+
+  private aplicarSeleccionAlmacenes(): void {
+    this.pagina.set(1);
+    this.paginaEspeciales.set(1);
+    this.filtrosAplicados = this.copiarFiltros(this.construirFiltros());
+    ++this.revisionFiltros;
     this.guardarFiltros();
+    void this.actualizarRuta(1);
   }
 
   public resumenAlmacenes(): string {
@@ -616,6 +629,7 @@ export class ListaPedidosComponent implements OnInit {
       exhaustMap((esAutomatica) => {
         this.consultaEnCurso = true;
         const filtrosConsulta = this.copiarFiltros(this.filtrosAplicados);
+        const revisionConsulta = this.revisionFiltros;
         const mostrarCargaInicial = this.primeraConsulta;
         if (mostrarCargaInicial) this.cargando.set(true);
         else this.actualizando.set(true);
@@ -632,7 +646,7 @@ export class ListaPedidosComponent implements OnInit {
             clasificacion: 'especial',
           }).pipe(catchError(() => of(null))),
         }).pipe(
-          map((respuestas) => ({ respuestas, esAutomatica, filtrosConsulta })),
+          map((respuestas) => ({ respuestas, esAutomatica, filtrosConsulta, revisionConsulta })),
           catchError((error: unknown) => {
             if (this.primeraConsulta) {
               this.pedidos.set([]);
@@ -655,7 +669,8 @@ export class ListaPedidosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuestas, esAutomatica, filtrosConsulta }) => {
+    ).subscribe(({ respuestas, esAutomatica, filtrosConsulta, revisionConsulta }) => {
+      if (revisionConsulta !== this.revisionFiltros) return;
       const normales = respuestas.normales;
       const especiales = respuestas.especiales;
       if (!normales && !especiales) {
@@ -804,6 +819,8 @@ export class ListaPedidosComponent implements OnInit {
     });
     if (!navego) {
       this.pagina.set(pagina);
+      this.filtrosAplicados = this.copiarFiltros(this.construirFiltros());
+      ++this.revisionFiltros;
       this.actualizarAhora.next(false);
     }
   }
