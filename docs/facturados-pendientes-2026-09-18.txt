@@ -1,0 +1,288 @@
+FACTURADOS PENDIENTES — IMPLEMENTACIÓN Y VALIDACIÓN
+Fecha: 18/09/2026
+Proyecto: appPedidosBodega-ultima-version
+Estado: cambios locales sin commit ni push. No desplegados a producción.
+
+RESUMEN
+Se agregó una cola operativa independiente dentro de Pedidos. Muestra únicamente
+líneas MANUALES pendientes de pedidos cuyo estado financiero puede reconocerse
+con los criterios existentes. No reinserta pedidos en Pendientes normales,
+no modifica Historial y no asume entrega física por facturación.
+
+La migración 18 está preparada, NO aplicada a la base compartida. El SELECT de
+esquema confirmó que la última migración sigue siendo 17 y que la tabla nueva
+ControlOperativoPedido todavía no existe. La API nueva responde 503 mientras
+su esquema no esté habilitado; el flujo existente continúa funcionando.
+
+Operaciones definió la política inicial el 18/09/2026: códigos que comienzan
+con B son MANUAL y códigos que comienzan con T son SIN_VALIDACION_MANUAL.
+La migración materializa esa decisión en filas locales editables; no quedó como
+una condición permanente dentro de la lógica de lectura de la aplicación.
+
+1. CÓMO SE DETERMINA UNA LÍNEA DESPACHADA
+El sistema existente guarda PedidoDespachadoDetalle con idOrigen e
+identificadorDetalle. Se reutiliza ese registro, sin cambiarlo. Para esta nueva
+cola se exige además coincidencia de artículo y almacén con el snapshot local.
+Se compara cantidad despachada con cantidad solicitada; un despacho parcial
+conserva solamente la cantidad restante. No se usa codigoArticulo solo.
+
+Las identidades LEGACY/SIN-PARTIDA no se convierten en confirmaciones de todas
+las líneas. No se genera confirmación física a partir de una etiqueta financiera.
+
+2. FUENTE DE FACTURADO
+R1: se reutiliza el predicado actual de HistorialR1Repositorio: tipo PE,
+U_SO1_VERIFICADO='Y' y U_SO1_DOCUMENTOSBO informado/no cero. El mismo predicado
+se comparte como constante, sin cambiar los filtros existentes de Historial.
+El sincronizador consulta las cabeceras por lotes, no por línea ni por pedido.
+STATUS=C por sí solo NO crea esta condición.
+
+SAP: se consume EntregaSapHistorial.estadoFinanciero='Facturado', con entrega
+no cancelada y salida comprobada, vinculada al pedido por base 17/DocEntry o por
+una conciliación estructurada local activa. No se consultan OINV/INV1 ni SAP
+por cada línea o refresh. No se alteró la lógica de EntregaSapFuente.
+
+LIMITACIÓN FINANCIERA IMPORTANTE:
+La rama antigua PedidoSapHistorial/PedidoDespachado VALIDADO puede mostrar
+Facturado como etiqueta por defecto en frontend, sin estado financiero
+explícito persistido. Esa etiqueta de cierre NO se transforma en prueba de
+factura para la nueva cola. Los SAP directos sin estado Facturado explícito
+en las fuentes anteriores quedan fuera de esta fase; Historial no cambia.
+Agregar otra fuente de factura para esos casos requiere una decisión aparte,
+no se inventó una prioridad entre R1 y SAP ni se tomó DocStatus=C como factura.
+
+Si una sucursal falla o una cabecera resulta ambigua, se conserva el último
+estado conocido sin escoger otra cabecera ni inventar un estado financiero.
+La fecha de revisión avanza para que una sucursal caída no monopolice el lote.
+
+3. CONFIGURACIÓN DE CONTROL POR ALMACÉN
+ConfiguracionControlAlmacen es local, con codigoAlmacen, modoControl,
+requiereConfirmacionFisica, activo, creadoEn y actualizadoEn.
+MANUAL implica requiereConfirmacionFisica=1.
+SIN_VALIDACION_MANUAL implica requiereConfirmacionFisica=0.
+Una restricción SQL impide combinaciones contradictorias.
+
+Las bodegas con prefijos distintos de B/T, o códigos nuevos todavía no
+materializados en configuración, permanecen sin clasificar y se reportan
+visualmente. No se interpretan como SIN_VALIDACION_MANUAL.
+La configuración es mantenible mediante endpoints administrativos locales:
+GET /api/facturados-pendientes/configuracion
+PUT /api/facturados-pendientes/configuracion/:codigo
+Cuerpo: {"modoControl":"MANUAL","activo":true}
+o: {"modoControl":"SIN_VALIDACION_MANUAL","activo":true}
+Solo ADMINISTRADOR puede cambiarlos. El código debe existir en los snapshots.
+No se creó una pantalla administrativa compleja ni se modificó Usuarios.
+
+4. ALMACENES MANUALES DEFINIDOS
+Por decisión explícita de Operaciones, son MANUAL los códigos observados que
+empiezan con B:
+BSPS01, BSPS02, BSPS03, BSPS04, BSPS05, BSPS07 y BSPS08.
+
+La clasificación MANUAL no autoasigna responsable. Todos los operadores
+consultados tienen codigoAlmacen vacío y no existe una tabla de responsables
+globales por bodega.
+
+Sí hay evidencia de trabajo manual por asignaciones locales, no de un modo
+global definitivo. Ejemplos de la lectura realizada:
+TCIR01: 146 líneas asignadas a tlopez.
+BSPS03: 218 a acalix y 13 a jlara; existen otras asignaciones puntuales.
+BSPS07: 13 a acalix y 3 a jlara.
+BSPS08: 1 a acalix.
+BSPS01/BSPS02/BSPS04/BSPS05: múltiples técnicos y gcruz.
+Esas asignaciones siguen sirviendo solamente para mostrar el responsable actual;
+no fueron la fuente de la clasificación.
+
+5. ALMACENES SIN_VALIDACION_MANUAL DEFINIDOS
+Por decisión explícita de Operaciones, son SIN_VALIDACION_MANUAL los códigos
+observados que empiezan con T:
+TCIR01, TLCB01, TPRO01, TSPS01, TTBM01 y TTGU01.
+
+“Automática” significa que no requieren confirmación humana y no bloquean la
+cola; no significa que se marquen como Entregado.
+
+6. ALMACENES AMBIGUOS / NO CONFIGURADOS
+Ninguno entre los 13 códigos actualmente observados: siete B quedan MANUAL y
+seis T quedan SIN_VALIDACION_MANUAL. Un código futuro que no empiece con B/T
+queda sin clasificar y será reportado, sin inferirle un comportamiento.
+El acceso de tlopez a TCIR01 continúa siendo visibilidad, no la fuente de esta
+política de control físico.
+
+También se encontraron 2.460 pedidos conocidos y 122 sin snapshot completo
+(huellaActual NULL). Estos últimos no se convierten en una cola confirmable
+con cantidades/totales incompletos. No se reconstruyeron retrospectivamente
+desde SAP/R1 ni se adivinaron las líneas ausentes.
+
+7. MODELO LOCAL CREADO / REUTILIZADO
+Reutilizados:
+SeguimientoPedido y SeguimientoPedidoDetalle, únicamente líneas activas y
+snapshots completos; PedidoDespachadoDetalle; AsignacionArticuloPedido;
+UsuarioAplicacion.codigoAlmacen cuando haya un único operador activo;
+EntregaSapHistorial, sus líneas y ConciliacionEntregaPedido.
+
+Creados por migración 18:
+ConfiguracionControlAlmacen: política de validación.
+ControlOperativoPedido: cabecera mínima y estado/fuente financiera sincronizados.
+ConfirmacionFisicaPedido: evento local de confirmación por identidad, versión,
+usuario autenticado y fecha UTC. No duplica las líneas de Seguimiento.
+
+Las cabeceras nuevas se conservan junto al seguimiento existente en un solo
+lote, sin invalidar la respuesta de Pedidos si falla esta captura adicional.
+La migración conserva cabeceras antiguas desde los registros locales existentes
+cuando hay metadatos disponibles. No crea líneas ni consulta fuentes externas.
+
+La versión SHA-256 incluye pedido, partida, artículo, bodega y cantidad
+original. Cambiar alguno de esos datos invalida la confirmación anterior.
+
+8. REGLA FACTURADO + PENDIENTE
+Estado financiero reconocido como Facturado
++ snapshot completo local
++ línea activa con identidad estable
++ modo MANUAL activo
++ cantidad física no despachada ni confirmada para esa versión
+= línea visible en Facturados pendientes.
+
+Los totales se calculan con líneas, no con porcentajes.
+SIN_VALIDACION_MANUAL cuenta como tal, no como Confirmado/Entregado.
+Los modos ausentes tampoco se inventan como Manual ni como Sin validación.
+
+9. CASO DE 7 ARTÍCULOS
+Con seis líneas SIN_VALIDACION_MANUAL y la séptima MANUAL pendiente:
+vista Pedido: total 7, manual 1, confirmados 0, pendientes 1, sin validación 6.
+Vista Artículos/detalle: solamente línea 7.
+Alerta en detalle: Pedido X fue facturado con 1 artículo pendiente de entrega.
+Después de confirmar la séptima, no quedan líneas en esta cola.
+Historial conserva sus registros y comportamiento.
+
+10. VISTA CREADA
+Acceso discreto Facturados pendientes en el encabezado de Pedidos de bodega.
+No se cambian las pestañas existentes Artículos/Pedido de normales/especiales.
+Rutas nuevas:
+/pedidos/facturados-pendientes
+/pedidos/facturados-pendientes/:idOrigen
+Las rutas estáticas se registran antes del detalle existente /pedidos/:folioPedido.
+
+La vista tiene sus propios Artículos/Pedido, filtros, paginación compartida,
+tabla corporativa, detalle local y botón Confirmar entrega.
+Fechas vacías por defecto para no ocultar pendientes de días anteriores.
+Respeta la selección inicial de bodegas y las restricciones de acceso backend.
+No cambia filtros globales, campana, sonido, sidebar ni notificaciones.
+Los indicadores son visuales en esta cola. No se agregó alerta sonora.
+Se reutiliza la consulta de inventario existente desde el código del artículo.
+
+11. COMPORTAMIENTO MIXTO Y RESPONSABLES
+A manual confirmado; B manual pendiente; C/D sin validación:
+únicamente B aparece. A cuenta Confirmado manual; C/D Sin validación manual.
+Una clasificación faltante se reporta, no se toma como entrega comprobada.
+Responsable: asignación actual de la partida primero; si no existe, único
+operador activo con bodega configurada. Si ninguno es inequívoco:
+Sin responsable configurado. No se guarda una autoasignación.
+
+12. SALIDA DE LA COLA AL COMPLETAR
+Cada lectura calcula las obligaciones contra despacho/confirmación locales.
+Confirmar la última manual elimina el pedido de la respuesta siguiente.
+No hay borrado de Historial ni traslado de regreso a Pendientes normales.
+La nueva confirmación no altera estados ni detalles de PedidoDespachado.
+
+Confirmación: transacción SERIALIZABLE y bloqueo de actualización por pedido,
+verificación de versión vigente y almacén/usuario responsable. Selecciones
+duplicadas o suplantación de usuario se rechazan. Una selección vieja recibe 409.
+Se comparte, sin cambios de comportamiento, la misma regla de responsables de
+DespachoServicio: administrador/gcruz; acalix/jlara entre sí; demás, su asignación.
+Los roles habilitados siguen siendo ADMINISTRADOR y OPERADOR_BODEGA.
+
+Refresco visual cada 15 s conservando datos ante fallos. Un nuevo filtro cancela
+su consulta anterior; se reajusta la página si desaparece su última línea.
+Finanzas se sincronizan en segundo plano con el intervalo de Historial existente
+(por defecto 60 s), por lotes de hasta 5.000 cabeceras. No se promete latencia
+instantánea ni se afirma que se haya medido en producción.
+GET de la nueva vista solo consulta PedidosBodega y no realiza escrituras.
+
+13. ARCHIVOS MODIFICADOS / CREADOS
+Modificados:
+backend/package.json
+backend/src/aplicacion.ts
+backend/src/modulos/despachos/despachoServicio.ts
+backend/src/modulos/historial/historialR1Repositorio.ts
+backend/src/modulos/historial/sincronizadorHistorial.ts
+backend/src/modulos/pedidos/seguimientoPedidoRepositorio.ts
+frontend/src/app/app.routes.ts
+frontend/src/app/funcionalidades/pedidos/lista-pedidos.component.html
+
+Creados:
+backend/scripts/migrarControlOperativo.ts
+backend/src/modulos/facturadosPendientes/controlOperativo.interface.ts
+backend/src/modulos/facturadosPendientes/controlOperativoModelo.ts
+backend/src/modulos/facturadosPendientes/controlOperativoMigracion.ts
+backend/src/modulos/facturadosPendientes/controlOperativoRepositorio.ts
+backend/src/modulos/facturadosPendientes/controlOperativoFinanciero.ts
+backend/src/modulos/facturadosPendientes/controlOperativoSincronizador.ts
+backend/src/modulos/facturadosPendientes/controlOperativoRutas.ts
+backend/src/modulos/facturadosPendientes/controlOperativo.spec.ts
+backend/src/modulos/facturadosPendientes/controlOperativoFinanciero.spec.ts
+backend/src/modulos/facturadosPendientes/controlOperativoRutas.spec.ts
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.interface.ts
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.service.ts
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.component.ts
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.component.html
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.component.css
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.component.spec.ts
+frontend/src/app/funcionalidades/facturados-pendientes/facturados-pendientes.service.spec.ts
+docs/facturados-pendientes-2026-09-18.txt
+
+14. BACKEND BUILD / TESTS
+npm run build: verde.
+Suite completa y pruebas nuevas: resultados finales al pie.
+Se cubren A-H, cantidad parcial, identidad repetida, versiones cambiadas,
+sin responsable, permisos, configuración administrativa, 400/404/503,
+sucursal caída, cabecera ambigua, ausencia de factura explícita y concurrencia.
+No se modificaron pruebas existentes para cambiar sus expectativas.
+
+15. FRONTEND BUILD / TESTS Y REVISIÓN VISUAL
+npm run build: verde. Mantiene las tres advertencias CSS preexistentes de
+app.css, lista-pedidos.component.css y detalle-pedido-vista.component.css.
+No se modificaron sus budgets ni esos estilos.
+Tests relacionados: 74 verdes en cinco archivos; 14 nuevos en esta funcionalidad
+y 60 existentes de filtros de almacenes, reasignación y detalle UX.
+No se ejecutó ni se declaró verde la suite general frontend en esta fase.
+Los diez fallos heredados de lista-pedidos.component.spec.ts no se alteraron.
+
+Revisión con Edge/Playwright y API SIMULADA, sin escrituras reales:
+Artículos, Pedido, conteos 7/1/0/1/6, navegación al detalle, confirmación de
+última línea y salida de cola, advertencia de bodega sin clasificación,
+vista móvil sin desborde horizontal y sin errores JavaScript.
+Se revisaron las capturas de escritorio y móvil. No fue una validación de
+factura/despacho real en producción ni una ejecución real de la migración.
+
+16. ESCRITURAS SAP/R1 Y PUBLICACIÓN
+Cero escrituras SAP/R1. Las lecturas nuevas de R1 usan el validador SELECT
+existente y sus conexiones de lectura. La vista nueva no consulta SAP.
+Los eventos físicos y configuración nuevos solo usan el pool PedidosBodega;
+las escrituras están protegidas con comprobación DB_NAME()='PedidosBodega'.
+Los diagnósticos reales de esta intervención fueron SELECT a PedidosBodega.
+No se aplicó la migración 18 ni se configuraron modos en la base compartida.
+No se reinició/detuvo producción. No commit. No push.
+
+ANTES DE ACTIVAR
+Aplicar explícitamente la migración 18 únicamente en PedidosBodega y validar un
+caso real controlado. La migración inserta solo configuraciones B/T ausentes y
+conserva cualquier configuración existente o posteriormente editada.
+Resolver aparte los SAP directos sin estado financiero explícito y los snapshots
+incompletos si se necesita incorporarlos; no se fabricó esa evidencia.
+
+RESULTADOS FINALES
+Backend: npm run build aprobado; npm test completo, 80 archivos y 529
+ejecuciones de pruebas aprobadas. Hay 43 casos nuevos independientes.
+La configuración Vitest heredada ejecuta también los spec compilados en dist;
+por eso los casos aparecen tanto desde src como desde dist. No se cambió esa
+configuración ni se presenta esa duplicación como cobertura independiente.
+
+Frontend: npm run build aprobado; tests relacionados, 5 archivos y 74 pruebas
+aprobadas (14 nuevas y 60 existentes). Tres advertencias CSS preexistentes.
+ESLint: sin errores en el nuevo módulo y las integraciones revisadas de ambos
+proyectos. git diff --check: aprobado, únicamente avisos de finales de línea.
+
+Edge/Playwright con API simulada: escenarios descritos aprobados, cero
+escrituras reales y cero errores JavaScript. Se comprobaron también etiquetas
+legibles por campo en la presentación móvil, sin desborde horizontal.
+
+HEAD continúa en 857459e7894ec2508be5da47fcdb2be7ebea6f6a.
+No commit, no push, no migración aplicada y no despliegue a producción.

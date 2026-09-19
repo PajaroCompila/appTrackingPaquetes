@@ -55,6 +55,16 @@ export const routes: Routes = [
       .then(({ HistorialComponent }) => HistorialComponent),
   },
   {
+    path: 'pedidos/facturados-pendientes', canActivate: [autenticacionGuard],
+    loadComponent: () => import('./funcionalidades/facturados-pendientes/facturados-pendientes.component')
+      .then(({ FacturadosPendientesComponent }) => FacturadosPendientesComponent),
+  },
+  {
+    path: 'pedidos/facturados-pendientes/:idOrigen', canActivate: [autenticacionGuard],
+    loadComponent: () => import('./funcionalidades/facturados-pendientes/facturados-pendientes.component')
+      .then(({ FacturadosPendientesComponent }) => FacturadosPendientesComponent),
+  },
+  {
     path: 'pedidos/:folioPedido',
     canActivate: [autenticacionGuard],
     loadComponent: () =>

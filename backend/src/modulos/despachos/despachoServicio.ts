@@ -9,6 +9,17 @@ import { puedeVerAlmacen } from '../usuarios/accesoAlmacenes.js';
 import { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
 import type { IConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
 
+// Misma regla de responsables, compartida por despacho y confirmación física local.
+export function puedeOperarResponsableDespacho(usuario: IdentidadAutenticada, usuarioAsignado: string): boolean {
+  const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+  const asignado = usuarioAsignado.trim().toLowerCase();
+  if (usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR' || nombreUsuario === 'gcruz') return true;
+  if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
+    return asignado === 'acalix' || asignado === 'jlara';
+  }
+  return nombreUsuario === asignado;
+}
+
 export class DespachoServicio {
   public constructor(
     private readonly despachoRepositorio: IDespachoRepositorio,
@@ -72,12 +83,6 @@ export class DespachoServicio {
   }
 
   private puedeOperarAsignacion(usuario: IdentidadAutenticada, usuarioAsignado: string): boolean {
-    const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
-    const asignado = usuarioAsignado.trim().toLowerCase();
-    if (usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR' || nombreUsuario === 'gcruz') return true;
-    if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
-      return asignado === 'acalix' || asignado === 'jlara';
-    }
-    return nombreUsuario === asignado;
+    return puedeOperarResponsableDespacho(usuario, usuarioAsignado);
   }
 }

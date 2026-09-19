@@ -47,6 +47,10 @@ interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> {
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
 
+export const CONDICION_HISTORIAL_R1 = `venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
+        AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
+        AND venta.[U_SO1_DOCUMENTOSBO] <> 0`;
+
 export class HistorialR1Repositorio {
   public constructor(private readonly sucursales: ConfiguracionSucursalR1[] = obtenerSucursalesR1()) {}
 
@@ -139,9 +143,7 @@ export class HistorialR1Repositorio {
       OUTER APPLY (SELECT TOP (1) catalogo.[U_SO1_NOMBREALMACEN]
         FROM [dbo].[@SO1_01SUCURSALALMA] catalogo
         WHERE catalogo.[U_SO1_CODIGOALMACEN] = detalle.[U_SO1_ALMACEN]) almacen
-      WHERE venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
-        AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
-        AND venta.[U_SO1_DOCUMENTOSBO] <> 0
+      WHERE ${CONDICION_HISTORIAL_R1}
         AND venta.[U_SO1_FECHA] >= @fechaDesde
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL
@@ -175,9 +177,7 @@ export class HistorialR1Repositorio {
       venta.[U_SO1_STATUS] codigoEstadoVenta, venta.[U_SO1_SINCRONIZADO] codigoSincronizacion
       FROM [dbo].[@SO1_01VENTA] venta
       LEFT JOIN [dbo].[OSLP] vendedor ON vendedor.[SlpCode] = venta.[U_SO1_VENDEDOR]
-      WHERE venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
-        AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
-        AND venta.[U_SO1_DOCUMENTOSBO] <> 0
+      WHERE ${CONDICION_HISTORIAL_R1}
         AND venta.[U_SO1_FECHA] >= @fechaDesde
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL

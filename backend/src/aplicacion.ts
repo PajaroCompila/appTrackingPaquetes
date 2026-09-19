@@ -22,6 +22,7 @@ import { dashboardRutas } from './modulos/dashboard/dashboardRutas.js';
 import { impresionRutas } from './modulos/impresiones/impresionRutas.js';
 import { asignacionRutas } from './modulos/asignaciones/asignacionRutas.js';
 import { pedidoDevueltoRutas } from './modulos/pedidosDevueltos/pedidoDevueltoRutas.js';
+import { controlOperativoRutas } from './modulos/facturadosPendientes/controlOperativoRutas.js';
 
 export const aplicacion = express();
 const directorioFrontend = join(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist/frontend/browser');
@@ -77,6 +78,8 @@ aplicacion.use('/api/usuarios', requerirAutenticacion, requerirContrasenaActuali
 aplicacion.use('/api/almacenes', requerirAutenticacion, requerirContrasenaActualizada, almacenRutas);
 aplicacion.use('/api/pedidos/asignaciones', requerirAutenticacion,
   requerirContrasenaActualizada, asignacionRutas);
+aplicacion.use('/api/facturados-pendientes', requerirAutenticacion,
+  requerirContrasenaActualizada, controlOperativoRutas);
 aplicacion.use('/api/pedidos', requerirAutenticacion, requerirContrasenaActualizada, pedidoRutas);
 aplicacion.use('/api/articulos', requerirAutenticacion, requerirContrasenaActualizada, inventarioArticuloRutas);
 aplicacion.use('/api/historial-validados', requerirAutenticacion, requerirContrasenaActualizada, historialRutas);

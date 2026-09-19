@@ -1,0 +1,53 @@
+<section class="pagina vista-control" aria-labelledby="titulo-control">
+  <div class="encabezado-pagina">
+    <div><p class="sobrelinea">Pedidos</p><h1 id="titulo-control">Facturados pendientes</h1>
+      <p>Artículos facturados pendientes de entrega por bodega.</p></div>
+    <a class="boton boton-secundario" [routerLink]="idOrigen() ? ['/pedidos/facturados-pendientes'] : ['/pedidos']">Regresar a pedidos</a>
+  </div>
+  @if (!idOrigen()) {
+    <form class="panel filtros" (ngSubmit)="buscar()">
+      <div class="campo"><label for="numeroControl">Número de pedido</label><input id="numeroControl" name="numero" [(ngModel)]="filtros.numeroPedido" /></div>
+      <div class="campo"><label for="desdeControl">Fecha desde</label><input id="desdeControl" type="date" name="desde" [(ngModel)]="filtros.fechaDesde" /></div>
+      <div class="campo"><label for="hastaControl">Fecha hasta</label><input id="hastaControl" type="date" name="hasta" [(ngModel)]="filtros.fechaHasta" /></div>
+      <div class="campo"><label for="cantidadControl">Registros por página</label><select id="cantidadControl" name="cantidad" [(ngModel)]="filtros.cantidadPorPagina" (change)="buscar()"><option [ngValue]="25">25</option><option [ngValue]="50">50</option><option [ngValue]="100">100</option></select></div>
+      <div class="campo campo-amplio"><span>Almacenes</span>
+        <details class="selector-multiple" appSelectorAlmacenes><summary>{{ filtros.codigosAlmacen.length ? filtros.codigosAlmacen.join(', ') : 'Todos los almacenes' }}</summary>
+          <fieldset><legend>Seleccionar almacenes</legend>
+            @for (a of almacenes(); track a.codigoAlmacen) {
+              <label class="opcion-almacen"><input type="checkbox" [checked]="filtros.codigosAlmacen.includes(a.codigoAlmacen)" (change)="alternarAlmacen(a.codigoAlmacen,$event)" /><span>{{ a.codigoAlmacen }} · {{ a.nombreAlmacen }}</span></label>
+            }
+          </fieldset>
+        </details>
+      </div>
+      <div class="acciones-filtros"><button type="submit" class="boton boton-primario">Buscar</button><button type="button" class="boton boton-secundario" (click)="limpiar()">Limpiar filtros</button></div>
+    </form>
+    <nav class="pestanas-vistas" aria-label="Vista de facturados pendientes">
+      <button type="button" [class.activa]="vista()==='articulos'" [attr.aria-pressed]="vista()==='articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+      <button type="button" [class.activa]="vista()==='pedido'" [attr.aria-pressed]="vista()==='pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+    </nav>
+  }
+  @if (errorAlmacenes()) {<p class="aviso" role="status">No se pudo cargar la lista de bodegas.</p>}
+  @if (sinConfiguracion().length) {<p class="aviso" role="status">Bodegas sin control definido: {{ sinConfiguracion().join(', ') }}. Sus líneas no se incluyen en esta cola.</p>}
+  @if (error()) {<p class="texto-error" role="alert">{{ error() }}</p>}
+  @if (mensaje()) {<p role="status">{{ mensaje() }}</p>}
+  @if (cargando()) {<p class="panel" role="status">Cargando pedidos…</p>}
+  @else if (!registros().length && !error()) {<p class="panel vacio">No hay partidas pendientes para las bodegas configuradas.</p>}
+  @else if (idOrigen() || vista()==='articulos') {
+    @if (idOrigen() && registros().length) {
+      <p class="aviso">Pedido {{ registros()[0].numeroPedido }} fue facturado con {{ registros()[0].pendientes }} {{ registros()[0].pendientes === 1 ? 'artículo pendiente' : 'artículos pendientes' }} de entrega.</p>
+    }
+    <div class="panel tabla-contenedor"><table><thead><tr>
+      <th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Vendedor</th><th>Estado financiero</th><th>Estado operativo</th><th>Responsable</th><th>{{ idOrigen() ? 'Confirmar entrega' : 'Ver detalle' }}</th>
+    </tr></thead><tbody>
+      @for (p of registros(); track $index) {@for (l of p.lineas; track l.identificadorDetalle) {
+        <tr><td data-label="Pedido"><strong>{{ p.numeroPedido }}</strong></td><td data-label="Código"><strong [appCodigoArticuloInventario]="l.codigoArticulo" [codigoAlmacenInventario]="l.codigoAlmacen">{{ l.codigoArticulo }}</strong></td><td data-label="Descripción">{{ l.descripcion }}</td><td data-label="Cantidad">{{ l.cantidad }}</td><td data-label="Bodega">{{ l.codigoAlmacen }}</td><td data-label="Vendedor">{{ p.nombreVendedor || '—' }}</td><td data-label="Estado financiero"><span class="estado-financiero">Facturado</span></td><td data-label="Estado operativo"><span class="estado-pendiente">Pendiente de entrega</span></td><td data-label="Responsable"><strong>{{ l.responsable || 'Sin responsable configurado' }}</strong></td>
+          <td [attr.data-label]="idOrigen() ? 'Confirmar entrega' : 'Ver detalle'">@if (idOrigen()) {<button type="button" class="boton boton-primario" [disabled]="confirmando() || actualizando() || !puedeConfirmar(l)" (click)="confirmar(l)">Confirmar entrega</button>}
+            @else {<a class="enlace-detalle" [routerLink]="['/pedidos/facturados-pendientes',p.idOrigen]">Ver detalle</a>}</td></tr>
+      }}</tbody></table></div>
+  } @else {
+    <div class="panel tabla-contenedor"><table><thead><tr><th>Pedido</th><th>Total artículos</th><th>Controlados manualmente</th><th>Confirmados</th><th>Pendientes</th><th>Sin validación manual</th><th>Estado financiero</th><th>Estado operativo</th><th>Vendedor</th><th>Ver detalle</th></tr></thead><tbody>
+      @for (p of registros(); track p.idOrigen) {<tr><td data-label="Pedido"><strong>{{ p.numeroPedido }}</strong></td><td data-label="Total artículos">{{ p.totalArticulos }}</td><td data-label="Controlados manualmente">{{ p.controladosManualmente }}</td><td data-label="Confirmados">{{ p.confirmados }}</td><td data-label="Pendientes"><strong>{{ p.pendientes }}</strong></td><td data-label="Sin validación manual">{{ p.sinValidacionManual }}</td><td data-label="Estado financiero"><span class="estado-financiero">Facturado</span></td><td data-label="Estado operativo"><span class="estado-pendiente">Entrega pendiente</span></td><td data-label="Vendedor">{{ p.nombreVendedor || '—' }}</td><td data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos/facturados-pendientes',p.idOrigen]">Ver detalle</a></td></tr>}
+    </tbody></table></div>
+  }
+  @if (!idOrigen()) {<app-paginacion [paginaActual]="pagina()" [totalRegistros]="total()" [cantidadPorPagina]="filtros.cantidadPorPagina" [deshabilitada]="cargando() || confirmando()" etiquetaRegistros="registros" (paginaSeleccionada)="cambiarPagina($event)" />}
+</section>

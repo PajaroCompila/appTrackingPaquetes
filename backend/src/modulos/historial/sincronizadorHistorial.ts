@@ -3,6 +3,7 @@ import { configuracion } from '../../configuracion/configuracion.js';
 import { EntregaSapSincronizador } from './entregaSapSincronizador.js';
 import { ConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
 import { PedidoDevueltoSincronizador } from '../pedidosDevueltos/pedidoDevueltoSincronizador.js';
+import { ControlOperativoSincronizador } from '../facturadosPendientes/controlOperativoSincronizador.js';
 
 let temporizador: NodeJS.Timeout | undefined;
 let activo = false;
@@ -10,6 +11,7 @@ let ejecutando = false;
 let servicio: HistorialServicio | undefined;
 let servicioEntregas: EntregaSapSincronizador | undefined;
 let servicioDevoluciones: PedidoDevueltoSincronizador | undefined;
+let servicioControlOperativo: ControlOperativoSincronizador | undefined;
 
 function programarSiguiente(): void {
   if (!activo) return;
@@ -27,6 +29,9 @@ async function ejecutar(): Promise<void> {
     if (entregas.status === 'rejected') console.error('No fue posible actualizar las entregas SAP; se conserva el historial local.');
     try { await servicioDevoluciones?.sincronizar(); }
     catch { console.error('No fue posible revisar las devoluciones; se conserva la información local.'); }
+    // No bloquea ni retrasa los sincronizadores existentes.
+    void servicioControlOperativo?.sincronizar().catch(() =>
+      console.error('No fue posible revisar los facturados pendientes; se conserva la información local.'));
     if (pedidos.status === 'rejected') throw pedidos.reason;
     const cantidad = pedidos.value;
     if (cantidad > 0) {
@@ -45,6 +50,7 @@ export function iniciarSincronizadorHistorial(): void {
   servicio = new HistorialServicio();
   servicioEntregas = new EntregaSapSincronizador(undefined, undefined, new ConciliacionEntregaPedido());
   servicioDevoluciones = new PedidoDevueltoSincronizador();
+  servicioControlOperativo = new ControlOperativoSincronizador();
   activo = true;
   void ejecutar();
 }
@@ -56,4 +62,5 @@ export function detenerSincronizadorHistorial(): void {
   servicio = undefined;
   servicioEntregas = undefined;
   servicioDevoluciones = undefined;
+  servicioControlOperativo = undefined;
 }

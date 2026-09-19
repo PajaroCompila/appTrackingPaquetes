@@ -1,5 +1,6 @@
 import sql from 'mssql';
 import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedidosBodega.js';
+import { ControlOperativoRepositorio } from '../facturadosPendientes/controlOperativoRepositorio.js';
 import type {
   CambioPedido,
   PedidoResumen,
@@ -178,6 +179,9 @@ export class SeguimientoPedidoRepositorio {
       ]);
     }
     this.aplicarEstado(pedidos, estado);
+    // La captura adicional nunca impide mostrar los pedidos existentes.
+    try { await new ControlOperativoRepositorio().capturarCabeceras(pedidos); }
+    catch { console.error('No fue posible conservar las cabeceras para el control físico local.'); }
   }
 
   public async aplicar(pedidos: PedidoResumen[]): Promise<void> {

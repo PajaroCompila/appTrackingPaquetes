@@ -1,0 +1,30 @@
+.vista-control { width:min(100% - 2rem,var(--ancho-matriz-pedidos)); }
+.encabezado-pagina { align-items:center; }
+a.boton { display:inline-flex;align-items:center;text-decoration:none;white-space:nowrap; }
+.filtros { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin:1.5rem 0; }
+.campo-amplio { grid-column:span 2; }
+.acciones-filtros { display:flex;align-items:end;gap:.75rem;grid-column:span 2; }
+.selector-multiple { position:relative; }
+.selector-multiple summary { display:flex;min-height:2.65rem;align-items:center;justify-content:space-between;padding:.58rem .7rem;border:1px solid #aebdca;border-radius:.48rem;background:white;cursor:pointer;list-style:none; }
+.selector-multiple summary::after { content:'▾';color:var(--azul-700); }
+.selector-multiple fieldset { position:absolute;z-index:5;width:100%;max-height:18rem;overflow:auto;margin:.3rem 0 0;padding:.6rem;border:1px solid #aebdca;border-radius:.48rem;background:white;box-shadow:0 8px 24px rgb(22 47 75 / 16%); }
+.selector-multiple legend { font-size:.85rem; }
+.opcion-almacen { display:flex;gap:.6rem;padding:.4rem;align-items:center;cursor:pointer; }
+.opcion-almacen:hover { background:var(--azul-100); }
+.opcion-almacen input { width:1.15rem;min-height:1.15rem;margin:0; }
+.pestanas-vistas { display:flex;border-bottom:1px solid #b9c9d8;margin-bottom:1rem; }
+.pestanas-vistas button { padding:.8rem 1.5rem;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--gris-600);cursor:pointer; }
+.pestanas-vistas button.activa { border-bottom-color:var(--azul-700);color:var(--azul-700); }
+.tabla-contenedor { overflow-x:auto; }
+th,td { text-align:center;vertical-align:middle; }
+table { min-width:1080px; }
+th { white-space:normal; }
+td:first-child { white-space:nowrap; }
+td { max-width:20rem;overflow-wrap:anywhere; }
+.estado-financiero,.estado-pendiente { display:inline-block;border-radius:999px;padding:.25rem .5rem;font-size:.8rem; }
+.estado-financiero { background:var(--azul-100);color:var(--azul-900); }
+.estado-pendiente,.aviso { background:#fbf4df;color:#685217; }
+.aviso { border:1px solid #e7d7a9;border-radius:.65rem;padding:.8rem 1rem; }
+.vacio { text-align:center;color:var(--gris-600); }
+@media(max-width:800px) { .filtros { grid-template-columns:repeat(2,minmax(0,1fr)); } .encabezado-pagina { flex-wrap:wrap; } }
+@media(max-width:480px) { .filtros { grid-template-columns:1fr; } .campo-amplio,.acciones-filtros { grid-column:span 1; } }
