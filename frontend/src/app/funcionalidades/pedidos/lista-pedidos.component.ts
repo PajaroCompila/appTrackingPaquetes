@@ -25,6 +25,12 @@ import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { PedidosNotificacionesService } from '../../compartido/notificaciones/pedidos-notificaciones.service';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
+import { FacturadosPendientesService } from '../facturados-pendientes/facturados-pendientes.service';
+import { AccionSeleccionDetalleComponent } from '../../compartido/detalle-pedido/controles-seleccion-detalle.component';
+import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from './vista-impresion-pedido.component';
+import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/confirmacion-impresion.component';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
+import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -61,7 +67,9 @@ interface GrupoPedidos {
 
 @Component({
   selector: 'app-lista-pedidos',
-  imports: [CommonModule, FormsModule, RouterLink, CodigoArticuloInventarioDirective, PaginacionComponent, SelectorAlmacenesDirective],
+  imports: [CommonModule, FormsModule, RouterLink, CodigoArticuloInventarioDirective,
+    PaginacionComponent, SelectorAlmacenesDirective, AccionSeleccionDetalleComponent,
+    VistaImpresionPedidoComponent, ConfirmacionImpresionComponent],
   templateUrl: './lista-pedidos.component.html',
   styleUrl: './lista-pedidos.component.css',
 })
@@ -75,6 +83,8 @@ export class ListaPedidosComponent implements OnInit {
   private readonly asignacionesService = inject(AsignacionesService);
   private readonly autenticacion = inject(AutenticacionService);
   private readonly notificaciones = inject(PedidosNotificacionesService);
+  private readonly facturadosPendientesService = inject(FacturadosPendientesService);
+  private readonly impresionesService = inject(ImpresionesService);
   private readonly actualizarAhora = new Subject<boolean>();
   private primeraConsulta = true;
   private consultaEnCurso = false;
@@ -84,6 +94,9 @@ export class ListaPedidosComponent implements OnInit {
   private versionAsignaciones = 0;
   private usuariosAsignablesCargados = false;
   private desfaseRelojServidorMs = 0;
+  private loteImpresion: LineaRegistroImpresion[] | null = null;
+  private esperandoCierreImpresion = false;
+  private temporizadorImpresion?: ReturnType<typeof setTimeout>;
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
@@ -95,6 +108,7 @@ export class ListaPedidosComponent implements OnInit {
   public readonly hayMas = signal(false);
   public readonly totalRegistros = signal(0);
   public readonly totalRegistrosEspeciales = signal(0);
+  public readonly cantidadFacturadosPendientes = signal(0);
   public readonly cargando = signal(true);
   public readonly actualizando = signal(false);
   public readonly ultimaActualizacion = signal<Date | null>(null);
@@ -103,6 +117,14 @@ export class ListaPedidosComponent implements OnInit {
   public readonly transfiriendo = signal(false);
   public readonly mensajeTransferencia = signal('');
   public readonly lineasSeleccionadasTransferencia = signal<ReadonlySet<string>>(new Set());
+  public readonly lineasSeleccionadasImpresion = signal<ReadonlySet<string>>(new Set());
+  public readonly articulosImpresion = signal<readonly ArticuloImpresionPedido[]>([]);
+  public readonly fechaHoraImpresion = signal('');
+  public readonly preparandoImpresion = signal(false);
+  public readonly confirmarImpresion = signal(false);
+  public readonly guardandoImpresion = signal(false);
+  public readonly mensajeImpresion = signal('');
+  public readonly errorRegistroImpresion = signal('');
   public readonly usuariosAsignables = signal<readonly TecnicoAsignable[]>([]);
   public readonly asignaciones = signal<ReadonlyMap<string, AsignacionArticulo>>(new Map());
   public readonly seleccionesAsignacion = signal<ReadonlyMap<string, string>>(new Map());
@@ -120,14 +142,16 @@ export class ListaPedidosComponent implements OnInit {
   ]);
 
   public ngOnInit(): void {
+    this.destruirRef.onDestroy(() => clearTimeout(this.temporizadorImpresion));
     this.cargarAlmacenes();
     this.cargarUsuariosAsignables();
+    this.iniciarActualizacionFacturadosPendientes();
     this.iniciarActualizacionAutomatica();
     this.iniciarRelojSla();
     this.ruta.queryParamMap
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe((parametros) => {
-        this.limpiarSeleccionTransferencia();
+        this.limpiarSeleccionesOperativas();
         this.restaurarEstadoDesdeUrl(parametros);
         this.guardarFiltros();
         this.filtrosAplicados = this.copiarFiltros(this.construirFiltros());
@@ -145,13 +169,13 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public buscar(): void {
-    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionesOperativas();
     this.guardarFiltros();
     void this.actualizarRuta(1);
   }
 
   public limpiarFiltros(): void {
-    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionesOperativas();
     this.filtrosFormulario = formularioInicial(obtenerFechaLocalActual());
     this.guardarFiltros();
     void this.actualizarRuta(1);
@@ -164,7 +188,7 @@ export class ListaPedidosComponent implements OnInit {
   public cambiarVista(vista: VistaPedidos): void {
     if (this.vista() === vista) return;
     this.vista.set(vista);
-    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionesOperativas();
     void this.actualizarRuta(1);
   }
 
@@ -219,14 +243,14 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public paginaAnterior(): void {
-    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionesOperativas();
     if (this.pagina() > 1 && !this.cargando()) {
       void this.actualizarRuta(this.pagina() - 1);
     }
   }
 
   public paginaSiguiente(): void {
-    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionesOperativas();
     if (this.hayMas() && !this.cargando()) {
       void this.actualizarRuta(this.pagina() + 1);
     }
@@ -507,8 +531,183 @@ export class ListaPedidosComponent implements OnInit {
     this.mensajeTransferencia.set('');
   }
 
+  public todasTransferenciasSeleccionadas(grupo: GrupoPedidos['clave']): boolean {
+    const disponibles = this.clavesVisiblesGrupo(grupo);
+    const seleccionadas = this.lineasSeleccionadasTransferencia();
+    return disponibles.length > 0 && disponibles.every((clave) => seleccionadas.has(clave));
+  }
+
+  public puedeSeleccionarTransferencias(grupo: GrupoPedidos['clave']): boolean {
+    return this.clavesVisiblesGrupo(grupo).length > 0 && !this.transfiriendo();
+  }
+
+  public seleccionarTodasTransferencias(grupo: GrupoPedidos['clave']): void {
+    if (!this.puedeSeleccionarTransferencias(grupo)) return;
+    const disponibles = this.clavesVisiblesGrupo(grupo);
+    const seleccionar = !disponibles.every((clave) => this.lineasSeleccionadasTransferencia().has(clave));
+    const nuevas = new Set(this.lineasSeleccionadasTransferencia());
+    disponibles.forEach((clave) => seleccionar ? nuevas.add(clave) : nuevas.delete(clave));
+    this.lineasSeleccionadasTransferencia.set(nuevas);
+    this.mensajeTransferencia.set('');
+  }
+
+  public estaSeleccionadoParaImpresion(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+    indice: number,
+  ): boolean {
+    return this.lineasSeleccionadasImpresion()
+      .has(this.claveEstableLinea(pedido, articulo, indice));
+  }
+
+  public alternarSeleccionImpresion(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+    indice: number,
+    seleccionado: boolean,
+  ): void {
+    if (seleccionado && !this.puedeOperarArticulo(pedido, articulo)) return;
+    const nuevas = new Set(this.lineasSeleccionadasImpresion());
+    const clave = this.claveEstableLinea(pedido, articulo, indice);
+    if (seleccionado) nuevas.add(clave); else nuevas.delete(clave);
+    this.lineasSeleccionadasImpresion.set(nuevas);
+    this.mensajeImpresion.set('');
+  }
+
+  public todasImpresionesSeleccionadas(grupo: GrupoPedidos['clave']): boolean {
+    const disponibles = this.clavesVisiblesGrupo(grupo);
+    const seleccionadas = this.lineasSeleccionadasImpresion();
+    return disponibles.length > 0 && disponibles.every((clave) => seleccionadas.has(clave));
+  }
+
+  public puedeSeleccionarImpresiones(grupo: GrupoPedidos['clave']): boolean {
+    return this.clavesVisiblesGrupo(grupo).length > 0
+      && !this.preparandoImpresion() && !this.confirmarImpresion() && !this.guardandoImpresion();
+  }
+
+  public seleccionarTodasImpresiones(grupo: GrupoPedidos['clave']): void {
+    if (!this.puedeSeleccionarImpresiones(grupo)) return;
+    const disponibles = this.clavesVisiblesGrupo(grupo);
+    const seleccionar = !disponibles.every((clave) => this.lineasSeleccionadasImpresion().has(clave));
+    const nuevas = new Set(this.lineasSeleccionadasImpresion());
+    disponibles.forEach((clave) => seleccionar ? nuevas.add(clave) : nuevas.delete(clave));
+    this.lineasSeleccionadasImpresion.set(nuevas);
+    this.mensajeImpresion.set('');
+  }
+
+  public imprimirSeleccionados(): void {
+    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()
+      || this.lineasSeleccionadasImpresion().size === 0) return;
+    const elegidos = this.obtenerLineasSeleccionadasImpresion();
+    if (elegidos.length === 0) {
+      this.limpiarSeleccionImpresion();
+      return;
+    }
+    this.loteImpresion = elegidos.map(({ pedido, articulo }) => ({
+      idOrigen: pedido.idOrigen,
+      identificadorDetalle: articulo.identificadorDetalle!.trim(),
+      codigoArticulo: articulo.codigoArticulo?.trim() || null,
+    }));
+    this.articulosImpresion.set(elegidos.map(({ articulo }) => ({
+      codigo: articulo.codigoArticulo?.trim() || '—',
+      descripcion: articulo.descripcion?.trim() || '—',
+      cantidad: articulo.cantidad,
+      bodega: articulo.codigoAlmacen?.trim() || '—',
+    })));
+    this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
+    this.errorRegistroImpresion.set('');
+    this.mensajeImpresion.set('');
+    this.preparandoImpresion.set(true);
+    this.temporizadorImpresion = setTimeout(() => {
+      this.esperandoCierreImpresion = true;
+      try {
+        window.print();
+      } catch {
+        this.descartarRegistroImpresion();
+        this.mensajeImpresion.set('No se pudo abrir la impresión.');
+      }
+    });
+  }
+
+  @HostListener('window:afterprint')
+  public alCerrarImpresion(): void {
+    if (!this.esperandoCierreImpresion || !this.loteImpresion) return;
+    this.esperandoCierreImpresion = false;
+    this.preparandoImpresion.set(false);
+    this.confirmarImpresion.set(true);
+  }
+
+  public descartarRegistroImpresion(): void {
+    if (this.guardandoImpresion()) return;
+    clearTimeout(this.temporizadorImpresion);
+    this.esperandoCierreImpresion = false;
+    this.loteImpresion = null;
+    this.confirmarImpresion.set(false);
+    this.preparandoImpresion.set(false);
+    this.errorRegistroImpresion.set('');
+  }
+
+  public registrarImpresionConfirmada(): void {
+    const lote = this.loteImpresion;
+    if (!lote || !this.confirmarImpresion() || this.guardandoImpresion()) return;
+    this.guardandoImpresion.set(true);
+    this.errorRegistroImpresion.set('');
+    this.impresionesService.registrar(lote)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe({
+        next: () => {
+          const seleccion = new Set(this.lineasSeleccionadasImpresion());
+          lote.forEach(({ idOrigen, identificadorDetalle }) =>
+            seleccion.delete(`${idOrigen}\u0000${identificadorDetalle}`));
+          this.lineasSeleccionadasImpresion.set(seleccion);
+          this.guardandoImpresion.set(false);
+          this.descartarRegistroImpresion();
+        },
+        error: () => {
+          this.guardandoImpresion.set(false);
+          this.errorRegistroImpresion.set('No se pudo guardar el registro de impresión. Intentá de nuevo.');
+        },
+      });
+  }
+
+  private clavesVisiblesGrupo(grupo: GrupoPedidos['clave']): string[] {
+    return this.pedidosGrupo(grupo).flatMap((pedido) => pedido.articulos.flatMap((articulo, indice) =>
+      articulo.identificadorDetalle?.trim() && this.puedeOperarArticulo(pedido, articulo)
+        ? [this.claveEstableLinea(pedido, articulo, indice)]
+        : []));
+  }
+
+  private pedidosGrupo(grupo: GrupoPedidos['clave']): PedidoResumen[] {
+    return grupo === 'normales' ? this.pedidos() : this.pedidosEspeciales();
+  }
+
+  private obtenerLineasSeleccionadasImpresion(): {
+    pedido: PedidoResumen;
+    articulo: ArticuloPedidoResumen;
+  }[] {
+    const seleccionadas = this.lineasSeleccionadasImpresion();
+    const agregadas = new Set<string>();
+    return [...this.pedidos(), ...this.pedidosEspeciales()].flatMap((pedido) =>
+      pedido.articulos.flatMap((articulo, indice) => {
+        const clave = this.claveEstableLinea(pedido, articulo, indice);
+        if (!articulo.identificadorDetalle?.trim() || !this.puedeOperarArticulo(pedido, articulo)
+          || !seleccionadas.has(clave) || agregadas.has(clave)) return [];
+        agregadas.add(clave);
+        return [{ pedido, articulo }];
+      }));
+  }
+
+  private limpiarSeleccionesOperativas(): void {
+    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionImpresion();
+  }
+
   private limpiarSeleccionTransferencia(): void {
     this.lineasSeleccionadasTransferencia.set(new Set());
+  }
+
+  private limpiarSeleccionImpresion(): void {
+    this.lineasSeleccionadasImpresion.set(new Set());
   }
 
   private reconciliarSeleccionTransferencia(pedidos: PedidoResumen[]): void {
@@ -535,20 +734,14 @@ export class ListaPedidosComponent implements OnInit {
         next: ({ datos }) => {
           const transferidas = new Set(datos.transferidas.map(({ idOrigen, identificadorDetalle }) =>
             `${idOrigen}\u0000${identificadorDetalle}`));
-          let pedidosRetirados = 0;
-          this.pedidos.update((pedidos) => pedidos.map((pedido) => ({ ...pedido,
-            articulos: pedido.articulos.filter((articulo) => {
-              const identidad = articulo.identificadorDetalle?.trim();
-              return !identidad || !transferidas.has(`${pedido.idOrigen}\u0000${identidad}`);
-            }),
-          })).filter((pedido) => {
-            if (pedido.articulos.length > 0) return true;
-            pedidosRetirados += 1;
-            return false;
-          }));
-          if (pedidosRetirados > 0) {
-            this.totalRegistros.update((total) => Math.max(0, total - pedidosRetirados));
-          }
+          const normales = this.retirarLineasTransferidas(this.pedidos(), transferidas);
+          const especiales = this.retirarLineasTransferidas(this.pedidosEspeciales(), transferidas);
+          this.pedidos.set(normales.pedidos);
+          this.pedidosEspeciales.set(especiales.pedidos);
+          if (normales.registrosRetirados > 0) this.totalRegistros.update((total) =>
+            Math.max(0, total - normales.registrosRetirados));
+          if (especiales.registrosRetirados > 0) this.totalRegistrosEspeciales.update((total) =>
+            Math.max(0, total - especiales.registrosRetirados));
           this.limpiarSeleccionTransferencia();
           this.mensajeTransferencia.set(
             `${datos.transferidas.length} artículo(s) transferido(s) a despachados.`,
@@ -685,7 +878,6 @@ export class ListaPedidosComponent implements OnInit {
         return;
       }
       if (normales) {
-        this.reconciliarSeleccionTransferencia(normales.datos);
         this.notificaciones.procesarRespuesta(normales.datos, filtrosConsulta, !esAutomatica);
         this.pedidos.set(normales.datos);
         this.cargarAsignaciones(normales.datos);
@@ -699,11 +891,41 @@ export class ListaPedidosComponent implements OnInit {
         this.totalRegistrosEspeciales.set(especiales.paginacion.totalRegistros ?? especiales.datos.length);
         this.cargarAsignaciones(especiales.datos);
       }
+      const pedidosVisibles = [...this.pedidos(), ...this.pedidosEspeciales()];
+      this.reconciliarSeleccionTransferencia(pedidosVisibles);
+      this.reconciliarSeleccionImpresion(pedidosVisibles);
       this.ultimaActualizacion.set(new Date());
       this.cargando.set(false);
       this.actualizando.set(false);
       this.primeraConsulta = false;
     });
+  }
+
+  private reconciliarSeleccionImpresion(pedidos: PedidoResumen[]): void {
+    const visibles = new Set<string>();
+    for (const pedido of pedidos) {
+      pedido.articulos.forEach((articulo, indice) => {
+        visibles.add(this.claveEstableLinea(pedido, articulo, indice));
+      });
+    }
+    this.lineasSeleccionadasImpresion.set(new Set(
+      [...this.lineasSeleccionadasImpresion()].filter((clave) => visibles.has(clave)),
+    ));
+  }
+
+  private iniciarActualizacionFacturadosPendientes(): void {
+    merge(
+      of(0),
+      timer(intervaloActualizacionPedidosMs, intervaloActualizacionPedidosMs),
+    ).pipe(
+      exhaustMap(() => this.facturadosPendientesService.listar({
+        numeroPedido: '', fechaDesde: '', fechaHasta: '', codigosAlmacen: [],
+        pagina: 1, cantidadPorPagina: 1, vista: 'articulos',
+      }).pipe(catchError(() => of(null)))),
+      takeUntilDestroyed(this.destruirRef),
+    ).subscribe((respuesta) => this.cantidadFacturadosPendientes.set(
+      respuesta?.paginacion.totalRegistros ?? 0,
+    ));
   }
 
   private construirFiltros(): FiltrosPedidos {
@@ -812,7 +1034,7 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private async actualizarRuta(pagina: number): Promise<void> {
-    this.limpiarSeleccionTransferencia();
+    this.limpiarSeleccionesOperativas();
     const navego = await this.enrutador.navigate([], {
       relativeTo: this.ruta,
       queryParams: this.construirParametros(pagina),
@@ -841,16 +1063,37 @@ export class ListaPedidosComponent implements OnInit {
   }[] {
     const seleccionadas = this.lineasSeleccionadasTransferencia();
     const resultado: { idOrigen: string; identificadorDetalle: string }[] = [];
-    for (const pedido of this.pedidos()) {
+    const agregadas = new Set<string>();
+    for (const pedido of [...this.pedidos(), ...this.pedidosEspeciales()]) {
       pedido.articulos.forEach((articulo, indice) => {
         const identificadorDetalle = articulo.identificadorDetalle?.trim();
-        if (identificadorDetalle
-          && seleccionadas.has(this.claveLineaTransferencia(pedido, articulo, indice))) {
+        const clave = this.claveLineaTransferencia(pedido, articulo, indice);
+        if (identificadorDetalle && seleccionadas.has(clave) && !agregadas.has(clave)) {
+          agregadas.add(clave);
           resultado.push({ idOrigen: pedido.idOrigen, identificadorDetalle });
         }
       });
     }
     return resultado;
+  }
+
+  private retirarLineasTransferidas(
+    pedidos: PedidoResumen[],
+    transferidas: ReadonlySet<string>,
+  ): { pedidos: PedidoResumen[]; registrosRetirados: number } {
+    let registrosRetirados = 0;
+    const restantes = pedidos.map((pedido) => ({
+      ...pedido,
+      articulos: pedido.articulos.filter((articulo) => {
+        const identidad = articulo.identificadorDetalle?.trim();
+        return !identidad || !transferidas.has(`${pedido.idOrigen}\u0000${identidad}`);
+      }),
+    })).filter((pedido) => {
+      if (pedido.articulos.length > 0) return true;
+      registrosRetirados += 1;
+      return false;
+    });
+    return { pedidos: restantes, registrosRetirados };
   }
 
   private cargarUsuariosAsignables(): void {

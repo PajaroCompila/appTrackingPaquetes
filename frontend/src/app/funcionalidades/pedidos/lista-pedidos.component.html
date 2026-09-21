@@ -6,8 +6,23 @@
         <h1 id="titulo-pedidos">Pedidos de bodega</h1>
         <p>Buscá y revisá los pedidos de bodega.</p>
       </div>
-      <a class="enlace-detalle" routerLink="/pedidos/facturados-pendientes">Facturados pendientes</a>
     </div>
+
+    @if (cantidadFacturadosPendientes() > 0) {
+      <section class="aviso-facturados-pendientes" aria-labelledby="titulo-facturados-pendientes">
+        <div>
+          <div class="encabezado-aviso-facturados">
+            <h2 id="titulo-facturados-pendientes">Facturados pendientes</h2>
+            <span class="cantidad-facturados-pendientes">
+              {{ cantidadFacturadosPendientes() }}
+              {{ cantidadFacturadosPendientes() === 1 ? 'artículo' : 'artículos' }}
+            </span>
+          </div>
+          <p>Hay artículos facturados pendientes de entrega por bodega.</p>
+        </div>
+        <a class="enlace-facturados-pendientes" routerLink="/pedidos/facturados-pendientes">Ver detalle</a>
+      </section>
+    }
 
     <form class="panel filtros" (ngSubmit)="buscar()">
     <div class="campo">
@@ -115,13 +130,19 @@
       }
       <button class="boton boton-primario" type="button" (click)="reintentar()">Reintentar</button>
     </div>
-  } @else if (pedidos().length === 0) {
+  } @else if (pedidos().length === 0 && pedidosEspeciales().length === 0) {
     <div class="estado-interfaz" role="status">
       <h2>Sin resultados</h2>
       <p>No hay pedidos con esos filtros.</p>
     </div>
   } @else {
     @if (vista() === 'articulos') { <div class="acciones-transferencia">
+      <button
+        class="boton boton-secundario boton-imprimir-seleccionados"
+        type="button"
+        [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+        (click)="imprimirSeleccionados()"
+      >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
       <button
         class="boton boton-primario"
         type="button"
@@ -130,6 +151,7 @@
       >Transferir a despachados ({{ lineasSeleccionadasTransferencia().size }})</button>
     </div> }
     @if (mensajeTransferencia()) { <p class="mensaje-transferencia" role="status">{{ mensajeTransferencia() }}</p> }
+    @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
     @if (mensajeAsignacion()) {
       <p
         class="mensaje-asignacion"
@@ -149,7 +171,14 @@
         <caption class="solo-lectores">Listado de pedidos encontrados</caption>
         <thead>
           <tr>
-            <th class="columna-seleccion" scope="col"><span class="solo-lectores">Seleccionar</span></th>
+            <th class="columna-seleccion columna-accion-masiva" scope="col">
+              <app-accion-seleccion-detalle
+                etiqueta="TRANSFERIR TODO"
+                [seleccionados]="todasTransferenciasSeleccionadas(grupo.clave)"
+                [bloqueado]="!puedeSeleccionarTransferencias(grupo.clave)"
+                (seleccionar)="seleccionarTodasTransferencias(grupo.clave)"
+              />
+            </th>
             <th class="columna-pedido" scope="col">Pedido</th>
             <th class="columna-codigo" scope="col">Código</th>
             <th class="columna-descripcion" scope="col">Descripción</th>
@@ -159,6 +188,14 @@
             <th class="columna-vendedor" scope="col">Vendedor</th>
             <th class="columna-detalle" scope="col">Ver detalle</th>
             <th class="columna-asignado" scope="col">Asignado a</th>
+            <th class="columna-imprimir columna-accion-masiva" scope="col">
+              <app-accion-seleccion-detalle
+                etiqueta="IMPRIMIR TODO"
+                [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
+                [bloqueado]="!puedeSeleccionarImpresiones(grupo.clave)"
+                (seleccionar)="seleccionarTodasImpresiones(grupo.clave)"
+              />
+            </th>
           </tr>
         </thead>
         @for (pedido of grupo.pedidos; track pedido.idOrigen + ':' + (pedido.articulos[0]?.identificadorDetalle ?? $index)) {
@@ -171,11 +208,11 @@
                 [class.fila-sla-advertencia]="estadoSla === 'advertencia'"
                 [class.fila-sla-critica]="estadoSla === 'critica'"
               >
-                <td class="columna-seleccion" data-label="Seleccionar">
+                <td class="columna-seleccion columna-accion-masiva" data-label="Seleccionar">
                   <label class="selector-linea selector-transferencia" title="Seleccionar para transferir">
                     <input
                       type="checkbox"
-                      [disabled]="!puedeOperarArticulo(pedido, articulo)"
+                      [disabled]="!articulo.identificadorDetalle || !puedeOperarArticulo(pedido, articulo)"
                       [checked]="estaSeleccionadoParaTransferencia(pedido, articulo, $index)"
                       [attr.aria-label]="'Seleccionar artículo ' + marcador(articulo.codigoArticulo)"
                       (click)="$event.stopPropagation()"
@@ -275,6 +312,19 @@
                     {{ tiempoSla(pedido) }}
                   </span>
                 </td>
+                <td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+                  <label class="selector-linea selector-impresion" title="Seleccionar para imprimir">
+                    <input
+                      type="checkbox"
+                      [disabled]="!articulo.identificadorDetalle || !puedeOperarArticulo(pedido, articulo)"
+                      [checked]="estaSeleccionadoParaImpresion(pedido, articulo, $index)"
+                      [attr.aria-label]="'Seleccionar ' + marcador(articulo.codigoArticulo) + ' para imprimir'"
+                      (click)="$event.stopPropagation()"
+                      (change)="alternarSeleccionImpresion(pedido, articulo, $index, $any($event.target).checked)"
+                    />
+                    <span aria-hidden="true">✓</span>
+                  </label>
+                </td>
               </tr>
             }
           </tbody>
@@ -321,4 +371,16 @@
       </section>
     }
   }
+
+  <app-vista-impresion-pedido
+    [articulos]="articulosImpresion()"
+    [fechaHora]="fechaHoraImpresion()"
+  />
+  <app-confirmacion-impresion
+    [abierta]="confirmarImpresion()"
+    [guardando]="guardandoImpresion()"
+    [error]="errorRegistroImpresion()"
+    (confirmar)="registrarImpresionConfirmada()"
+    (descartar)="descartarRegistroImpresion()"
+  />
 </section>

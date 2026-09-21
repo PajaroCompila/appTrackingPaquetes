@@ -9,6 +9,8 @@ import { AlmacenesService } from './almacenes.service';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import type { AsignacionArticulo } from '../../compartido/asignaciones/asignacion.interface';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { FacturadosPendientesService } from '../facturados-pendientes/facturados-pendientes.service';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
 
 describe('ListaPedidos: restauración puntual de Reasignar', () => {
@@ -57,6 +59,10 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
       { provide: PedidosService, useValue: { obtenerPedidos: vi.fn().mockImplementation((f: { clasificacion: string }) =>
         of({ datos: f.clasificacion === 'especial' ? [] : [pedido],
           paginacion: { pagina: 1, cantidadPorPagina: 25, cantidadDevuelta: 1, totalRegistros: 1, hayMas: false } })) } },
+      { provide: FacturadosPendientesService, useValue: { listar: () => of({ datos: [], paginacion: {
+        pagina: 1, cantidadPorPagina: 1, totalRegistros: 0, hayMas: false,
+      }, almacenesSinConfiguracion: [] }) } },
+      { provide: ImpresionesService, useValue: { registrar: () => of({ datos: [] }) } },
       { provide: AlmacenesService, useValue: { obtenerAlmacenes: () => of({ datos: [{
         codigoAlmacen: 'TCIR01', nombreAlmacen: 'Circunvalación', codigoSucursal: 'CIR', nombreSucursal: 'CIR',
       }] }) } },

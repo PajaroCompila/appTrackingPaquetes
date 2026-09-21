@@ -10,6 +10,8 @@ import { ConsultaInventarioArticuloService } from '../../compartido/inventario/c
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
+import { FacturadosPendientesService } from '../facturados-pendientes/facturados-pendientes.service';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 
 const respuestaLista = {
   datos: [{
@@ -37,6 +39,7 @@ describe('ListaPedidosComponent', () => {
     despacharLineas: ReturnType<typeof vi.fn>;
   };
   let almacenesService: { obtenerAlmacenes: ReturnType<typeof vi.fn> };
+  let facturadosPendientesService: { listar: ReturnType<typeof vi.fn> };
   let asignacionesService: {
     obtenerUsuarios: ReturnType<typeof vi.fn>;
     consultar: ReturnType<typeof vi.fn>;
@@ -88,6 +91,11 @@ describe('ListaPedidosComponent', () => {
         ],
       })),
     };
+    facturadosPendientesService = {
+      listar: vi.fn().mockReturnValue(of({ datos: [], paginacion: {
+        pagina: 1, cantidadPorPagina: 1, totalRegistros: 0, hayMas: false,
+      }, almacenesSinConfiguracion: [] })),
+    };
     usuarioSesion.set({
       usuarioId: '1', nombreUsuario: 'admin', nombreVisible: 'Administrador',
       codigoRol: 'ADMINISTRADOR', codigoAlmacen: null, debeCambiarContrasena: false,
@@ -125,6 +133,8 @@ describe('ListaPedidosComponent', () => {
       providers: [
         { provide: PedidosService, useValue: pedidosService },
         { provide: AlmacenesService, useValue: almacenesService },
+        { provide: FacturadosPendientesService, useValue: facturadosPendientesService },
+        { provide: ImpresionesService, useValue: { registrar: vi.fn().mockReturnValue(of({ datos: [] })) } },
         { provide: AsignacionesService, useValue: asignacionesService },
         { provide: AutenticacionService, useValue: { usuario: usuarioSesion } },
         {
@@ -175,13 +185,47 @@ describe('ListaPedidosComponent', () => {
     expect(encabezados).not.toContain('Creado en R1');
     expect(encabezados.some((encabezado) => encabezado.includes('Asignado a'))).toBe(true);
     expect(fixture.nativeElement.querySelector('.boton-asignar-todos')).toBeNull();
-    expect(encabezados).not.toContain('Imprimir');
-    expect(encabezados).toHaveLength(10);
+    expect(encabezados.some((encabezado) => encabezado.includes('TRANSFERIR TODO'))).toBe(true);
+    expect(encabezados.some((encabezado) => encabezado.includes('IMPRIMIR TODO'))).toBe(true);
+    expect(encabezados).toHaveLength(22);
     expect(componente.filtrosFormulario.fechaDesde).toBe('2026-08-03');
     expect(componente.filtrosFormulario.fechaHasta).toBe('2026-08-03');
     expect(pedidosService.obtenerPedidos).toHaveBeenCalledWith(expect.objectContaining({
       fechaDesde: '2026-08-03', fechaHasta: '2026-08-03',
     }));
+  });
+
+  it('no renderiza acceso ni reserva espacio cuando no hay facturados pendientes', () => {
+    fixture.detectChanges();
+
+    expect(componente.cantidadFacturadosPendientes()).toBe(0);
+    expect(fixture.nativeElement.querySelector('.aviso-facturados-pendientes')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Facturados pendientes');
+    expect(facturadosPendientesService.listar).toHaveBeenCalledWith({
+      numeroPedido: '', fechaDesde: '', fechaHasta: '', codigosAlmacen: [],
+      pagina: 1, cantidadPorPagina: 1, vista: 'articulos',
+    });
+  });
+
+  it('muestra un contenedor informativo con total real, conserva la navegación y se oculta al quedar vacío', async () => {
+    facturadosPendientesService.listar.mockReturnValue(of({ datos: [{}], paginacion: {
+      pagina: 1, cantidadPorPagina: 1, totalRegistros: 3, hayMas: true,
+    }, almacenesSinConfiguracion: [] }));
+    fixture.detectChanges();
+
+    const aviso = fixture.nativeElement.querySelector('.aviso-facturados-pendientes') as HTMLElement;
+    expect(aviso).not.toBeNull();
+    expect(aviso.textContent).toContain('Facturados pendientes');
+    expect(aviso.textContent).toContain('3 artículos');
+    expect(aviso.querySelector('button')).toBeNull();
+    expect(aviso.querySelector('.enlace-facturados-pendientes')?.textContent?.trim()).toBe('Ver detalle');
+
+    facturadosPendientesService.listar.mockReturnValue(of({ datos: [], paginacion: {
+      pagina: 1, cantidadPorPagina: 1, totalRegistros: 0, hayMas: false,
+    }, almacenesSinConfiguracion: [] }));
+    await vi.advanceTimersByTimeAsync(15000);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.aviso-facturados-pendientes')).toBeNull();
   });
 
   it('conserva bodegas con el mismo nombre como opciones independientes', () => {
@@ -264,6 +308,7 @@ describe('ListaPedidosComponent', () => {
       providers: [
         { provide: PedidosService, useValue: pedidosService },
         { provide: AlmacenesService, useValue: almacenesService },
+        { provide: FacturadosPendientesService, useValue: facturadosPendientesService },
         { provide: ActivatedRoute, useValue: {
           queryParamMap: of(convertToParamMap({ fechaDesde: '2026-07-01', fechaHasta: '2026-07-02' })),
           snapshot: { queryParamMap: convertToParamMap({}) },
@@ -295,6 +340,7 @@ describe('ListaPedidosComponent', () => {
       providers: [
         { provide: PedidosService, useValue: pedidosService },
         { provide: AlmacenesService, useValue: almacenesService },
+        { provide: FacturadosPendientesService, useValue: facturadosPendientesService },
         { provide: ActivatedRoute, useValue: {
           queryParamMap: of(parametros), snapshot: { queryParamMap: parametros },
         } },
@@ -399,17 +445,18 @@ describe('ListaPedidosComponent', () => {
       }],
     }));
     fixture.detectChanges();
-    const filas = [...fixture.nativeElement.querySelectorAll('.grupo-pedido tr')] as HTMLTableRowElement[];
+    const primeraSeccion = fixture.nativeElement.querySelector('.grupo-listado-pedidos') as HTMLElement;
+    const filas = [...primeraSeccion.querySelectorAll('.grupo-pedido tr')] as HTMLTableRowElement[];
 
     expect(filas).toHaveLength(3);
-    expect(filas.every((fila) => fila.cells.length === 10)).toBe(true);
+    expect(filas.every((fila) => fila.cells.length === 11)).toBe(true);
     expect(filas.every((fila) => fila.tabIndex === -1)).toBe(true);
     expect(filas.every((fila) => !fila.querySelector('[rowspan]'))).toBe(true);
-    expect(fixture.nativeElement.textContent.match(/101468453/g)).toHaveLength(3);
-    expect(fixture.nativeElement.textContent.match(/Vendedor original/g)).toHaveLength(3);
-    expect(fixture.nativeElement.querySelectorAll('.enlace-detalle')).toHaveLength(3);
-    expect(fixture.nativeElement.querySelectorAll('.selector-asignacion')).toHaveLength(3);
-    expect(fixture.nativeElement.querySelectorAll('.pi-print')).toHaveLength(0);
+    expect(primeraSeccion.textContent?.match(/101468453/g)).toHaveLength(3);
+    expect(primeraSeccion.textContent?.match(/Vendedor original/g)).toHaveLength(3);
+    expect(primeraSeccion.querySelectorAll('.enlace-detalle')).toHaveLength(3);
+    expect(primeraSeccion.querySelectorAll('.selector-asignacion')).toHaveLength(3);
+    expect(primeraSeccion.querySelectorAll('.pi-print')).toHaveLength(0);
     expect(filas[1]?.textContent).toContain('Descripción suficientemente extensa');
     filas[1]?.click();
     fixture.detectChanges();

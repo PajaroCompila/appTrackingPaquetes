@@ -63,6 +63,53 @@ label { font-size: 13px; font-weight: 600; }
   app-vista-impresion-pedido, app-vista-impresion-pedido * { visibility: visible !important; }
   app-vista-impresion-pedido { display: block !important; position: absolute !important; left: 0 !important; top: 0; width: 52.14mm; max-width: 52.14mm; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 }
+
+.vista-pedidos .aviso-facturados-pendientes {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.25rem;
+  margin: 1.25rem 0 0; padding: 1rem 1.15rem;
+  border: 1px solid #c8d6e3; border-left: 4px solid var(--azul-700);
+  border-radius: .7rem; background: #fff; box-shadow: 0 5px 16px rgb(20 52 88 / 7%);
+}
+.vista-pedidos .encabezado-aviso-facturados { display: flex; align-items: center; gap: .7rem; }
+.vista-pedidos .aviso-facturados-pendientes h2 { margin: 0; color: var(--azul-900); font-size: 1rem; }
+.vista-pedidos .aviso-facturados-pendientes p { margin: .3rem 0 0; color: var(--gris-600); font-size: .88rem; }
+.vista-pedidos .cantidad-facturados-pendientes {
+  padding: .2rem .5rem; border-radius: 999px; background: var(--azul-100);
+  color: var(--azul-900); font-size: .76rem; font-weight: 700; white-space: nowrap;
+}
+.vista-pedidos .enlace-facturados-pendientes {
+  flex: 0 0 auto; color: var(--azul-700); font-size: .86rem;
+  font-weight: 700; text-underline-offset: .18rem;
+}
+.vista-pedidos .enlace-facturados-pendientes:hover { color: var(--azul-900); }
+.vista-pedidos .columna-accion-masiva { width: 7rem; min-width: 7rem; white-space: nowrap; }
+.vista-pedidos .columna-accion-masiva app-accion-seleccion-detalle { display: inline-block; font-size: .68rem; }
+.vista-pedidos .selector-linea input:disabled { cursor: not-allowed; }
+.vista-pedidos .selector-linea input:disabled + span { opacity: .5; }
+
+@media (min-width: 681px) {
+  .vista-pedidos .grupo-listado-pedidos .tabla-contenedor:not(.tabla-pedidos-agrupados) table {
+    table-layout: auto;
+  }
+  .vista-pedidos .columna-pedido { width: 5.5rem; min-width: 5.5rem; max-width: 5.5rem; }
+  .vista-pedidos .columna-codigo { width: 12rem; min-width: 10rem; max-width: 12rem; }
+  .vista-pedidos .columna-descripcion { width: 16%; }
+  .vista-pedidos .columna-cantidad { width: 4.5rem; }
+  .vista-pedidos .columna-bodega { width: 5rem; }
+  .vista-pedidos .columna-fecha { width: 7rem; }
+  .vista-pedidos .columna-vendedor { width: 10%; }
+  .vista-pedidos .columna-detalle { width: 5.5rem; }
+  .vista-pedidos .columna-asignado { width: 13.25rem; min-width: 13.25rem; }
+}
+
+@media (max-width: 620px) {
+  .vista-pedidos .aviso-facturados-pendientes {
+    align-items: flex-start; flex-direction: column; gap: .65rem;
+  }
+  .vista-pedidos .encabezado-aviso-facturados {
+    align-items: flex-start; flex-direction: column; gap: .35rem;
+  }
+}
 button, input, select { font: inherit; }
 button, a, input, select { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid #65a8df; outline-offset: 2px; }

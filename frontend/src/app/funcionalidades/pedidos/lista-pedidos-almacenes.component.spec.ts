@@ -11,6 +11,8 @@ import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { PedidosNotificacionesService } from '../../compartido/notificaciones/pedidos-notificaciones.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { FacturadosPendientesService } from '../facturados-pendientes/facturados-pendientes.service';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 
 describe('ListaPedidos: almacenes aplicados automáticamente en normales y especiales', () => {
   let fixture: ComponentFixture<ListaPedidosComponent>;
@@ -56,6 +58,10 @@ describe('ListaPedidos: almacenes aplicados automáticamente en normales y espec
     pedidos.obtenerPedidos.mockImplementation(f => of(respuesta(f)));
     await TestBed.configureTestingModule({ imports: [ListaPedidosComponent], providers: [
       { provide: PedidosService, useValue: pedidos },
+      { provide: FacturadosPendientesService, useValue: { listar: () => of({ datos: [], paginacion: {
+        pagina: 1, cantidadPorPagina: 1, totalRegistros: 0, hayMas: false,
+      }, almacenesSinConfiguracion: [] }) } },
+      { provide: ImpresionesService, useValue: { registrar: () => of({ datos: [] }) } },
       { provide: AlmacenesService, useValue: { obtenerAlmacenes: () => of({ datos: ['BSPS03', 'BSPS04'].map(codigoAlmacen => ({ codigoAlmacen, nombreAlmacen: codigoAlmacen, codigoSucursal: 'SPS', nombreSucursal: 'Principal' })) }) } },
       { provide: AsignacionesService, useValue: { obtenerUsuarios: () => of({ datos: [], puedeAsignar: false, puedeAsignarTodos: false }), consultar: () => of({ datos: [] }) } },
       { provide: AutenticacionService, useValue: { usuario: signal({ usuarioId: 'qa', nombreUsuario: 'gcruz', codigoRol: 'OPERADOR_BODEGA' }) } },
