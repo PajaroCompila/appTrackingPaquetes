@@ -45,9 +45,8 @@ export class VentasVendedorComponent implements OnInit {
 
   public ngOnInit(): void {
     this.ruta.queryParamMap.pipe(takeUntilDestroyed(this.destruirRef)).subscribe((parametros) => {
-      const guardados = this.leerFiltrosGuardados();
-      this.filtros = { fechaDesde: parametros.get('fechaDesde') || guardados.fechaDesde || this.hoy,
-        fechaHasta: parametros.get('fechaHasta') || guardados.fechaHasta || this.hoy };
+      this.filtros = { fechaDesde: parametros.get('fechaDesde') || this.hoy,
+        fechaHasta: parametros.get('fechaHasta') || this.hoy };
       this.guardarFiltros();
       this.aplicados.next({ ...this.filtros });
     });
@@ -137,12 +136,6 @@ export class VentasVendedorComponent implements OnInit {
   private guardarFiltros(): void {
     try { localStorage.setItem(this.claveFiltros(), JSON.stringify(this.filtros)); }
     catch { /* La pantalla conserva los filtros mientras permanece abierta. */ }
-  }
-  private leerFiltrosGuardados(): Partial<{ fechaDesde: string; fechaHasta: string }> {
-    try {
-      const valor = JSON.parse(localStorage.getItem(this.claveFiltros()) ?? '{}');
-      return valor && typeof valor === 'object' ? valor : {};
-    } catch { return {}; }
   }
   private claveFiltros(): string { return `pedidosBodega.vendedores.${this.codigoSucursal}.filtros`; }
 }

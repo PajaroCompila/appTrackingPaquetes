@@ -251,10 +251,11 @@ export class HistorialComponent implements OnInit {
     const parametros = this.ruta.snapshot.queryParamMap;
     const guardados = this.leerFiltrosGuardados();
     const globales = this.filtrosGlobales.obtener();
+    const fechaActual = obtenerFechaLocalActual();
     const fechaDesdeUrl = parametros.get('fechaDesde');
     const fechaHastaUrl = parametros.get('fechaHasta');
-    this.filtros.fechaDesde = esFechaCalendarioValida(fechaDesdeUrl) ? fechaDesdeUrl : globales.fechaDesde;
-    this.filtros.fechaHasta = esFechaCalendarioValida(fechaHastaUrl) ? fechaHastaUrl : globales.fechaHasta;
+    this.filtros.fechaDesde = esFechaCalendarioValida(fechaDesdeUrl) ? fechaDesdeUrl : fechaActual;
+    this.filtros.fechaHasta = esFechaCalendarioValida(fechaHastaUrl) ? fechaHastaUrl : fechaActual;
     this.filtros.numeroPedido = parametros.get('numeroPedido') || guardados.numeroPedido || '';
     const codigosUrl = parametros.getAll('codigoAlmacen')
       .map((codigo) => codigo.trim()).filter(Boolean);

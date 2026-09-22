@@ -13,7 +13,9 @@ let usuario:IdentidadAutenticada;
 let repo:RepositorioDevolucionRutas;
 function app(){const a=express();a.use(express.json());a.use((r,_s,n)=>{r.user=usuario;n();});
   a.use('/api/pedidos-devueltos',crearPedidoDevueltoRutas(repo));
-  a.use((e:{estadoHttp?:number},_r:express.Request,s:express.Response,_n:express.NextFunction)=>s.status(e.estadoHttp??400).json({error:true}));return a;}
+  a.use((e:{estadoHttp?:number},_r:express.Request,s:express.Response,n:express.NextFunction)=>{
+    void n; return s.status(e.estadoHttp??400).json({error:true});
+  });return a;}
 beforeEach(()=>{
   usuario={usuarioId:'1',nombreUsuario:'ana',nombreVisible:'Ana',codigoRol:'OPERADOR_BODEGA',codigoAlmacen:null,
     codigosAlmacenVisibles:['BSPS03'],sesionId:'1',debeCambiarContrasena:false};

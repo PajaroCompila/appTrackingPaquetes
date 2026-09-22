@@ -7,7 +7,7 @@ import { FiltrosGlobalesService } from '../../compartido/filtros-globales.servic
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
-import { esFechaCalendarioValida } from '../../compartido/estado-filtros-sesion';
+import { esFechaCalendarioValida, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import type { Almacen } from '../pedidos/almacen.interface';
@@ -43,7 +43,7 @@ export class FacturadosPendientesComponent implements OnInit {
   public readonly pagina=signal(1);
   public readonly total=signal(0);
   public readonly vista=signal<'articulos'|'pedido'>('articulos');
-  public readonly filtros={numeroPedido:'',fechaDesde:'',fechaHasta:'',
+  public readonly filtros={numeroPedido:'',fechaDesde:obtenerFechaLocalActual(),fechaHasta:obtenerFechaLocalActual(),
     codigosAlmacen:this.globales.obtener().codigosAlmacen,cantidadPorPagina:25};
 
   public ngOnInit():void {
@@ -96,7 +96,8 @@ export class FacturadosPendientesComponent implements OnInit {
     this.buscar();
   }
   public limpiar():void {
-    Object.assign(this.filtros,{numeroPedido:'',fechaDesde:'',fechaHasta:'',codigosAlmacen:[],cantidadPorPagina:25});this.buscar();
+    const fechaActual=obtenerFechaLocalActual();
+    Object.assign(this.filtros,{numeroPedido:'',fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:[],cantidadPorPagina:25});this.buscar();
   }
   public puedeConfirmar(linea:LineaFacturadaPendiente):boolean {
     const u=this.autenticacion.usuario();

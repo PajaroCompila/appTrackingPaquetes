@@ -832,12 +832,18 @@ export class ListaPedidosComponent implements OnInit {
             ...filtrosConsulta,
             pagina: this.pagina(),
             clasificacion: 'normal',
-          }).pipe(catchError(() => of(null))),
+          }).pipe(
+            map((respuesta) => ({ respuesta, error: null as unknown })),
+            catchError((error: unknown) => of({ respuesta: null, error })),
+          ),
           especiales: this.pedidosService.obtenerPedidos({
             ...filtrosConsulta,
             pagina: this.paginaEspeciales(),
             clasificacion: 'especial',
-          }).pipe(catchError(() => of(null))),
+          }).pipe(
+            map((respuesta) => ({ respuesta, error: null as unknown })),
+            catchError((error: unknown) => of({ respuesta: null, error })),
+          ),
         }).pipe(
           map((respuestas) => ({ respuestas, esAutomatica, filtrosConsulta, revisionConsulta })),
           catchError((error: unknown) => {
@@ -864,10 +870,13 @@ export class ListaPedidosComponent implements OnInit {
       takeUntilDestroyed(this.destruirRef),
     ).subscribe(({ respuestas, esAutomatica, filtrosConsulta, revisionConsulta }) => {
       if (revisionConsulta !== this.revisionFiltros) return;
-      const normales = respuestas.normales;
-      const especiales = respuestas.especiales;
+      const normales = respuestas.normales.respuesta;
+      const especiales = respuestas.especiales.respuesta;
       if (!normales && !especiales) {
-        if (this.primeraConsulta || !esAutomatica) this.error.set(obtenerMensajeError(null, 'listado'));
+        const errorConsulta = respuestas.normales.error ?? respuestas.especiales.error;
+        if (this.primeraConsulta || !esAutomatica) {
+          this.error.set(obtenerMensajeError(errorConsulta, 'listado'));
+        }
         this.cargando.set(false);
         this.actualizando.set(false);
         this.primeraConsulta = false;

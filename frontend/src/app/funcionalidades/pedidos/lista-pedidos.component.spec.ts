@@ -263,6 +263,7 @@ describe('ListaPedidosComponent', () => {
     expect(enrutador.navigate).toHaveBeenLastCalledWith([], expect.objectContaining({
       queryParams: {
         pagina: 1, cantidadPorPagina: 25,
+        paginaEspeciales: 1, vista: 'articulos',
         fechaDesde: '2026-08-03', fechaHasta: '2026-08-03',
       },
     }));
@@ -389,12 +390,12 @@ describe('ListaPedidosComponent', () => {
 
     await vi.advanceTimersByTimeAsync(15000);
 
-    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(llamadasIniciales + 1);
+    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(llamadasIniciales + 2);
     expect(pedidosService.obtenerPedidos).toHaveBeenLastCalledWith(expect.objectContaining({
       pagina: 1, fechaDesde: '2026-08-03', fechaHasta: '2026-08-03',
     }));
     expect(pedidosService.obtenerPedidos.mock.calls.at(-1)?.[0]).not.toHaveProperty('numeroPedido');
-    expect(pedidosService.obtenerPedidos.mock.calls.at(-1)?.[0].codigosAlmacen).toBeUndefined();
+    expect(pedidosService.obtenerPedidos.mock.calls.at(-1)?.[0].codigosAlmacen).toEqual(['BSPS01']);
     expect(componente.lineasSeleccionadasTransferencia().size).toBe(1);
     expect(consultaInventario.abierto()).toBe(true);
   });
@@ -414,8 +415,8 @@ describe('ListaPedidosComponent', () => {
     fixture.detectChanges();
     await vi.advanceTimersByTimeAsync(35000);
 
-    expect(maximoActivas).toBe(1);
-    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(2);
+    expect(maximoActivas).toBe(2);
+    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(4);
   });
 
   it('conserva los datos ante un error temporal y vuelve a intentar', async () => {
@@ -428,7 +429,7 @@ describe('ListaPedidosComponent', () => {
     await vi.advanceTimersByTimeAsync(15000);
     expect(componente.pedidos()).toEqual(respuestaLista.datos);
     await vi.advanceTimersByTimeAsync(15000);
-    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(3);
+    expect(pedidosService.obtenerPedidos).toHaveBeenCalledTimes(4);
     expect(componente.pedidos()).toEqual(respuestaLista.datos);
   });
 
@@ -482,8 +483,14 @@ describe('ListaPedidosComponent', () => {
   });
 
   it('habilita la navegación según página y hayMás', () => {
+    pedidosService.obtenerPedidos.mockReturnValue(of({
+      ...respuestaLista,
+      paginacion: { ...respuestaLista.paginacion, totalRegistros: 50 },
+    }));
     fixture.detectChanges();
-    const botones = fixture.nativeElement.querySelectorAll('.paginacion button') as NodeListOf<HTMLButtonElement>;
+    const botones = fixture.nativeElement.querySelectorAll(
+      '.paginacion .control-pagina',
+    ) as NodeListOf<HTMLButtonElement>;
 
     expect(botones[0]?.disabled).toBe(true);
     expect(botones[1]?.disabled).toBe(false);

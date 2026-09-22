@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
@@ -21,7 +21,7 @@ import { PedidosDevueltosService, type RespuestaPedidosDevueltos } from './pedid
   templateUrl: './pedidos-devueltos.component.html',
   styleUrls: ['../pedidos/lista-pedidos.component.css', './pedidos-devueltos.component.css'],
 })
-export class PedidosDevueltosComponent {
+export class PedidosDevueltosComponent implements OnInit {
   private readonly servicio = inject(PedidosDevueltosService);
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);

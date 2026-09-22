@@ -94,8 +94,8 @@ export class DashboardComponent implements OnInit {
     const parametros = this.ruta.snapshot.queryParamMap;
     const guardados = this.leerFiltrosGuardados();
     this.filtros = {
-      fechaDesde: parametros.get('fechaDesde') || guardados.fechaDesde || this.hoy,
-      fechaHasta: parametros.get('fechaHasta') || guardados.fechaHasta || this.hoy,
+      fechaDesde: parametros.get('fechaDesde') || this.hoy,
+      fechaHasta: parametros.get('fechaHasta') || this.hoy,
       codigoTienda: parametros.get('codigoTienda') || guardados.codigoTienda || '',
     };
     this.guardarFiltros();

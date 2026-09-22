@@ -73,6 +73,8 @@ describe('facturados pendientes: casos de aceptación y snapshots locales',()=> 
     const consulta=mocks.query.mock.calls[0]![0];
     expect(consulta).toContain('s.huellaActual IS NOT NULL');expect(consulta).toContain('l.activo=1');
     expect(consulta).toContain("p.estadoFinanciero=N'Facturado'");
+    expect(consulta).toContain('NOT EXISTS(SELECT 1 FROM dbo.DevolucionPedido');
+    expect(consulta).toContain('devolucion.idOrigen=p.idOrigen');
     expect(consulta).toContain('detalle.identificadorDetalle=l.identificadorDetalle');
     expect(consulta).toContain('detalle.codigoArticulo=l.codigoArticulo');
     expect(consulta).toContain('detalle.codigoAlmacen=l.codigoAlmacen');

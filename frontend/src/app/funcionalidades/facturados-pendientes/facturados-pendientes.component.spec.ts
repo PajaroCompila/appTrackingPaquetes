@@ -23,7 +23,7 @@ describe('Facturados pendientes: vista operativa aislada',()=> {
     controladosManualmente:1,confirmados:0,pendientes:1,sinValidacionManual:6,sinConfiguracion:0,lineas:[linea]};
   const respuesta:RespuestaFacturadosPendientes={datos:[pedido],paginacion:{pagina:1,cantidadPorPagina:25,totalRegistros:1,hayMas:false},almacenesSinConfiguracion:[]};
   beforeEach(async()=> {
-    vi.useFakeTimers();Object.values(servicio).forEach(m=>m.mockReset());usuario.set({nombreUsuario:'gcruz',codigoRol:'OPERADOR_BODEGA'});
+    vi.useFakeTimers();vi.setSystemTime(new Date(2026,8,21,12));Object.values(servicio).forEach(m=>m.mockReset());usuario.set({nombreUsuario:'gcruz',codigoRol:'OPERADOR_BODEGA'});
     servicio.listar.mockReturnValue(of(respuesta));servicio.obtener.mockReturnValue(of({datos:pedido}));servicio.confirmar.mockReturnValue(of({exito:true}));
     ruta=new BehaviorSubject(convertToParamMap({}));
     await TestBed.configureTestingModule({imports:[FacturadosPendientesComponent],providers:[provideRouter([]),
@@ -39,7 +39,7 @@ describe('Facturados pendientes: vista operativa aislada',()=> {
     const texto=fixture.nativeElement.textContent;
     expect(texto).toContain('Facturado');expect(texto).toContain('Pendiente de entrega');expect(texto).toContain('Responsable');
     expect(fixture.nativeElement.querySelectorAll('tbody tr').length).toBe(1);
-    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({codigosAlmacen:['BSPS04'],fechaDesde:'',fechaHasta:''}));
+    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({codigosAlmacen:['BSPS04'],fechaDesde:'2026-09-21',fechaHasta:'2026-09-21'}));
   });
   it('por pedido muestra 7/1/0/1/6 sin crear pendientes para las seis sin validación',()=> {
     fixture.componentInstance.cambiarVista('pedido');fixture.detectChanges();

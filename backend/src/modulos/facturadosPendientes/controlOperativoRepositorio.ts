@@ -107,6 +107,8 @@ export class ControlOperativoRepositorio {
         WHERE detalle.idOrigen=l.idOrigen AND detalle.identificadorDetalle=l.identificadorDetalle
           AND detalle.codigoArticulo=l.codigoArticulo AND detalle.codigoAlmacen=l.codigoAlmacen) d
       WHERE p.estadoFinanciero=N'Facturado'
+        AND NOT EXISTS(SELECT 1 FROM dbo.DevolucionPedido devolucion
+          WHERE devolucion.idOrigen=p.idOrigen)
         AND (@ids IS NULL OR p.idOrigen IN(SELECT value FROM OPENJSON(@ids)))
         AND (@numero IS NULL OR JSON_VALUE(p.cabecera,'$.numeroPedido') LIKE '%'+@numero+'%')
         AND (@desde IS NULL OR TRY_CONVERT(date,JSON_VALUE(p.cabecera,'$.fechaHoraPedido'))>=@desde)

@@ -323,12 +323,13 @@ export class PedidosDespachadosComponent implements OnInit {
     const parametros = this.ruta.snapshot.queryParamMap;
     const guardados = leerFiltrosSesion(claveFiltrosDespachados);
     const globales = this.filtrosGlobales.obtener();
+    const fechaActual = obtenerFechaLocalActual();
     const codigosUrl = parametros.getAll('codigoAlmacen').map((codigo) => codigo.trim()).filter(Boolean);
     const cantidad = Number(parametros.get('cantidadPorPagina') ?? guardados['cantidadPorPagina']);
     this.filtros = {
       numeroPedido: parametros.get('numeroPedido') ?? (typeof guardados['numeroPedido'] === 'string' ? guardados['numeroPedido'] : ''),
-      fechaDesde: esFechaCalendarioValida(parametros.get('fechaDesde')) ? parametros.get('fechaDesde')! : globales.fechaDesde,
-      fechaHasta: esFechaCalendarioValida(parametros.get('fechaHasta')) ? parametros.get('fechaHasta')! : globales.fechaHasta,
+      fechaDesde: esFechaCalendarioValida(parametros.get('fechaDesde')) ? parametros.get('fechaDesde')! : fechaActual,
+      fechaHasta: esFechaCalendarioValida(parametros.get('fechaHasta')) ? parametros.get('fechaHasta')! : fechaActual,
       codigosAlmacen: [...new Set(codigosUrl.length ? codigosUrl : globales.codigosAlmacen)],
       cantidadPorPagina: cantidad === 50 || cantidad === 100 ? cantidad : 25,
     };

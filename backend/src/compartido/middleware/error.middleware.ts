@@ -27,10 +27,9 @@ export function manejarError(
       ? error
       : new ErrorAplicacion(500, 'ERROR_INTERNO', 'Ocurrió un error inesperado.');
 
-  solicitud.log.error(
-    { error: error instanceof Error ? error : new Error('Error no identificable') },
-    'Solicitud terminada con error',
-  );
+  const errorRegistrable = error instanceof Error ? error : new Error('Error no identificable');
+  if (solicitud.log) solicitud.log.error({ error: errorRegistrable }, 'Solicitud terminada con error');
+  else console.error('Solicitud terminada con error', errorRegistrable);
 
   respuesta.status(errorAplicacion.estadoHttp).json({
     codigo: errorAplicacion.codigo,

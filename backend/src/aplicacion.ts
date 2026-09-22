@@ -56,9 +56,6 @@ aplicacion.use(
     credentials: true,
   }),
 );
-aplicacion.use(express.json({ limit: '16kb' }));
-aplicacion.use(cookieParser());
-aplicacion.use(asignarIdSeguimiento);
 aplicacion.use(
   pinoHttp({
     quietReqLogger: true,
@@ -71,6 +68,9 @@ aplicacion.use(
     ],
   }),
 );
+aplicacion.use(express.json({ limit: '16kb' }));
+aplicacion.use(cookieParser());
+aplicacion.use(asignarIdSeguimiento);
 
 aplicacion.use('/api/autenticacion', autenticacionRutas);
 aplicacion.use('/api/salud', saludRutas);
