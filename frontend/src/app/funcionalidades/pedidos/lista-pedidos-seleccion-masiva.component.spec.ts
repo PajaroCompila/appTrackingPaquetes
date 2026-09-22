@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
+import type { AsignacionArticulo } from '../../compartido/asignaciones/asignacion.interface';
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import { PedidosNotificacionesService } from '../../compartido/notificaciones/pedidos-notificaciones.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
@@ -19,6 +20,18 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
   let especiales: PedidoResumen[];
   const despacharLineas = vi.fn();
   const registrarImpresiones = vi.fn();
+  const estadosAsignacion = new Map<string, AsignacionArticulo>();
+  const asignaciones = { consultar: vi.fn(), obtenerUsuarios: vi.fn(), guardar: vi.fn(), reasignar: vi.fn() };
+
+  const asignacion = (
+    idOrigen: string,
+    identificadorDetalle: string,
+    usuarioAsignado: string | null = null,
+    nombreAsignado: string | null = null,
+  ): AsignacionArticulo => ({
+    idOrigen, identificadorDetalle, usuarioAsignado, nombreAsignado,
+    asignadoEn: null, actualizadoEn: null,
+  });
 
   const pedido = (idOrigen: string, numeroPedido: string, detalles: string[]): PedidoResumen => ({
     idOrigen, origenPedido: 'R1', creadoEnR1: true, sapDocEntry: null,
@@ -37,8 +50,31 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     sessionStorage.clear();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-21T14:00:00Z'));
+    for (const nombre of ['showModal', 'close'] as const) {
+      if (!HTMLDialogElement.prototype[nombre]) Object.defineProperty(HTMLDialogElement.prototype, nombre, {
+        configurable: true, value(this: HTMLDialogElement) { this.open = nombre === 'showModal'; },
+      });
+      vi.spyOn(HTMLDialogElement.prototype, nombre).mockImplementation(function (this: HTMLDialogElement) {
+        this.open = nombre === 'showModal';
+      });
+    }
     normales = [pedido('R1:NORMAL:1', '1001', ['1', '2'])];
     especiales = [pedido('R1:ESPECIAL:1', '2001', ['1'])];
+    estadosAsignacion.clear();
+    Object.values(asignaciones).forEach((metodo) => metodo.mockReset());
+    asignaciones.obtenerUsuarios.mockReturnValue(of({
+      datos: [{ usuario: 'mperez', nombre: 'Marcos Perez' }],
+      puedeAsignar: true, puedeAsignarTodos: true, puedeReasignar: true,
+    }));
+    asignaciones.consultar.mockImplementation((lineas: { idOrigen: string; identificadorDetalle: string }[]) => of({
+      datos: lineas.map((linea) => estadosAsignacion.get(`${linea.idOrigen}\u0000${linea.identificadorDetalle}`)
+        ?? asignacion(linea.idOrigen, linea.identificadorDetalle)),
+    }));
+    asignaciones.guardar.mockImplementation((linea: { idOrigen: string; identificadorDetalle: string }, usuario: string) => {
+      const datos = asignacion(linea.idOrigen, linea.identificadorDetalle, usuario, 'Marcos Perez');
+      estadosAsignacion.set(`${linea.idOrigen}\u0000${linea.identificadorDetalle}`, datos);
+      return of({ datos });
+    });
     despacharLineas.mockReset().mockImplementation((lineas) => of({ datos: {
       transferidas: lineas, omitidas: [], rechazadas: [],
     } }));
@@ -61,14 +97,7 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
         { provide: FacturadosPendientesService, useValue: { listar: () => of({ datos: [], paginacion: {
           pagina: 1, cantidadPorPagina: 1, totalRegistros: 0, hayMas: false,
         }, almacenesSinConfiguracion: [] }) } },
-        { provide: AsignacionesService, useValue: {
-          obtenerUsuarios: () => of({ datos: [], puedeAsignar: false,
-            puedeAsignarTodos: false, puedeReasignar: false }),
-          consultar: (lineas: { idOrigen: string; identificadorDetalle: string }[]) => of({
-            datos: lineas.map((linea) => ({ ...linea, usuarioAsignado: null,
-              nombreAsignado: null, asignadoEn: null, actualizadoEn: null })),
-          }),
-        } },
+        { provide: AsignacionesService, useValue: asignaciones },
         { provide: ImpresionesService, useValue: { registrar: registrarImpresiones } },
         { provide: PedidosNotificacionesService, useValue: { procesarRespuesta: vi.fn() } },
         { provide: AutenticacionService, useValue: { usuario: signal({
@@ -90,6 +119,7 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
   afterEach(() => {
     fixture.destroy();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('renderiza las dos acciones compactas en cada matriz', () => {
@@ -162,13 +192,15 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
 
   it('envía la selección masiva al flujo vigente de impresión y auditoría', async () => {
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    estadosAsignacion.set('R1:NORMAL:1\u00001', asignacion('R1:NORMAL:1', '1', 'gcruz', 'Gregorio Cruz'));
+    estadosAsignacion.set('R1:NORMAL:1\u00002', asignacion('R1:NORMAL:1', '2', 'mperez', 'Marcos Perez'));
     componente.seleccionarTodasImpresiones('normales');
     componente.imprimirSeleccionados();
     await vi.advanceTimersByTimeAsync(0);
     expect(componente.articulosImpresion().map(({ vendedor, asignadoA }) => ({ vendedor, asignadoA })))
       .toEqual([
-        { vendedor: 'Vendedor', asignadoA: 'Sin asignar' },
-        { vendedor: 'Vendedor', asignadoA: 'Sin asignar' },
+        { vendedor: 'Vendedor', asignadoA: 'Gregorio Cruz' },
+        { vendedor: 'Vendedor', asignadoA: 'Marcos Perez' },
       ]);
     componente.alCerrarImpresion();
     componente.registrarImpresionConfirmada();
@@ -180,6 +212,41 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     ]);
     expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
     imprimir.mockRestore();
+  });
+
+  it('sin responsable abre el modal y cancelar no imprime', () => {
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    componente.seleccionarTodasImpresiones('normales');
+    componente.imprimirSeleccionados();
+    fixture.detectChanges();
+
+    expect(componente.solicitarResponsableImpresion()).toBe(true);
+    expect(componente.articulosSinResponsableImpresion().map(({ codigo }) => codigo))
+      .toEqual(['ART-1', 'ART-2']);
+    expect(fixture.nativeElement.querySelector('app-asignacion-impresion dialog').open).toBe(true);
+    componente.cancelarAsignacionImpresion();
+
+    expect(imprimir).not.toHaveBeenCalled();
+    expect(asignaciones.guardar).not.toHaveBeenCalled();
+  });
+
+  it('asigna solo faltantes, conserva responsables existentes e imprime automáticamente', async () => {
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    estadosAsignacion.set('R1:NORMAL:1\u00001', asignacion('R1:NORMAL:1', '1', 'gcruz', 'Gregorio Cruz'));
+    componente.seleccionarTodasImpresiones('normales');
+    componente.imprimirSeleccionados();
+
+    expect(componente.articulosSinResponsableImpresion().map(({ codigo }) => codigo)).toEqual(['ART-2']);
+    componente.asignarYContinuarImpresion('mperez');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(asignaciones.guardar).toHaveBeenCalledExactlyOnceWith(
+      { idOrigen: 'R1:NORMAL:1', identificadorDetalle: '2' }, 'mperez',
+    );
+    expect(asignaciones.reasignar).not.toHaveBeenCalled();
+    expect(componente.articulosImpresion().map(({ asignadoA }) => asignadoA))
+      .toEqual(['Gregorio Cruz', 'Marcos Perez']);
+    expect(imprimir).toHaveBeenCalledOnce();
   });
 
   it('limpia selecciones al cambiar de vista', () => {

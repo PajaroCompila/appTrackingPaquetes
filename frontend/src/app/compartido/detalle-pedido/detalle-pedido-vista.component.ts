@@ -16,7 +16,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, concatMap, from, of, tap, throwError, toArray } from 'rxjs';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { claveArticuloAsignado, type AsignacionArticulo, type TecnicoAsignable } from '../asignaciones/asignacion.interface';
-import { AutenticacionService } from '../../funcionalidades/autenticacion/autenticacion.service';
 import { AsignacionImpresionComponent } from './asignacion-impresion.component';
 import { EncabezadoArticulosDetalleComponent } from './encabezado-articulos-detalle.component';
 import { AccionSeleccionDetalleComponent, SelectorTransferenciaDetalleComponent } from './controles-seleccion-detalle.component';
@@ -370,8 +369,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
         const faltantes = elegidos.filter(a => !actuales.get(claveArticuloAsignado(this.identidad(a)!))?.usuarioAsignado);
         if (faltantes.length === 0) {
           this.consultandoResponsables.set(false);
-          if (datos.every(a => this.puedeImprimirAsignacion(a))) this.abrirImpresion(elegidos, datos);
-          else this.mensajeImpresion.set('Algunos artículos tienen otro responsable. Revisá la selección.');
+          this.abrirImpresion(elegidos, datos);
           return;
         }
         this.articulosSinResponsable.set(faltantes);
@@ -428,9 +426,9 @@ export class DetallePedidoVistaComponent implements OnChanges {
         if (!this.flujoAsignacionVigente(version)) return;
         this.asignandoResponsables.set(false);
         this.solicitarResponsable.set(false);
-        if (resultados.length === lineas.length && resultados.every(({ datos }) => datos.usuarioAsignado && this.puedeImprimirAsignacion(datos))) {
+        if (resultados.length === lineas.length && resultados.every(({ datos }) => datos.usuarioAsignado)) {
           this.abrirImpresion(this.articulosElegidos(), resultados.map(({ datos }) => datos));
-        } else this.mensajeImpresion.set('Algunos artículos tienen otro responsable. Revisá la selección.');
+        } else this.mensajeImpresion.set('No se pudo comprobar el responsable de todos los artículos. Intentá de nuevo.');
       },
       error: () => {
         if (version !== this.versionAsignacion) return;
@@ -438,12 +436,6 @@ export class DetallePedidoVistaComponent implements OnChanges {
         this.errorAsignacionImpresion.set('No se pudo completar la asignación. Las asignaciones guardadas se conservan; podés reintentar.');
       },
     });
-  }
-
-  private puedeImprimirAsignacion(asignacion: AsignacionArticulo): boolean {
-    const sesion = this.inyector.get(AutenticacionService).usuario();
-    return sesion?.codigoRol === 'ADMINISTRADOR' || sesion?.nombreUsuario.trim().toLowerCase() === 'gcruz'
-      || sesion?.nombreUsuario.trim().toLowerCase() === asignacion.usuarioAsignado?.trim().toLowerCase();
   }
 
   private flujoAsignacionVigente(version: number): boolean {

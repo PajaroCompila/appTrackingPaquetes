@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
 import { ActivatedRoute, Router, RouterLink, type ParamMap } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, Subject, catchError, exhaustMap, filter, finalize, forkJoin, map, merge, of, tap, timer } from 'rxjs';
+import { EMPTY, Subject, catchError, concatMap, exhaustMap, filter, finalize, forkJoin, from, map, merge, of, tap, throwError, timer, toArray } from 'rxjs';
 import type { MensajeError } from '../../compartido/error-api.interface';
 import { obtenerMensajeError } from '../../compartido/manejar-error-http';
 import type { Almacen } from './almacen.interface';
@@ -32,6 +32,8 @@ import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/con
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
 import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
+import { AsignacionImpresionComponent } from '../../compartido/detalle-pedido/asignacion-impresion.component';
+import type { ArticuloDetalleVisual } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -70,7 +72,7 @@ interface GrupoPedidos {
   selector: 'app-lista-pedidos',
   imports: [CommonModule, FormsModule, RouterLink, CodigoArticuloInventarioDirective,
     PaginacionComponent, SelectorAlmacenesDirective, AccionSeleccionDetalleComponent,
-    VistaImpresionPedidoComponent, ConfirmacionImpresionComponent],
+    VistaImpresionPedidoComponent, ConfirmacionImpresionComponent, AsignacionImpresionComponent],
   templateUrl: './lista-pedidos.component.html',
   styleUrl: './lista-pedidos.component.css',
 })
@@ -98,6 +100,8 @@ export class ListaPedidosComponent implements OnInit {
   private loteImpresion: LineaRegistroImpresion[] | null = null;
   private esperandoCierreImpresion = false;
   private temporizadorImpresion?: ReturnType<typeof setTimeout>;
+  private versionAsignacionImpresion = 0;
+  private firmaAsignacionImpresion = '';
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
@@ -126,6 +130,12 @@ export class ListaPedidosComponent implements OnInit {
   public readonly guardandoImpresion = signal(false);
   public readonly mensajeImpresion = signal('');
   public readonly errorRegistroImpresion = signal('');
+  public readonly solicitarResponsableImpresion = signal(false);
+  public readonly consultandoResponsablesImpresion = signal(false);
+  public readonly asignandoResponsablesImpresion = signal(false);
+  public readonly articulosSinResponsableImpresion = signal<readonly ArticuloDetalleVisual[]>([]);
+  public readonly usuariosAsignablesImpresion = signal<readonly TecnicoAsignable[]>([]);
+  public readonly errorAsignacionImpresion = signal('');
   public readonly usuariosAsignables = signal<readonly TecnicoAsignable[]>([]);
   public readonly asignaciones = signal<ReadonlyMap<string, AsignacionArticulo>>(new Map());
   public readonly seleccionesAsignacion = signal<ReadonlyMap<string, string>>(new Map());
@@ -561,6 +571,7 @@ export class ListaPedidosComponent implements OnInit {
     indice: number,
     seleccionado: boolean,
   ): void {
+    if (this.hayFlujoAsignacionImpresion()) return;
     if (seleccionado && !this.puedeOperarArticulo(pedido, articulo)) return;
     const nuevas = new Set(this.lineasSeleccionadasImpresion());
     const clave = this.claveEstableLinea(pedido, articulo, indice);
@@ -577,7 +588,8 @@ export class ListaPedidosComponent implements OnInit {
 
   public puedeSeleccionarImpresiones(grupo: GrupoPedidos['clave']): boolean {
     return this.clavesVisiblesGrupo(grupo).length > 0
-      && !this.preparandoImpresion() && !this.confirmarImpresion() && !this.guardandoImpresion();
+      && !this.preparandoImpresion() && !this.confirmarImpresion() && !this.guardandoImpresion()
+      && !this.hayFlujoAsignacionImpresion();
   }
 
   public seleccionarTodasImpresiones(grupo: GrupoPedidos['clave']): void {
@@ -592,12 +604,22 @@ export class ListaPedidosComponent implements OnInit {
 
   public imprimirSeleccionados(): void {
     if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()
-      || this.lineasSeleccionadasImpresion().size === 0) return;
+      || this.hayFlujoAsignacionImpresion() || this.lineasSeleccionadasImpresion().size === 0) return;
     const elegidos = this.obtenerLineasSeleccionadasImpresion();
     if (elegidos.length === 0) {
       this.limpiarSeleccionImpresion();
       return;
     }
+    this.validarResponsablesImpresion(elegidos);
+  }
+
+  private abrirImpresion(
+    elegidos: { pedido: PedidoResumen; articulo: ArticuloPedidoResumen }[],
+    asignaciones: readonly AsignacionArticulo[] = [],
+  ): void {
+    const asignacionesPorLinea = new Map(asignaciones.map((asignacion) => [
+      claveArticuloAsignado(asignacion), asignacion,
+    ]));
     this.loteImpresion = elegidos.map(({ pedido, articulo }) => ({
       idOrigen: pedido.idOrigen,
       identificadorDetalle: articulo.identificadorDetalle!.trim(),
@@ -611,7 +633,8 @@ export class ListaPedidosComponent implements OnInit {
       cantidad: articulo.cantidad,
       bodega: articulo.codigoAlmacen?.trim() || '—',
       vendedor: pedido.nombreVendedor?.trim() || 'Sin vendedor',
-      asignadoA: this.asignacionActual(pedido, articulo)?.nombreAsignado?.trim()
+      asignadoA: asignacionesPorLinea.get(claveArticuloAsignado(this.identidadAsignacion(pedido, articulo)!))
+        ?.nombreAsignado?.trim() || this.asignacionActual(pedido, articulo)?.nombreAsignado?.trim()
         || articulo.usuarioAsignado?.trim() || 'Sin asignar',
     })));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
@@ -627,6 +650,121 @@ export class ListaPedidosComponent implements OnInit {
         this.mensajeImpresion.set('No se pudo abrir la impresión.');
       }
     });
+  }
+
+  private validarResponsablesImpresion(
+    elegidos: { pedido: PedidoResumen; articulo: ArticuloPedidoResumen }[],
+  ): void {
+    const version = ++this.versionAsignacionImpresion;
+    this.firmaAsignacionImpresion = this.firmaSeleccionImpresion();
+    this.consultandoResponsablesImpresion.set(true);
+    this.mensajeImpresion.set('');
+    const lineas = elegidos.map(({ pedido, articulo }) => this.identidadAsignacion(pedido, articulo)!);
+    this.asignacionesService.consultar(lineas)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe({
+        next: ({ datos }) => {
+          if (!this.flujoAsignacionImpresionVigente(version)) return;
+          const actuales = new Map(datos.map((asignacion) => [claveArticuloAsignado(asignacion), asignacion]));
+          if (lineas.some((linea) => !actuales.has(claveArticuloAsignado(linea)))) {
+            this.consultandoResponsablesImpresion.set(false);
+            this.mensajeImpresion.set('No se pudo comprobar el responsable de todos los artículos. Intentá de nuevo.');
+            return;
+          }
+          this.actualizarAsignacionesImpresion(datos);
+          const faltantes = elegidos.filter(({ pedido, articulo }) =>
+            !actuales.get(claveArticuloAsignado(this.identidadAsignacion(pedido, articulo)!))?.usuarioAsignado);
+          if (faltantes.length === 0) {
+            this.consultandoResponsablesImpresion.set(false);
+            this.abrirImpresion(elegidos, datos);
+            return;
+          }
+          this.articulosSinResponsableImpresion.set(faltantes.map(({ pedido, articulo }) =>
+            this.articuloDetalleImpresion(pedido, articulo)));
+          this.asignacionesService.obtenerUsuarios()
+            .pipe(takeUntilDestroyed(this.destruirRef))
+            .subscribe({
+              next: ({ datos: usuarios, puedeAsignar }) => {
+                if (!this.flujoAsignacionImpresionVigente(version)) return;
+                this.consultandoResponsablesImpresion.set(false);
+                this.usuariosAsignablesImpresion.set(puedeAsignar ? usuarios : []);
+                this.errorAsignacionImpresion.set(puedeAsignar && usuarios.length > 0 ? ''
+                  : 'Tu usuario no puede asignar estos artículos. Solicitá la asignación al responsable de bodega.');
+                this.solicitarResponsableImpresion.set(true);
+              },
+              error: () => {
+                if (!this.flujoAsignacionImpresionVigente(version)) return;
+                this.consultandoResponsablesImpresion.set(false);
+                this.mensajeImpresion.set('No se pudo cargar la lista de responsables. Intentá de nuevo.');
+              },
+            });
+        },
+        error: () => {
+          if (!this.flujoAsignacionImpresionVigente(version)) return;
+          this.consultandoResponsablesImpresion.set(false);
+          this.mensajeImpresion.set('No se pudo comprobar la asignación. Intentá de nuevo.');
+        },
+      });
+  }
+
+  public asignarYContinuarImpresion(usuario: string): void {
+    if (!this.solicitarResponsableImpresion() || this.asignandoResponsablesImpresion()
+      || !this.usuariosAsignablesImpresion().some((tecnico) => tecnico.usuario === usuario)) return;
+    const version = this.versionAsignacionImpresion;
+    if (!this.flujoAsignacionImpresionVigente(version)) return;
+    const elegidos = this.obtenerLineasSeleccionadasImpresion();
+    const lineas = elegidos.map(({ pedido, articulo }) => this.identidadAsignacion(pedido, articulo)!);
+    this.asignandoResponsablesImpresion.set(true);
+    this.errorAsignacionImpresion.set('');
+    this.asignacionesService.consultar(lineas).pipe(
+      concatMap(({ datos }) => {
+        if (!this.flujoAsignacionImpresionVigente(version)
+          || lineas.some((linea) => !datos.some((actual) =>
+            claveArticuloAsignado(actual) === claveArticuloAsignado(linea)))) {
+          return throwError(() => new Error('La selección cambió.'));
+        }
+        return from(datos).pipe(concatMap((actual) => actual.usuarioAsignado
+          ? of({ datos: actual })
+          : this.asignacionesService.guardar({
+            idOrigen: actual.idOrigen,
+            identificadorDetalle: actual.identificadorDetalle,
+          }, usuario).pipe(catchError((error) => error.status === 409 && error.error?.datos?.usuarioAsignado
+            ? of({ datos: error.error.datos as AsignacionArticulo }) : throwError(() => error)))));
+      }),
+      tap(({ datos }) => {
+        if (version === this.versionAsignacionImpresion) this.actualizarAsignacionesImpresion([datos]);
+      }),
+      toArray(),
+      takeUntilDestroyed(this.destruirRef),
+    ).subscribe({
+      next: (resultados) => {
+        if (!this.flujoAsignacionImpresionVigente(version)) return;
+        this.asignandoResponsablesImpresion.set(false);
+        this.solicitarResponsableImpresion.set(false);
+        if (resultados.length === lineas.length
+          && resultados.every(({ datos }) => Boolean(datos.usuarioAsignado))) {
+          this.abrirImpresion(elegidos, resultados.map(({ datos }) => datos));
+        } else {
+          this.mensajeImpresion.set('No se pudo comprobar el responsable de todos los artículos. Intentá de nuevo.');
+        }
+      },
+      error: () => {
+        if (version !== this.versionAsignacionImpresion) return;
+        this.asignandoResponsablesImpresion.set(false);
+        this.errorAsignacionImpresion.set('No se pudo completar la asignación. Las asignaciones guardadas se conservan; podés reintentar.');
+      },
+    });
+  }
+
+  public cancelarAsignacionImpresion(forzar = false): void {
+    if (this.asignandoResponsablesImpresion() && !forzar) return;
+    ++this.versionAsignacionImpresion;
+    this.solicitarResponsableImpresion.set(false);
+    this.consultandoResponsablesImpresion.set(false);
+    this.asignandoResponsablesImpresion.set(false);
+    this.articulosSinResponsableImpresion.set([]);
+    this.usuariosAsignablesImpresion.set([]);
+    this.errorAsignacionImpresion.set('');
   }
 
   @HostListener('window:afterprint')
@@ -707,7 +845,55 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private limpiarSeleccionImpresion(): void {
+    this.cancelarAsignacionImpresion(true);
     this.lineasSeleccionadasImpresion.set(new Set());
+  }
+
+  private hayFlujoAsignacionImpresion(): boolean {
+    return this.consultandoResponsablesImpresion() || this.solicitarResponsableImpresion()
+      || this.asignandoResponsablesImpresion();
+  }
+
+  private articuloDetalleImpresion(
+    pedido: PedidoResumen,
+    articulo: ArticuloPedidoResumen,
+  ): ArticuloDetalleVisual {
+    const identidad = this.identidadAsignacion(pedido, articulo)!;
+    return {
+      clave: claveArticuloAsignado(identidad),
+      identificadorDetalle: identidad.identificadorDetalle,
+      codigo: articulo.codigoArticulo,
+      descripcion: articulo.descripcion,
+      cantidad: articulo.cantidad,
+      codigoAlmacen: articulo.codigoAlmacen,
+      nombreAlmacen: articulo.nombreAlmacen,
+      responsable: this.asignacionActual(pedido, articulo)?.nombreAsignado
+        || articulo.usuarioAsignado || null,
+    };
+  }
+
+  private actualizarAsignacionesImpresion(datos: readonly AsignacionArticulo[]): void {
+    const actuales = new Map(this.asignaciones());
+    datos.forEach((asignacion) => actuales.set(claveArticuloAsignado(asignacion), asignacion));
+    this.asignaciones.set(actuales);
+  }
+
+  private flujoAsignacionImpresionVigente(version: number): boolean {
+    if (version !== this.versionAsignacionImpresion) return false;
+    if (this.firmaAsignacionImpresion === this.firmaSeleccionImpresion()) return true;
+    this.cancelarAsignacionImpresion(true);
+    this.mensajeImpresion.set('Los artículos cambiaron. Revisá la selección antes de imprimir.');
+    return false;
+  }
+
+  private firmaSeleccionImpresion(): string {
+    return JSON.stringify(this.obtenerLineasSeleccionadasImpresion().map(({ pedido, articulo }) => [
+      pedido.idOrigen,
+      articulo.identificadorDetalle,
+      articulo.codigoArticulo,
+      articulo.cantidad,
+      articulo.codigoAlmacen,
+    ]));
   }
 
   private reconciliarSeleccionTransferencia(pedidos: PedidoResumen[]): void {

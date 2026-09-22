@@ -376,6 +376,15 @@
     [articulos]="articulosImpresion()"
     [fechaHora]="fechaHoraImpresion()"
   />
+  <app-asignacion-impresion
+    [abierta]="solicitarResponsableImpresion()"
+    [guardando]="asignandoResponsablesImpresion()"
+    [articulos]="articulosSinResponsableImpresion()"
+    [usuarios]="usuariosAsignablesImpresion()"
+    [error]="errorAsignacionImpresion()"
+    (confirmar)="asignarYContinuarImpresion($event)"
+    (cancelar)="cancelarAsignacionImpresion()"
+  />
   <app-confirmacion-impresion
     [abierta]="confirmarImpresion()"
     [guardando]="guardandoImpresion()"

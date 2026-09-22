@@ -1,12 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
 import { DetallePedidoVistaComponent } from './detalle-pedido-vista.component';
 import type { ConfiguracionDetallePedido, PedidoDetalleVisual } from './detalle-pedido-vista.interface';
 import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import type { AsignacionArticulo } from '../asignaciones/asignacion.interface';
-import { AutenticacionService } from '../../funcionalidades/autenticacion/autenticacion.service';
 import { ImpresionesService } from '../impresiones/impresiones.service';
 
 describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir', () => {
@@ -21,7 +19,6 @@ describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir
   const estados = new Map<string, AsignacionArticulo>();
   const asignaciones = { consultar: vi.fn(), obtenerUsuarios: vi.fn(), guardar: vi.fn(), reasignar: vi.fn() };
   const impresiones = { consultar: vi.fn(), registrar: vi.fn() };
-  const sesion = signal({ nombreUsuario: 'sistemas', codigoRol: 'ADMINISTRADOR' });
   const asignacion = (n: string, usuario: string | null = null): AsignacionArticulo => ({ idOrigen: pedido.idOrigen,
     identificadorDetalle: n, usuarioAsignado: usuario, nombreAsignado: usuario, asignadoEn: null, actualizadoEn: null });
 
@@ -34,7 +31,6 @@ describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir
       vi.spyOn(HTMLDialogElement.prototype, nombre).mockImplementation(function (this: HTMLDialogElement) { this.open = nombre === 'showModal'; });
     }
     vi.spyOn(window, 'print').mockImplementation(() => undefined);
-    sesion.set({ nombreUsuario: 'sistemas', codigoRol: 'ADMINISTRADOR' });
     estados.clear();
     Object.values(asignaciones).forEach(m => m.mockReset());
     Object.values(impresiones).forEach(m => m.mockReset());
@@ -49,7 +45,6 @@ describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir
     });
     await TestBed.configureTestingModule({ imports: [DetallePedidoVistaComponent], providers: [
       { provide: AsignacionesService, useValue: asignaciones }, { provide: ImpresionesService, useValue: impresiones },
-      { provide: AutenticacionService, useValue: { usuario: sesion } },
     ] }).compileComponents();
     fixture = TestBed.createComponent(DetallePedidoVistaComponent);
     fixture.componentRef.setInput('configuracion', configuracion);
@@ -158,11 +153,13 @@ describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir
     componente().asignarYContinuarImpresion('mperez'); expect(asignaciones.guardar).not.toHaveBeenCalled();
     expect(componente().errorAsignacionImpresion()).toContain('no puede asignar');
   });
-  it('no imprime asignaciones ajenas cuando el permiso vigente del usuario no lo permite', () => {
-    sesion.set({ nombreUsuario: 'jlara', codigoRol: 'OPERADOR_BODEGA' });
+  it('imprime asignaciones existentes de otra persona sin modificarlas', () => {
     pedido.articulos.forEach(a => estados.set(a.identificadorDetalle!, asignacion(a.identificadorDetalle!, 'acalix')));
-    pedirImpresion(); vi.runAllTimers(); expect(window.print).not.toHaveBeenCalled();
-    expect(componente().mensajeImpresion()).toContain('otro responsable');
+    pedirImpresion(); vi.runAllTimers(); expect(window.print).toHaveBeenCalledOnce();
+    expect(asignaciones.guardar).not.toHaveBeenCalled();
+    expect(asignaciones.reasignar).not.toHaveBeenCalled();
+    expect(componente().articulosImpresion().map(({ asignadoA }) => asignadoA))
+      .toEqual(['acalix', 'acalix', 'acalix']);
   });
   it('fallo o respuesta incompleta al consultar no permite imprimir', () => {
     asignaciones.consultar.mockReturnValueOnce(throwError(() => new Error('503'))); pedirImpresion();
