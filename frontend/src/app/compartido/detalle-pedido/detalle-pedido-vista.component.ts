@@ -323,7 +323,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
       bodega: articulo.codigoAlmacen?.trim() || '—',
       vendedor: this.pedido?.vendedor?.trim() || 'Sin vendedor',
       asignadoA: asignacionesPorLinea.get(claveArticuloAsignado(this.identidad(articulo)!))
-        ?.nombreAsignado?.trim() || articulo.responsable?.trim() || 'Sin asignar',
+        ?.nombreAsignado?.trim() || articulo.responsable?.trim() || articulo.usuario?.trim() || 'Sin asignar',
     })));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.preparandoImpresion.set(true);

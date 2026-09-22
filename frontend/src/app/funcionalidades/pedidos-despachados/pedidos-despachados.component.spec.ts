@@ -81,7 +81,8 @@ describe('PedidosDespachadosComponent', () => {
     expect(enlaces).toHaveLength(2);
     expect(enlaces[0].getAttribute('href')).toBe(enlaces[1].getAttribute('href'));
     expect(texto).toContain('05:30');
-    expect(texto).not.toContain('Imprimir');
+    expect(texto).toContain('Imprimir seleccionados (0)');
+    expect(texto).toContain('IMPRIMIR TODO');
   });
 
   it('calcula el tiempo congelado de un pedido especial con la misma regla', () => {
@@ -92,6 +93,30 @@ describe('PedidosDespachadosComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.tiempo-total-despacho').textContent).toContain('05:30');
+  });
+
+  it('imprime todo el listado conservando los responsables existentes', async () => {
+    vi.useFakeTimers();
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    responderListados(http, [pedido]);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [] });
+    fixture.detectChanges();
+
+    fixture.componentInstance.seleccionarTodasImpresiones('normales');
+    fixture.componentInstance.imprimirSeleccionados();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fixture.componentInstance.lineasSeleccionadasImpresion().size).toBe(2);
+    expect(fixture.componentInstance.articulosImpresion().map(({ asignadoA }) => asignadoA))
+      .toEqual(['Jorge Lara', 'Ana Calix']);
+    expect(imprimir).toHaveBeenCalledOnce();
+    fixture.destroy();
+    imprimir.mockRestore();
+    vi.useRealTimers();
   });
 
   it('muestra ambas secciones y mantiene su paginación independiente', () => {

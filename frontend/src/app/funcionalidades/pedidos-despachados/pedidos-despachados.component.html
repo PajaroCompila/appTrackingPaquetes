@@ -95,6 +95,13 @@
     } @else if (error()) {
       <div class="estado-interfaz estado-error"><p>No pudimos cargar los pedidos despachados.</p></div>
     } @else {
+      @if (vista() === 'articulos') {
+        <div class="acciones-transferencia">
+          <button class="boton boton-secundario boton-imprimir-seleccionados" type="button"
+            [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+            (click)="imprimirSeleccionados()">Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
+        </div>
+      }
       @for (grupo of grupos(); track grupo.clave) {
         <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-despachados-' + grupo.clave">
           <h2 [id]="'titulo-despachados-' + grupo.clave">{{ grupo.titulo }}</h2>
@@ -115,8 +122,12 @@
             <col class="ancho-usuario" />
             <col class="ancho-detalle" />
             <col class="ancho-tiempo-total" />
+            <col class="ancho-imprimir" />
           </colgroup>
-          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th></tr></thead>
+          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th><th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+            etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
+            [bloqueado]="grupo.pedidos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+            (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th></tr></thead>
           @for (pedido of grupo.pedidos; track pedido.idOrigen + ':' + pedido.articulos[0]?.identificadorDetalle) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
@@ -132,6 +143,15 @@
                   <td data-label="Usuario" [title]="articulo.usuarioAsignado || '—'"><span class="texto-dos-lineas">{{ articulo.usuarioAsignado || '—' }}</span></td>
                   <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
                   <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalDespacho(pedido, articulo.transferidoEn || pedido.despachadoEn) }}</strong></td>
+                  <td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+                    <label class="selector-linea selector-impresion" title="Seleccionar para imprimir">
+                      <input type="checkbox" [disabled]="!articulo.identificadorDetalle || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+                        [checked]="estaSeleccionadoParaImpresion(pedido, articulo)"
+                        [attr.aria-label]="'Seleccionar ' + (articulo.codigoArticulo || 'artículo') + ' para imprimir'"
+                        (change)="alternarSeleccionImpresion(pedido, articulo, $any($event.target).checked)" />
+                      <span aria-hidden="true">✓</span>
+                    </label>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -173,5 +193,11 @@
         </section>
       }
     }
+  }
+  @if (!idOrigen()) {
+    <app-vista-impresion-pedido [articulos]="articulosImpresion()" [fechaHora]="fechaHoraImpresion()" />
+    <app-confirmacion-impresion [abierta]="confirmarImpresion()" [guardando]="guardandoImpresion()"
+      [error]="errorRegistroImpresion()" (confirmar)="registrarImpresionConfirmada()"
+      (descartar)="descartarRegistroImpresion()" />
   }
 </section>

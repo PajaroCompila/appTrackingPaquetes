@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, Injector, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
@@ -21,6 +21,11 @@ import { AlmacenesService } from '../pedidos/almacenes.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
 import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
+import { AccionSeleccionDetalleComponent } from '../../compartido/detalle-pedido/controles-seleccion-detalle.component';
+import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from '../pedidos/vista-impresion-pedido.component';
+import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/confirmacion-impresion.component';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
+import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
 
 const claveFiltrosHistorial = 'historial';
 const intervaloActualizacionHistorialMs = 15000;
@@ -40,7 +45,8 @@ type VistaHistorial = 'pedido' | 'articulos';
 @Component({
   selector: 'app-historial',
   imports: [FormsModule, RouterLink, DetallePedidoVistaComponent,
-    CodigoArticuloInventarioDirective, PaginacionComponent, SelectorAlmacenesDirective],
+    CodigoArticuloInventarioDirective, PaginacionComponent, SelectorAlmacenesDirective,
+    AccionSeleccionDetalleComponent, VistaImpresionPedidoComponent, ConfirmacionImpresionComponent],
   templateUrl: './historial.component.html',
   styleUrls: ['../pedidos/lista-pedidos.component.css', './historial.component.css'],
 })
@@ -51,7 +57,11 @@ export class HistorialComponent implements OnInit {
   private readonly ruta = inject(ActivatedRoute);
   private readonly enrutador = inject(Router);
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
+  private readonly inyector = inject(Injector);
   private temporizador?: ReturnType<typeof setInterval>;
+  private temporizadorImpresion?: ReturnType<typeof setTimeout>;
+  private loteImpresion: LineaRegistroImpresion[] | null = null;
+  private esperandoCierreImpresion = false;
   private haCargado = false;
   private recargaManualPendiente = false;
   public readonly idOrigen = signal<string | null>(null);
@@ -80,6 +90,13 @@ export class HistorialComponent implements OnInit {
   public readonly cargando = signal(false);
   public readonly actualizando = signal(false);
   public readonly error = signal<MensajeError | null>(null);
+  public readonly lineasSeleccionadasImpresion = signal<ReadonlySet<string>>(new Set());
+  public readonly articulosImpresion = signal<readonly ArticuloImpresionPedido[]>([]);
+  public readonly fechaHoraImpresion = signal('');
+  public readonly preparandoImpresion = signal(false);
+  public readonly confirmarImpresion = signal(false);
+  public readonly guardandoImpresion = signal(false);
+  public readonly errorRegistroImpresion = signal('');
   public readonly configuracionDetalle: ConfiguracionDetallePedido = {
     contexto: 'Historial',
     titulo: 'Detalle del pedido',
@@ -89,7 +106,7 @@ export class HistorialComponent implements OnInit {
     etiquetaRetorno: 'Regresar al historial',
     tituloInformacion: 'Datos de entrega',
     etiquetaArticulos: 'Artículos entregados',
-    permitirImpresion: false,
+    permitirImpresion: true,
   };
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     if (!this.idOrigen()) return null;
@@ -151,6 +168,7 @@ export class HistorialComponent implements OnInit {
   }
 
   public ngOnInit(): void {
+    this.destruirRef.onDestroy(() => clearTimeout(this.temporizadorImpresion));
     const idOrigen = this.ruta.snapshot.paramMap.get('idOrigen');
     this.idOrigen.set(idOrigen);
     if (idOrigen) {
@@ -169,6 +187,7 @@ export class HistorialComponent implements OnInit {
   }
 
   public buscar(): void {
+    this.limpiarSeleccionImpresion();
     this.pagina.set(1);
     this.paginaEspeciales.set(1);
     this.guardarFiltros();
@@ -176,6 +195,7 @@ export class HistorialComponent implements OnInit {
     this.cargar();
   }
   public cambiarCantidadPorPagina(): void {
+    this.limpiarSeleccionImpresion();
     this.pagina.set(1);
     this.paginaEspeciales.set(1);
     this.guardarFiltros();
@@ -184,6 +204,7 @@ export class HistorialComponent implements OnInit {
   }
   public cambiarVista(vista: VistaHistorial): void {
     if (this.vista() === vista) return;
+    this.limpiarSeleccionImpresion();
     this.vista.set(vista); this.pagina.set(1); this.paginaEspeciales.set(1);
     this.haCargado = false; this.hayMas.set(false);
     if (vista === 'articulos') { this.articulos.set([]); this.articulosEspeciales.set([]); }
@@ -191,6 +212,7 @@ export class HistorialComponent implements OnInit {
     this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
   public limpiarFiltros(): void {
+    this.limpiarSeleccionImpresion();
     this.filtros = { fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
       numeroPedido: '', codigosAlmacen: [], cantidadPorPagina: 25 };
     this.pagina.set(1); this.paginaEspeciales.set(1);
@@ -221,6 +243,129 @@ export class HistorialComponent implements OnInit {
     return cantidad === 0 ? 'Todos los almacenes'
       : cantidad === 1 ? this.filtros.codigosAlmacen[0]! : `${cantidad} almacenes seleccionados`;
   }
+
+  public estaSeleccionadoParaImpresion(articulo: ArticuloHistorial): boolean {
+    return this.lineasSeleccionadasImpresion().has(this.claveImpresion(articulo));
+  }
+
+  public alternarSeleccionImpresion(articulo: ArticuloHistorial, seleccionado: boolean): void {
+    if (!articulo.identificadorDetalle?.trim() || this.preparandoImpresion()
+      || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const seleccion = new Set(this.lineasSeleccionadasImpresion());
+    const clave = this.claveImpresion(articulo);
+    if (seleccionado) seleccion.add(clave); else seleccion.delete(clave);
+    this.lineasSeleccionadasImpresion.set(seleccion);
+  }
+
+  public todasImpresionesSeleccionadas(grupo: 'normales' | 'especiales'): boolean {
+    const disponibles = this.articulosGrupo(grupo).filter((articulo) => articulo.identificadorDetalle?.trim());
+    return disponibles.length > 0
+      && disponibles.every((articulo) => this.estaSeleccionadoParaImpresion(articulo));
+  }
+
+  public seleccionarTodasImpresiones(grupo: 'normales' | 'especiales'): void {
+    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const disponibles = this.articulosGrupo(grupo).filter((articulo) => articulo.identificadorDetalle?.trim());
+    const seleccionar = !this.todasImpresionesSeleccionadas(grupo);
+    const seleccion = new Set(this.lineasSeleccionadasImpresion());
+    disponibles.forEach((articulo) => seleccionar
+      ? seleccion.add(this.claveImpresion(articulo))
+      : seleccion.delete(this.claveImpresion(articulo)));
+    this.lineasSeleccionadasImpresion.set(seleccion);
+  }
+
+  public imprimirSeleccionados(): void {
+    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const elegidos = [...this.articulos(), ...this.articulosEspeciales()]
+      .filter((articulo) => articulo.identificadorDetalle?.trim()
+        && this.lineasSeleccionadasImpresion().has(this.claveImpresion(articulo)));
+    if (elegidos.length === 0) return;
+    this.loteImpresion = elegidos.map((articulo) => ({
+      idOrigen: articulo.idOrigen,
+      identificadorDetalle: articulo.identificadorDetalle!.trim(),
+      codigoArticulo: articulo.codigoArticulo?.trim() || null,
+    }));
+    this.articulosImpresion.set(elegidos.map((articulo) => ({
+      idPedido: articulo.idOrigen,
+      numeroPedido: articulo.numeroPedido,
+      codigo: articulo.codigoArticulo?.trim() || '—',
+      descripcion: articulo.descripcion?.trim() || '—',
+      cantidad: articulo.cantidad,
+      bodega: articulo.codigoAlmacen?.trim() || '—',
+      vendedor: articulo.nombreVendedor?.trim() || 'Sin vendedor',
+      asignadoA: articulo.usuarioAsignado?.trim() || 'Sin asignar',
+    })));
+    this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
+    this.errorRegistroImpresion.set('');
+    this.preparandoImpresion.set(true);
+    this.temporizadorImpresion = setTimeout(() => {
+      this.esperandoCierreImpresion = true;
+      try { window.print(); } catch { this.descartarRegistroImpresion(); }
+    });
+  }
+
+  @HostListener('window:afterprint')
+  public alCerrarImpresion(): void {
+    if (!this.esperandoCierreImpresion || !this.loteImpresion) return;
+    this.esperandoCierreImpresion = false;
+    this.preparandoImpresion.set(false);
+    this.confirmarImpresion.set(true);
+  }
+
+  public descartarRegistroImpresion(): void {
+    if (this.guardandoImpresion()) return;
+    clearTimeout(this.temporizadorImpresion);
+    this.esperandoCierreImpresion = false;
+    this.loteImpresion = null;
+    this.confirmarImpresion.set(false);
+    this.preparandoImpresion.set(false);
+    this.errorRegistroImpresion.set('');
+  }
+
+  public registrarImpresionConfirmada(): void {
+    const lote = this.loteImpresion;
+    if (!lote || !this.confirmarImpresion() || this.guardandoImpresion()) return;
+    this.guardandoImpresion.set(true);
+    this.errorRegistroImpresion.set('');
+    this.inyector.get(ImpresionesService).registrar(lote)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe({
+        next: () => {
+          const seleccion = new Set(this.lineasSeleccionadasImpresion());
+          lote.forEach(({ idOrigen, identificadorDetalle }) =>
+            seleccion.delete(`${idOrigen}\u0000${identificadorDetalle}`));
+          this.lineasSeleccionadasImpresion.set(seleccion);
+          this.guardandoImpresion.set(false);
+          this.descartarRegistroImpresion();
+        },
+        error: () => {
+          this.guardandoImpresion.set(false);
+          this.errorRegistroImpresion.set('No se pudo guardar el registro de impresión. Intentá de nuevo.');
+        },
+      });
+  }
+
+  private articulosGrupo(grupo: 'normales' | 'especiales'): ArticuloHistorial[] {
+    return grupo === 'normales' ? this.articulos() : this.articulosEspeciales();
+  }
+
+  private claveImpresion(articulo: ArticuloHistorial): string {
+    return `${articulo.idOrigen}\u0000${articulo.identificadorDetalle?.trim() ?? ''}`;
+  }
+
+  private limpiarSeleccionImpresion(): void {
+    this.lineasSeleccionadasImpresion.set(new Set());
+  }
+
+  private reconciliarSeleccionImpresion(): void {
+    const visibles = new Set([...this.articulos(), ...this.articulosEspeciales()]
+      .filter((articulo) => articulo.identificadorDetalle?.trim())
+      .map((articulo) => this.claveImpresion(articulo)));
+    this.lineasSeleccionadasImpresion.set(new Set(
+      [...this.lineasSeleccionadasImpresion()].filter((clave) => visibles.has(clave)),
+    ));
+  }
+
   public marcador(valor: string | null): string { return valor?.trim() || '—'; }
   public responsablesPedido(pedido: HistorialValidado): string {
     const responsables = pedido.responsablesAsignados ?? [...new Set(pedido.articulos
@@ -229,6 +374,7 @@ export class HistorialComponent implements OnInit {
   }
   public irPagina(grupo: 'normales' | 'especiales', pagina: number): void {
     if (this.cargando()) return;
+    this.limpiarSeleccionImpresion();
     if (grupo === 'normales') this.pagina.set(pagina); else this.paginaEspeciales.set(pagina);
     this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
@@ -333,6 +479,7 @@ export class HistorialComponent implements OnInit {
           if (vistaConsulta === 'articulos') {
             if (normales) this.articulos.set(normales.datos as ArticuloHistorial[]);
             if (especiales) this.articulosEspeciales.set(especiales.datos as ArticuloHistorial[]);
+            this.reconciliarSeleccionImpresion();
           } else {
             if (normales) this.registros.set(normales.datos as HistorialValidado[]);
             if (especiales) this.registrosEspeciales.set(especiales.datos as HistorialValidado[]);

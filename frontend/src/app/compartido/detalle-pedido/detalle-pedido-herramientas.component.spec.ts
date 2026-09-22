@@ -180,6 +180,8 @@ describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir
     fixture.componentRef.setInput('configuracion', { ...configuracion, herramientasImpresionPendiente: false }); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.filtro-bodegas-detalle')).toBeNull();
     expect(fixture.nativeElement.querySelector('.boton-seleccionar-todos')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.columna-imprimir-detalle .accion-seleccion-todo')
+      .textContent).toContain('IMPRIMIR TODO');
     componente().alternarSeleccion(pedido.articulos[0]!, true); componente().imprimirSeleccionados(); vi.runAllTimers();
     expect(window.print).toHaveBeenCalledOnce(); expect(asignaciones.consultar).not.toHaveBeenCalled();
   });

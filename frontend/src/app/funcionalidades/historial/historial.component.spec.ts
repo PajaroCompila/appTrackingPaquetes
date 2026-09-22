@@ -43,7 +43,7 @@ describe('HistorialComponent', () => {
       { texto: 'Artículos', activa: 'true' },
       { texto: 'Pedido', activa: 'false' },
     ]);
-    expect(fixture.nativeElement.textContent).not.toContain('Imprimir');
+    expect(fixture.nativeElement.textContent).toContain('Imprimir seleccionados (0)');
     const consultasIniciales = buscar.mock.calls.length;
     componente.alternarAlmacen('BSPS03', true);
     expect(buscar.mock.calls.length).toBe(consultasIniciales);
@@ -111,9 +111,20 @@ describe('HistorialComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    fixture.componentInstance.seleccionarTodasImpresiones('normales');
+    fixture.componentInstance.seleccionarTodasImpresiones('especiales');
+    fixture.componentInstance.imprimirSeleccionados();
+    await vi.advanceTimersByTimeAsync(0);
+
     const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]
       .map((titulo: HTMLElement) => titulo.textContent?.trim());
     expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
+    expect(fixture.nativeElement.textContent).toContain('IMPRIMIR TODO');
+    expect(fixture.componentInstance.lineasSeleccionadasImpresion().size).toBe(2);
+    expect(fixture.componentInstance.articulosImpresion().map(({ asignadoA }) => asignadoA))
+      .toEqual(['Sin asignar', 'Sin asignar']);
+    expect(imprimir).toHaveBeenCalledOnce();
     expect(fixture.nativeElement.textContent).toContain('NORMAL');
     expect(fixture.nativeElement.textContent).toContain('ESPECIAL');
     const tiempos = [...fixture.nativeElement.querySelectorAll('.tiempo-total-despacho')]
@@ -128,6 +139,7 @@ describe('HistorialComponent', () => {
       clasificacion: 'especial', pagina: 2,
     }));
     fixture.destroy();
+    imprimir.mockRestore();
     vi.useRealTimers();
   });
 });

@@ -237,10 +237,9 @@
                 }
                 @if (configuracion.permitirImpresion !== false) {
                   <th scope="col" class="columna-imprimir-detalle">
-                    @if (configuracion.herramientasImpresionPendiente) {
-                      <app-accion-seleccion-detalle etiqueta="IMPRIMIR TODO" [seleccionados]="todosSeleccionados()"
-                        [bloqueado]="bloqueoHerramientas()" (seleccionar)="seleccionarTodos()" />
-                    } @else { Imprimir }
+                    <app-accion-seleccion-detalle etiqueta="IMPRIMIR TODO" [seleccionados]="todosSeleccionados()"
+                      [bloqueado]="configuracion.herramientasImpresionPendiente === true && bloqueoHerramientas()"
+                      (seleccionar)="seleccionarTodos()" />
                   </th>
                 }
               </tr>
