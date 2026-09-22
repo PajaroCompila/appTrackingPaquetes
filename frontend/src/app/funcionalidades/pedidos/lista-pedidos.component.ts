@@ -608,11 +608,16 @@ export class ListaPedidosComponent implements OnInit {
       identificadorDetalle: articulo.identificadorDetalle!.trim(),
       codigoArticulo: articulo.codigoArticulo?.trim() || null,
     }));
-    this.articulosImpresion.set(elegidos.map(({ articulo }) => ({
+    this.articulosImpresion.set(elegidos.map(({ pedido, articulo }) => ({
+      idPedido: pedido.idOrigen,
+      numeroPedido: pedido.numeroPedido,
       codigo: articulo.codigoArticulo?.trim() || '—',
       descripcion: articulo.descripcion?.trim() || '—',
       cantidad: articulo.cantidad,
       bodega: articulo.codigoAlmacen?.trim() || '—',
+      vendedor: pedido.nombreVendedor?.trim() || 'Sin vendedor',
+      asignadoA: this.asignacionActual(pedido, articulo)?.nombreAsignado?.trim()
+        || articulo.usuarioAsignado?.trim() || 'Sin asignar',
     })));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.errorRegistroImpresion.set('');

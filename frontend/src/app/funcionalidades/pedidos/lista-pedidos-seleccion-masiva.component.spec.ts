@@ -165,6 +165,11 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     componente.seleccionarTodasImpresiones('normales');
     componente.imprimirSeleccionados();
     await vi.advanceTimersByTimeAsync(0);
+    expect(componente.articulosImpresion().map(({ vendedor, asignadoA }) => ({ vendedor, asignadoA })))
+      .toEqual([
+        { vendedor: 'Vendedor', asignadoA: 'Sin asignar' },
+        { vendedor: 'Vendedor', asignadoA: 'Sin asignar' },
+      ]);
     componente.alCerrarImpresion();
     componente.registrarImpresionConfirmada();
 

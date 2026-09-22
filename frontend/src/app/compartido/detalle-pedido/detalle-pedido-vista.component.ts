@@ -301,18 +301,29 @@ export class DetallePedidoVistaComponent implements OnChanges {
     });
   }
 
-  private abrirImpresion(elegidos: ArticuloDetalleVisual[]): void {
+  private abrirImpresion(
+    elegidos: ArticuloDetalleVisual[],
+    asignaciones: readonly AsignacionArticulo[] = [],
+  ): void {
     if (elegidos.length === 0) return;
+    const asignacionesPorLinea = new Map(asignaciones.map((asignacion) => [
+      claveArticuloAsignado(asignacion), asignacion,
+    ]));
     this.loteImpresion = elegidos.map((articulo) => ({
       ...this.identidad(articulo)!, codigoArticulo: articulo.codigo?.trim() || null,
     }));
     this.errorRegistroImpresion.set('');
 
     this.articulosImpresion.set(elegidos.map((articulo) => ({
+      idPedido: this.pedido!.idOrigen,
+      numeroPedido: this.pedido!.numeroPedido?.trim() || '—',
       codigo: articulo.codigo?.trim() || '—',
       descripcion: articulo.descripcion?.trim() || '—',
       cantidad: articulo.cantidad,
       bodega: articulo.codigoAlmacen?.trim() || '—',
+      vendedor: this.pedido?.vendedor?.trim() || 'Sin vendedor',
+      asignadoA: asignacionesPorLinea.get(claveArticuloAsignado(this.identidad(articulo)!))
+        ?.nombreAsignado?.trim() || articulo.responsable?.trim() || 'Sin asignar',
     })));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.preparandoImpresion.set(true);
@@ -358,7 +369,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
         const faltantes = elegidos.filter(a => !actuales.get(claveArticuloAsignado(this.identidad(a)!))?.usuarioAsignado);
         if (faltantes.length === 0) {
           this.consultandoResponsables.set(false);
-          if (datos.every(a => this.puedeImprimirAsignacion(a))) this.abrirImpresion(elegidos);
+          if (datos.every(a => this.puedeImprimirAsignacion(a))) this.abrirImpresion(elegidos, datos);
           else this.mensajeImpresion.set('Algunos artículos tienen otro responsable. Revisá la selección.');
           return;
         }
@@ -417,7 +428,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
         this.asignandoResponsables.set(false);
         this.solicitarResponsable.set(false);
         if (resultados.length === lineas.length && resultados.every(({ datos }) => datos.usuarioAsignado && this.puedeImprimirAsignacion(datos))) {
-          this.abrirImpresion(this.articulosElegidos());
+          this.abrirImpresion(this.articulosElegidos(), resultados.map(({ datos }) => datos));
         } else this.mensajeImpresion.set('Algunos artículos tienen otro responsable. Revisá la selección.');
       },
       error: () => {

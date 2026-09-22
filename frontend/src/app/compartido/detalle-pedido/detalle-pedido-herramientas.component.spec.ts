@@ -97,6 +97,12 @@ describe('Detalle pendiente: bodegas, selección y asignación antes de imprimir
     pedido.articulos.forEach(a => estados.set(a.identificadorDetalle!, asignacion(a.identificadorDetalle!, 'mperez')));
     pedirImpresion(); vi.runAllTimers(); expect(window.print).toHaveBeenCalledOnce();
     expect(asignaciones.obtenerUsuarios).not.toHaveBeenCalled(); expect(asignaciones.guardar).not.toHaveBeenCalled();
+    expect(componente().articulosImpresion().map(({ vendedor, asignadoA }) => ({ vendedor, asignadoA })))
+      .toEqual([
+        { vendedor: 'Vendedor', asignadoA: 'mperez' },
+        { vendedor: 'Vendedor', asignadoA: 'mperez' },
+        { vendedor: 'Vendedor', asignadoA: 'mperez' },
+      ]);
     componente().alCerrarImpresion(); componente().registrarImpresionConfirmada();
     expect(impresiones.registrar).toHaveBeenCalledOnce(); expect(componente().lineasImpresas().size).toBe(3);
   });
