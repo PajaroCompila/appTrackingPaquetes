@@ -20,6 +20,7 @@ import type { Almacen } from '../pedidos/almacen.interface';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
+import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 
 const claveFiltrosHistorial = 'historial';
 const intervaloActualizacionHistorialMs = 15000;
@@ -115,6 +116,7 @@ export class HistorialComponent implements OnInit {
         { etiqueta: 'Bodega', valor: pedido.codigosAlmacen.join(', '), icono: 'pi pi-map-marker' },
       ] : [
         { etiqueta: 'Fecha de despacho', valor: pedido.despachadoEn, icono: 'pi pi-calendar-clock', esFecha: true },
+        { etiqueta: 'Tiempo total', valor: this.tiempoTotalHistorial(pedido), icono: 'pi pi-stopwatch' },
         { etiqueta: 'Fecha de entrega', valor: pedido.validadoDetectadoEn, icono: 'pi pi-check-circle', esFecha: true },
         { etiqueta: 'Asignado a', valor: this.responsablesPedido(pedido), icono: 'pi pi-user' },
         { etiqueta: 'Bodega', valor: pedido.codigosAlmacen.join(', ') || null, icono: 'pi pi-map-marker' },
@@ -235,6 +237,12 @@ export class HistorialComponent implements OnInit {
   }
   public fechaHora(valor: string | null, hora12 = false): string {
     return valor ? formatearFechaHoraHonduras(valor, hora12) : '—';
+  }
+  public tiempoTotalHistorial(
+    pedido: HistorialValidado | ArticuloHistorial,
+    fin?: string | null,
+  ): string {
+    return formatearDuracionPedido(duracionPedidoMs(pedido, fin ?? pedido.despachadoEn));
   }
   public regresar(): void {
     const retorno = this.ruta.snapshot.queryParamMap.get('retorno');

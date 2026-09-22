@@ -9,7 +9,7 @@ import type {
   PartidaPedido,
   PedidoResumen,
 } from './pedido.interface.js';
-import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoSla.js';
+import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoEspecial.js';
 import { COLUMNAS_REFERENCIA_LINEA_R1, firmaLineaR1, type ReferenciaLineaR1 } from './firmaLineaR1.js';
 
 interface FilaPedido {

@@ -1,6 +1,6 @@
 import sql from 'mssql';
 import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedidosBodega.js';
-import { esVendedorEspecialSinSla } from '../pedidos/pedidoSla.js';
+import { esVendedorEspecial } from '../pedidos/pedidoEspecial.js';
 import type { ArticuloHistorial, FiltrosHistorial, PaginaArticulosHistorial, PaginaHistorial, PedidoHistorial } from './historial.interface.js';
 import type { EntregaSapPersistida, EntregaSapPublica } from './entregaSap.interface.js';
 
@@ -65,7 +65,7 @@ export class EntregaSapRepositorio {
     const lineas = entregas.flatMap(e => e.lineas.map(l => ({ ...l, idOrigen: e.idOrigen })));
     await obtenerPoolPedidosBodega().request()
       .input('entregas', sql.NVarChar(sql.MAX), JSON.stringify(entregas.map(e => ({ ...e,
-        esEspecial: esVendedorEspecialSinSla(e.nombreVendedor) }))))
+        esEspecial: esVendedorEspecial(e.nombreVendedor) }))))
       .input('lineas', sql.NVarChar(sql.MAX), JSON.stringify(lineas))
       .input('control', sql.NVarChar(sql.MAX), control ? JSON.stringify(control) : null)
       .input('esperado', sql.NVarChar(sql.MAX), esperado ? JSON.stringify(esperado) : null).query(`

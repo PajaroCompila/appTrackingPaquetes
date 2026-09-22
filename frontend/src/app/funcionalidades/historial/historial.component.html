@@ -93,17 +93,17 @@
         <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
       } @else if (vista() === 'pedido') {
       <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
-        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
+        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (pedido of grupo.pedidos; track pedido.idOrigen) {
-            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="pedido.excluidoSla">{{ numeroDocumento(pedido) }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estadoHistorial || 'Facturado' }}</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
+            <tr><td data-label="Pedido"><strong>{{ numeroDocumento(pedido) }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estadoHistorial || 'Facturado' }}</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalHistorial(pedido) }}</strong></td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td></tr>
           }</tbody>
         </table>
       </div>
       } @else {
       <div class="panel tabla-contenedor tabla-articulos" role="tabpanel" aria-labelledby="pestana-articulos">
-        <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Ver detalle</th></tr></thead>
+        <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Ver detalle</th></tr></thead>
           <tbody>@for (articulo of grupo.articulos; track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
-            <tr><td data-label="Pedido"><strong [class.pedido-excluido]="articulo.excluidoSla">{{ numeroDocumento(articulo) }}</strong></td>
+            <tr><td data-label="Pedido"><strong>{{ numeroDocumento(articulo) }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
                 title="Doble clic para consultar inventario"
                 [appCodigoArticuloInventario]="articulo.codigoArticulo"
@@ -118,6 +118,7 @@
               <td data-label="Estado"><span class="etiqueta-estado">{{ articulo.estadoHistorial || 'Facturado' }}</span></td>
               <td data-label="Vendedor"><span class="texto-dos-lineas">{{ marcador(articulo.nombreVendedor) }}</span></td>
               <td data-label="Usuario"><span class="texto-dos-lineas">{{ marcador(articulo.usuarioAsignado ?? null) }}</span></td>
+              <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalHistorial(articulo) }}</strong></td>
               <td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', articulo.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
             </tr>
           }</tbody>

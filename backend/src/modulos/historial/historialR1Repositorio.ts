@@ -10,7 +10,7 @@ import type {
   PaginaHistorial,
   PedidoHistorial,
 } from './historial.interface.js';
-import { NOMBRES_VENDEDORES_ESPECIALES } from '../pedidos/pedidoSla.js';
+import { NOMBRES_VENDEDORES_ESPECIALES } from '../pedidos/pedidoEspecial.js';
 
 const coincidenciaVendedorEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
   `UPPER(ISNULL(vendedor.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
@@ -38,6 +38,7 @@ interface LineaR1 {
 }
 interface MetaLocal {
   idOrigen: string; despachadoEn: Date; validadoDetectadoEn: Date | null; usuarioDespacho: string;
+  fechaEntradaCola: Date | null;
 }
 interface CabeceraFuente { sucursal: ConfiguracionSucursalR1; fila: CabeceraR1 }
 interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> {
@@ -98,7 +99,13 @@ export class HistorialR1Repositorio {
       || a.numeroPedido.localeCompare(b.numeroPedido)
       || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
-    return { registros: todos.slice(inicio, inicio + filtros.cantidadPorPagina),
+    const pagina = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
+    const metadatos = await this.obtenerMetadatosLocales(pagina.map(({ idOrigen }) => idOrigen));
+    return { registros: pagina.map((articulo) => {
+      const meta = metadatos.get(articulo.idOrigen);
+      return { ...articulo, fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
+        despachadoEn: meta?.despachadoEn?.toISOString() ?? null };
+    }),
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: disponibles.reduce((total, { value }) =>
         total + Number(value.filas[0]?.totalRegistros ?? 0), 0),
@@ -270,9 +277,11 @@ export class HistorialR1Repositorio {
     const solicitud = obtenerPoolPedidosBodega().request();
     idsConsulta.forEach((id, indice) => solicitud.input(`id${indice}`, sql.NVarChar(150), id));
     const resultado = await solicitud.query<MetaLocal>(`SELECT pedido.idOrigen, pedido.despachadoEn,
-      pedido.validadoDetectadoEn, usuario.nombreVisible usuarioDespacho
+      pedido.validadoDetectadoEn, usuario.nombreVisible usuarioDespacho,
+      seguimiento.fechaEntradaCola
       FROM dbo.PedidoDespachado pedido JOIN dbo.UsuarioAplicacion usuario
         ON usuario.idUsuario = pedido.idUsuario
+      LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
       WHERE pedido.idOrigen IN (${parametros.join(', ')});`);
     return new Map(resultado.recordset.map((fila) => [alias.get(fila.idOrigen) ?? fila.idOrigen, fila]));
   }
@@ -296,6 +305,7 @@ export class HistorialR1Repositorio {
       nombresBodega: [...new Set(articulos.map(({ nombreAlmacen }) => nombreAlmacen)
         .filter((nombre): nombre is string => Boolean(nombre)))].join(', ') || null,
       fechaHoraPedido: fila.fechaHoraPedido, codigoEstadoVenta: texto(fila.codigoEstadoVenta),
+      fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
       codigoSincronizacion: texto(fila.codigoSincronizacion), articulos, estadoLocal: 'VALIDADO',
       despachadoEn: meta?.despachadoEn.toISOString() ?? null,
       validadoDetectadoEn: meta?.validadoDetectadoEn?.toISOString() ?? null,

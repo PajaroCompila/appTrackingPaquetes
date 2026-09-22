@@ -144,7 +144,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       ? `WHERE detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
     const resultado = await solicitud.query(`WITH Pedidos AS (
         SELECT pedido.*, usuario.nombreVisible usuarioDespacho,
-          ISNULL(seguimiento.excluidoSla, 0) excluidoSla, COUNT(*) OVER() total
+          seguimiento.fechaEntradaCola,
+          ISNULL(seguimiento.excluidoSla, 0) esEspecial, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
@@ -190,7 +191,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
           estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
           usuarioDespacho: fila.usuarioDespacho,
-          excluidoSla: Boolean(fila.excluidoSla),
+          fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
+          esEspecial: Boolean(fila.esEspecial),
         });
       }
       mapa.get(fila.idOrigen)!.articulos.push({
@@ -233,7 +235,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         detalle.descripcion, detalle.cantidad, detalle.codigoAlmacen detalleCodigoAlmacen,
         detalle.nombreAlmacen detalleNombreAlmacen, detalle.transferidoEn,
         usuarioDetalle.nombreVisible usuarioLinea, asignacion.nombreAsignado usuarioAsignado,
-        ISNULL(seguimiento.excluidoSla, 0) excluidoSla, COUNT(*) OVER() total
+        seguimiento.fechaEntradaCola,
+        ISNULL(seguimiento.excluidoSla, 0) esEspecial, COUNT(*) OVER() total
       FROM dbo.PedidoDespachado pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
@@ -271,7 +274,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null,
       estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
       usuarioDespacho: fila.usuarioDespacho,
-      excluidoSla: Boolean(fila.excluidoSla),
+      fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
+      esEspecial: Boolean(fila.esEspecial),
       responsablesAsignados: fila.usuarioAsignado ? [fila.usuarioAsignado] : [],
       articulos: [{
         identificadorDetalle: fila.identificadorDetalle,
@@ -290,9 +294,12 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     const pool = obtenerPoolPedidosBodega();
     const cabecera = (await pool.request()
       .input('idOrigen', sql.NVarChar(150), idOrigen)
-      .query(`SELECT TOP (1) pedido.*, usuario.nombreVisible usuarioDespacho
+      .query(`SELECT TOP (1) pedido.*, usuario.nombreVisible usuarioDespacho,
+          seguimiento.fechaEntradaCola,
+          ISNULL(seguimiento.excluidoSla, 0) esEspecial
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
+        LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
         WHERE pedido.idOrigen = @idOrigen AND pedido.estadoLocal = 'DESPACHADO';`)).recordset[0];
     if (!cabecera) return null;
 
@@ -326,6 +333,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         .filter((codigo): codigo is string => Boolean(codigo)))],
       nombresBodega: null,
       fechaHoraPedido: fechaSqlSinZona(cabecera.fechaHoraPedido),
+      fechaEntradaCola: cabecera.fechaEntradaCola?.toISOString() ?? null,
+      esEspecial: Boolean(cabecera.esEspecial),
       codigoEstadoVenta: 'DESPACHADO',
       codigoSincronizacion: null,
       estadoLocal: 'DESPACHADO',

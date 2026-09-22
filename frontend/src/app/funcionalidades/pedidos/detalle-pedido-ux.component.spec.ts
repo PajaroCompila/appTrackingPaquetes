@@ -22,7 +22,8 @@ describe('Detalle pendiente: refresco silencioso, simetría y transferencia exis
   const datos: DetallePedido = {
     cabecera: { idOrigen, origenPedido: 'R1', creadoEnR1: true, sapDocEntry: null, folioPedido: 'QA', numeroPedido: 'QA',
       codigoVenta: null, codigoVendedor: 1, nombreVendedor: 'Vendedor', codigosAlmacen: ['BSPS01', 'BSPS02'],
-      nombresBodega: 'Principal, Secundaria', fechaHoraPedido: '2026-09-17T08:00:00-06:00', codigoEstadoVenta: 'A',
+      nombresBodega: 'Principal, Secundaria', fechaHoraPedido: '2026-09-17T08:00:00-06:00',
+      fechaEntradaCola: '2026-09-17T10:00:00.000Z', codigoEstadoVenta: 'A',
       codigoSincronizacion: null, articulos: [] },
     partidas: [1, 2, 3].map(n => ({ numeroPartida: String(n), codigoArticulo: 'A' + n, descripcionArticulo: 'Artículo ' + n,
       cantidadSolicitada: n, codigoAlmacen: n === 2 ? 'BSPS02' : 'BSPS01', nombreAlmacen: 'Bodega', codigoEstadoEntrega: 'A' })),
@@ -66,6 +67,14 @@ describe('Detalle pendiente: refresco silencioso, simetría y transferencia exis
     fixture.detectChanges();
   });
   afterEach(() => { fixture.destroy(); vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it('muestra el tiempo pendiente avanzando desde la entrada real a la cola', () => {
+    componente().ahoraTiempoMs.set(Date.parse('2026-09-17T10:23:00.000Z'));
+    fixture.detectChanges();
+    expect(componente().tiempoTotal()).toBe('23:00');
+    expect(fixture.nativeElement.textContent).toContain('Tiempo total');
+    expect(fixture.nativeElement.textContent).toContain('23:00');
+  });
 
   it('no vacía responsables ni activa loader mientras una consulta de asignaciones está pendiente', async () => {
     const pendiente = new Subject<{ datos: AsignacionArticulo[] }>();

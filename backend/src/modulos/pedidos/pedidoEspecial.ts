@@ -18,15 +18,13 @@ function palabrasNormalizadas(valor: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
-export function esVendedorEspecialSinSla(nombreVendedor: string | null | undefined): boolean {
+export function esVendedorEspecial(nombreVendedor: string | null | undefined): boolean {
   return palabrasNormalizadas(nombreVendedor)
     .some((palabra) => nombresVendedoresEspeciales.has(palabra));
 }
 
-export function aplicarExclusionSlaPorVendedor(pedidos: PedidoResumen[]): void {
+export function aplicarClasificacionEspecialPorVendedor(pedidos: PedidoResumen[]): void {
   pedidos.forEach((pedido) => {
-    if (esVendedorEspecialSinSla(pedido.nombreVendedor)) {
-      pedido.excluidoSla = true;
-    }
+    if (esVendedorEspecial(pedido.nombreVendedor)) pedido.esEspecial = true;
   });
 }

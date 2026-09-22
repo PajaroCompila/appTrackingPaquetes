@@ -100,6 +100,12 @@
             </dd>
           </div>
         }
+        @if (tiempoTotal) {
+          <div>
+            <dt><i class="pi pi-stopwatch" aria-hidden="true"></i>Tiempo total</dt>
+            <dd [class.dato-no-disponible]="tiempoTotal === 'No disponible'">{{ tiempoTotal }}</dd>
+          </div>
+        }
       </dl>
     </section>
 

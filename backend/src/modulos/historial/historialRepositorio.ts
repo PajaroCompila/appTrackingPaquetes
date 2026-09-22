@@ -375,7 +375,9 @@ export class HistorialRepositorio {
         SELECT pedido.idOrigen, pedido.origenPedido, pedido.creadoEnR1, pedido.sapDocEntry,
           pedido.folioPedido, pedido.numeroPedido, pedido.nombreVendedor, pedido.fechaHoraPedido,
           pedido.despachadoEn, pedido.validadoDetectadoEn, usuario.nombreVisible usuarioDespacho,
-          pedido.idPedidoDespachado, CONVERT(bigint, NULL) idPedidoSapHistorial
+          pedido.idPedidoDespachado, CONVERT(bigint, NULL) idPedidoSapHistorial,
+          seguimiento.fechaEntradaCola,
+          ISNULL(seguimiento.excluidoSla, 0) esEspecial
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
@@ -397,7 +399,8 @@ export class HistorialRepositorio {
           CONVERT(nvarchar(50), pedido.sapDocEntry), CONCAT('SAP:', pedido.sapDocEntry),
           pedido.numeroPedido, pedido.nombreVendedor, pedido.fechaHoraPedido,
           CONVERT(datetime2(3), NULL), pedido.cerradoDetectadoEn, CONVERT(nvarchar(200), NULL),
-          CONVERT(bigint, NULL), pedido.idPedidoSapHistorial
+          CONVERT(bigint, NULL), pedido.idPedidoSapHistorial, seguimiento.fechaEntradaCola,
+          ISNULL(seguimiento.excluidoSla, 0)
         FROM dbo.PedidoSapHistorial pedido
         LEFT JOIN dbo.SeguimientoPedido seguimiento
           ON seguimiento.idOrigen = CONCAT('SAP:', pedido.sapDocEntry)
@@ -450,6 +453,8 @@ export class HistorialRepositorio {
           codigoVenta: null, codigoVendedor: null, nombreVendedor: fila.nombreVendedor,
           codigosAlmacen: [], nombresBodega: null,
           fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
+          fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
+          esEspecial: Boolean(fila.esEspecial),
           codigoEstadoVenta: 'C', codigoSincronizacion: null, articulos: [],
           estadoLocal: 'VALIDADO', despachadoEn: fila.despachadoEn?.toISOString() ?? null,
           validadoDetectadoEn: fila.validadoDetectadoEn?.toISOString() ?? null,
@@ -490,7 +495,9 @@ export class HistorialRepositorio {
       SELECT pedido.idOrigen, detalle.identificadorDetalle, pedido.numeroPedido,
         detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
         detalle.codigoAlmacen, detalle.nombreAlmacen,
-        pedido.fechaHoraPedido, pedido.nombreVendedor
+        pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
+        COALESCE(detalle.transferidoEn, pedido.despachadoEn) despachadoEn,
+        ISNULL(seguimiento.excluidoSla, 0) esEspecial
       FROM dbo.PedidoDespachado pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
@@ -509,7 +516,8 @@ export class HistorialRepositorio {
       SELECT CONCAT('SAP:', pedido.sapDocEntry), CONVERT(nvarchar(150), detalle.numeroLinea),
         pedido.numeroPedido, detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
         detalle.codigoAlmacen, detalle.nombreAlmacen,
-        pedido.fechaHoraPedido, pedido.nombreVendedor
+        pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
+        CONVERT(datetime2(3), NULL) despachadoEn, ISNULL(seguimiento.excluidoSla, 0) esEspecial
       FROM dbo.PedidoSapHistorial pedido
       JOIN dbo.PedidoSapHistorialDetalle detalle
         ON detalle.idPedidoSapHistorial = pedido.idPedidoSapHistorial
@@ -541,7 +549,10 @@ export class HistorialRepositorio {
       codigoAlmacen: fila.codigoAlmacen,
       nombreAlmacen: fila.nombreAlmacen,
       fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
+      fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
+      despachadoEn: fila.despachadoEn?.toISOString() ?? null,
       nombreVendedor: fila.nombreVendedor,
+      esEspecial: Boolean(fila.esEspecial),
     }));
     const total = Number(resultado.recordset[0]?.total ?? 0);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,

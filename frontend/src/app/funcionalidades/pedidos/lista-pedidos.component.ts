@@ -31,6 +31,7 @@ import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from './v
 import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/confirmacion-impresion.component';
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
+import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -312,13 +313,7 @@ export class ListaPedidosComponent implements OnInit {
 
   public tiempoSla(pedido: PedidoResumen): string {
     const transcurrido = this.tiempoTranscurridoSlaMs(pedido);
-    if (transcurrido === null) return '—';
-    const segundosTotales = Math.floor(transcurrido / 1000);
-    const horas = Math.floor(segundosTotales / 3600);
-    const minutos = Math.floor((segundosTotales % 3600) / 60);
-    const segundos = segundosTotales % 60;
-    const mmss = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-    return horas > 0 ? `${String(horas).padStart(2, '0')}:${mmss}` : mmss;
+    return transcurrido === null ? '—' : formatearDuracionPedido(transcurrido);
   }
 
   public modificadoPor(pedido: PedidoResumen): string {
@@ -1199,13 +1194,8 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private tiempoTranscurridoSlaMs(pedido: PedidoResumen): number | null {
-    const valor = pedido.fechaEntradaCola ?? pedido.fechaEntradaOrigen ?? pedido.fechaHoraPedido;
-    if (!valor) return null;
-    const fecha = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(valor)
-      ? `${valor}-06:00` : valor;
-    const entradaMs = Date.parse(fecha);
-    if (!Number.isFinite(entradaMs)) return null;
-    return Math.max(0, this.ahoraSlaMs() - entradaMs);
+    const duracion = duracionPedidoMs(pedido, this.ahoraSlaMs());
+    return duracion === null ? null : Math.max(0, duracion);
   }
 
   private identidadAsignacion(

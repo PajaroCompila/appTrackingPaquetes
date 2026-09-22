@@ -16,7 +16,7 @@ export interface PedidoResumen {
   codigoUsuarioOrigen?: string | null;
   usuarioUltimaModificacion?: string | null;
   fechaUltimaModificacion?: string | null;
-  excluidoSla?: boolean;
+  esEspecial?: boolean;
   modificado?: boolean;
   modificadoPor?: string | null;
   modificadoEn?: string | null;

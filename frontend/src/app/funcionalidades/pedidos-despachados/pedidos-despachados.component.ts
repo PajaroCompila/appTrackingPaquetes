@@ -20,6 +20,7 @@ import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-hondur
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
+import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -284,17 +285,7 @@ export class PedidosDespachadosComponent implements OnInit {
   }
 
   public tiempoTotalDespacho(pedido: Despachado, fin?: string | null): string {
-    if (pedido.excluidoSla) return 'Excluido';
-    const inicio = this.fechaComoInstante(pedido.fechaEntradaCola ?? pedido.fechaEntradaOrigen
-      ?? pedido.fechaHoraPedido);
-    const terminado = this.fechaComoInstante(fin ?? pedido.despachadoEn);
-    if (inicio === null || terminado === null || terminado < inicio) return 'No disponible';
-    const segundos = Math.floor((terminado - inicio) / 1000);
-    const horas = Math.floor(segundos / 3600);
-    const minutos = Math.floor((segundos % 3600) / 60);
-    const resto = segundos % 60;
-    const dos = (valor: number): string => valor.toString().padStart(2, '0');
-    return horas > 0 ? `${dos(horas)}:${dos(minutos)}:${dos(resto)}` : `${dos(minutos)}:${dos(resto)}`;
+    return formatearDuracionPedido(duracionPedidoMs(pedido, fin ?? pedido.despachadoEn));
   }
 
   public modificadoPor(pedido: Despachado): string {
@@ -391,14 +382,6 @@ export class PedidosDespachadosComponent implements OnInit {
   private finalizarCarga(pedidos: Despachado[]): void {
     this.pedidos.set(pedidos);
     this.cargando.set(false);
-  }
-
-  private fechaComoInstante(valor: string | null | undefined): number | null {
-    if (!valor) return null;
-    const normalizada = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(valor)
-      ? `${valor}-06:00` : valor;
-    const instante = new Date(normalizada).getTime();
-    return Number.isFinite(instante) ? instante : null;
   }
 
   private marcarError(): void {

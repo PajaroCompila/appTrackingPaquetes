@@ -60,6 +60,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
   @Input() public permitirTransferencia = false;
   @Input() public revisionTransferencia = 0;
   @Input() public revisionRefresco = 0;
+  @Input() public tiempoTotal: string | null = null;
   @Input() public mensajeTransferencia = '';
   @Input() public set transfiriendo(valor: boolean) { this.transferenciaEnCurso.set(valor); }
   public readonly transferenciaEnCurso = signal(false);

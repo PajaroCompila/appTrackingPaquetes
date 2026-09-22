@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { esVendedorEspecialSinSla } from './pedidoSla.js';
+import { esVendedorEspecial } from './pedidoEspecial.js';
 
-describe('esVendedorEspecialSinSla', () => {
+describe('esVendedorEspecial', () => {
   it.each([
     'SPS Eliasar Gamaliel Gomez Cortes',
     'SPS Elisaar Gamaliel Gomez Cortes',
     'SPS Jensy Marilu Lainez Lainez',
     'SPS Jose Nahum Diaz Diaz',
     'SPS Jose Naun Diaz',
-  ])('excluye del tiempo al vendedor especial %s', (nombreVendedor) => {
-    expect(esVendedorEspecialSinSla(nombreVendedor)).toBe(true);
+  ])('clasifica al vendedor especial %s', (nombreVendedor) => {
+    expect(esVendedorEspecial(nombreVendedor)).toBe(true);
   });
 
   it.each([
@@ -18,7 +18,7 @@ describe('esVendedorEspecialSinSla', () => {
     'SPS Andrea Nicolle Rivas Claros',
     '',
     null,
-  ])('mantiene el SLA para %s', (nombreVendedor) => {
-    expect(esVendedorEspecialSinSla(nombreVendedor)).toBe(false);
+  ])('no clasifica como especial a %s', (nombreVendedor) => {
+    expect(esVendedorEspecial(nombreVendedor)).toBe(false);
   });
 });

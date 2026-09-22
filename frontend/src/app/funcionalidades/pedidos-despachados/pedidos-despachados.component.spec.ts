@@ -84,15 +84,14 @@ describe('PedidosDespachadosComponent', () => {
     expect(texto).not.toContain('Imprimir');
   });
 
-  it('marca como excluido el tiempo de un pedido mayorista y no lo colorea', () => {
+  it('calcula el tiempo congelado de un pedido especial con la misma regla', () => {
     configurar(null);
     const fixture = TestBed.createComponent(PedidosDespachadosComponent);
     fixture.detectChanges();
-    responderListados(TestBed.inject(HttpTestingController), [], [{ ...pedido, excluidoSla: true }]);
+    responderListados(TestBed.inject(HttpTestingController), [], [{ ...pedido, esEspecial: true }]);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.tiempo-total-despacho').textContent).toContain('Excluido');
-    expect(fixture.nativeElement.querySelector('.pedido-excluido')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.tiempo-total-despacho').textContent).toContain('05:30');
   });
 
   it('muestra ambas secciones y mantiene su paginación independiente', () => {
@@ -101,7 +100,7 @@ describe('PedidosDespachadosComponent', () => {
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
     responderListados(http, [pedido], [{ ...pedido, idOrigen: 'R1:E1', numeroPedido: '200',
-      excluidoSla: true }]);
+      esEspecial: true }]);
     fixture.detectChanges();
 
     const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]

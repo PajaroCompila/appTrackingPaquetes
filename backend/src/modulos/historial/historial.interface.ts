@@ -41,9 +41,11 @@ export interface ArticuloHistorial {
   codigoAlmacen: string | null;
   nombreAlmacen: string | null;
   fechaHoraPedido: string | null;
+  fechaEntradaCola?: string | null;
+  despachadoEn?: string | null;
   nombreVendedor: string | null;
   usuarioAsignado?: string | null;
-  excluidoSla?: boolean;
+  esEspecial?: boolean;
   modificado?: boolean;
   modificadoPor?: string | null;
 }

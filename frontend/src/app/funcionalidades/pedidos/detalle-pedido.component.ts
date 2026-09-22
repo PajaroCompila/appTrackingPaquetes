@@ -14,6 +14,7 @@ import { PedidosService } from './pedidos.service';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import { claveArticuloAsignado, type AsignacionArticulo } from '../../compartido/asignaciones/asignacion.interface';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 
 @Component({
   selector: 'app-detalle-pedido',
@@ -45,6 +46,7 @@ export class DetallePedidoComponent implements OnInit {
   public readonly mensajeTransferencia = signal('');
   public readonly revisionTransferencia = signal(0);
   public readonly revisionRefresco = signal(0);
+  public readonly ahoraTiempoMs = signal(Date.now());
   public readonly permitirTransferencia = computed(() => {
     const rol = this.autenticacion.usuario()?.codigoRol;
     return rol === 'ADMINISTRADOR' || rol === 'OPERADOR_BODEGA';
@@ -106,6 +108,12 @@ export class DetallePedidoComponent implements OnInit {
       })),
     };
   });
+  public readonly tiempoTotal = computed(() => {
+    const cabecera = this.detalle()?.cabecera;
+    return cabecera ? formatearDuracionPedido(
+      duracionPedidoMs(cabecera, this.ahoraTiempoMs()),
+    ) : null;
+  });
 
   public ngOnInit(): void {
     this.ruta.paramMap
@@ -128,6 +136,9 @@ export class DetallePedidoComponent implements OnInit {
     timer(5000, 5000)
       .pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe(() => this.cargarDetalle(true));
+    timer(0, 1000)
+      .pipe(takeUntilDestroyed(this.destruirRef))
+      .subscribe(() => this.ahoraTiempoMs.set(Date.now()));
   }
 
   public regresar(): void {

@@ -25,7 +25,7 @@ describe('ListaPedidos: almacenes aplicados automáticamente en normales y espec
     sapDocEntry: '962546', folioPedido: 'SPSS24PE387614', numeroPedido: '101476067',
     codigoVenta: null, codigoVendedor: 1, nombreVendedor: 'SPS Eliasar Gamaliel Gomez Cortes',
     codigosAlmacen: ['BSPS03', 'BSPS04'], nombresBodega: 'Bodega 3, Bodega 4',
-    fechaHoraPedido: '2026-09-18T08:36:00', codigoEstadoVenta: 'A', codigoSincronizacion: 'N', excluidoSla: true,
+    fechaHoraPedido: '2026-09-18T08:36:00', codigoEstadoVenta: 'A', codigoSincronizacion: 'N', esEspecial: true,
     articulos: [
       { identificadorDetalle: '1', codigoArticulo: 'TOR-TSP1508', descripcion: 'Artículo bodega 4', cantidad: 1, codigoAlmacen: 'BSPS04', nombreAlmacen: 'Bodega 4' },
       { identificadorDetalle: '2', codigoArticulo: 'V20K', descripcion: 'Artículo bodega 3', cantidad: 3, codigoAlmacen: 'BSPS03', nombreAlmacen: 'Bodega 3' },
@@ -36,7 +36,7 @@ describe('ListaPedidos: almacenes aplicados automáticamente en normales y espec
   const componente = () => fixture.componentInstance;
   const respuesta = (f: FiltrosPedidos): RespuestaListaPedidos => {
     const articulos = especial.articulos.filter(a => !f.codigosAlmacen?.length || f.codigosAlmacen.includes(a.codigoAlmacen!));
-    const pedido = f.clasificacion === 'especial' ? especial : { ...especial, idOrigen: 'R1:NORMAL', numeroPedido: 'NORMAL', excluidoSla: false };
+    const pedido = f.clasificacion === 'especial' ? especial : { ...especial, idOrigen: 'R1:NORMAL', numeroPedido: 'NORMAL', esEspecial: false };
     const datos = f.vista === 'pedido' ? [{ ...pedido, articulos }] : articulos.map(a => ({ ...pedido, articulos: [a], codigosAlmacen: [a.codigoAlmacen!] }));
     return { datos, paginacion: { pagina: f.pagina, cantidadPorPagina: f.cantidadPorPagina,
       cantidadDevuelta: datos.length, totalRegistros: datos.length, hayMas: false } };

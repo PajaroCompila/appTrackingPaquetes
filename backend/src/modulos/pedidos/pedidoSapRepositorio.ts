@@ -2,7 +2,7 @@ import sql from 'mssql';
 import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 import type { DetallePedido, FiltrosPedidos, PaginaPedidos, PedidoResumen } from './pedido.interface.js';
 import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from './gruposClienteSap.js';
-import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoSla.js';
+import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoEspecial.js';
 
 interface FilaSap {
   docEntry: number; docNum: number; nombreVendedor: string | null;
@@ -21,11 +21,11 @@ export interface IPedidoSapRepositorio {
 }
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
-const USUARIOS_SAP_EXCLUIDOS_SLA = ['TALLER01', 'SVENTA10', 'SVENTA11', 'SVENTA12'] as const;
-const usuariosSapExcluidosSla = new Set<string>(USUARIOS_SAP_EXCLUIDOS_SLA);
+const USUARIOS_SAP_ESPECIALES = ['TALLER01', 'SVENTA10', 'SVENTA11', 'SVENTA12'] as const;
+const usuariosSapEspeciales = new Set<string>(USUARIOS_SAP_ESPECIALES);
 
-export function esUsuarioSapExcluidoSla(codigoUsuario: string | null | undefined): boolean {
-  return usuariosSapExcluidosSla.has(codigoUsuario?.trim().toUpperCase() ?? '');
+export function esUsuarioSapEspecial(codigoUsuario: string | null | undefined): boolean {
+  return usuariosSapEspeciales.has(codigoUsuario?.trim().toUpperCase() ?? '');
 }
 
 export class PedidoSapRepositorio implements IPedidoSapRepositorio {
@@ -36,7 +36,7 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
     const cantidadConsulta = filtros.cantidadPorPagina + 1;
     const coincidenciaVendedorEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
       `UPPER(ISNULL(v.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
-    const coincidenciaUsuarioEspecial = `UPPER(ISNULL(creador.[USER_CODE], '')) IN (${USUARIOS_SAP_EXCLUIDOS_SLA
+    const coincidenciaUsuarioEspecial = `UPPER(ISNULL(creador.[USER_CODE], '')) IN (${USUARIOS_SAP_ESPECIALES
       .map((_, indice) => `@usuarioEspecial${indice}`).join(', ')})`;
     const coincidenciaEspecial = `(${coincidenciaVendedorEspecial} OR ${coincidenciaUsuarioEspecial})`;
     const filtroClasificacion = filtros.clasificacion === 'especial'
@@ -87,7 +87,7 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
       codigos.forEach((c, i) => r.input(`codigoAlmacen${i}`, sql.NVarChar(16), c));
       NOMBRES_VENDEDORES_ESPECIALES.forEach((nombre, indice) =>
         r.input(`vendedorEspecial${indice}`, sql.NVarChar(30), `%${nombre}%`));
-      USUARIOS_SAP_EXCLUIDOS_SLA.forEach((usuario, indice) =>
+      USUARIOS_SAP_ESPECIALES.forEach((usuario, indice) =>
         r.input(`usuarioEspecial${indice}`, sql.NVarChar(30), usuario));
       return r;
     });
@@ -129,7 +129,7 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
         codigoUsuarioOrigen: texto(c.codigoUsuarioOrigen),
         usuarioUltimaModificacion: texto(c.usuarioUltimaModificacion),
         fechaUltimaModificacion: c.fechaUltimaModificacion,
-        excluidoSla: esUsuarioSapExcluidoSla(c.codigoUsuarioOrigen),
+        esEspecial: esUsuarioSapEspecial(c.codigoUsuarioOrigen),
         codigoEstadoVenta: 'A', codigoSincronizacion: null, articulos };
     });
   }

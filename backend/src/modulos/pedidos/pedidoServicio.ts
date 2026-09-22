@@ -10,7 +10,7 @@ import { PedidoSapRepositorio, type IPedidoSapRepositorio } from './pedidoSapRep
 import type { IDespachoRepositorio } from '../despachos/despachoRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from './seguimientoPedidoRepositorio.js';
-import { aplicarExclusionSlaPorVendedor } from './pedidoSla.js';
+import { aplicarClasificacionEspecialPorVendedor } from './pedidoEspecial.js';
 import type { IConciliacionEntregaPedido } from './conciliacionEntregaPedido.js';
 
 interface EstadoCacheSap {
@@ -63,10 +63,10 @@ export class PedidoServicio {
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
       let pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
-      aplicarExclusionSlaPorVendedor(pedidosOrigen);
+      aplicarClasificacionEspecialPorVendedor(pedidosOrigen);
       if (filtros.clasificacion) {
         const especiales = filtros.clasificacion === 'especial';
-        pedidosOrigen = pedidosOrigen.filter((pedido) => Boolean(pedido.excluidoSla) === especiales);
+        pedidosOrigen = pedidosOrigen.filter((pedido) => Boolean(pedido.esEspecial) === especiales);
       }
       if (this.seguimientoRepositorio) {
         await this.seguimientoRepositorio.registrarYAplicar(
@@ -74,7 +74,7 @@ export class PedidoServicio {
           (filtrosAcumulados.codigosAlmacen?.length ?? 0) === 0,
         );
       }
-      aplicarExclusionSlaPorVendedor(pedidosOrigen);
+      aplicarClasificacionEspecialPorVendedor(pedidosOrigen);
       const pedidosAntesConciliacion = pedidosOrigen;
       if (this.conciliacionEntregas) {
         try { pedidosOrigen = await this.conciliacionEntregas.aplicar(pedidosOrigen); }
@@ -182,7 +182,7 @@ export class PedidoServicio {
       if (!pedido) {
         throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
       }
-      aplicarExclusionSlaPorVendedor([pedido.cabecera]);
+      aplicarClasificacionEspecialPorVendedor([pedido.cabecera]);
       if (this.conciliacionEntregas && !esSap) {
         const resumen = { ...pedido.cabecera, articulos: pedido.partidas.map(p => ({
           identificadorDetalle: p.numeroPartida, firmaConciliacion: p.firmaConciliacion,
@@ -197,7 +197,7 @@ export class PedidoServicio {
         });
       }
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido.cabecera]);
-      aplicarExclusionSlaPorVendedor([pedido.cabecera]);
+      aplicarClasificacionEspecialPorVendedor([pedido.cabecera]);
       return pedido;
     } catch (error) {
       if (error instanceof ErrorAplicacion) {

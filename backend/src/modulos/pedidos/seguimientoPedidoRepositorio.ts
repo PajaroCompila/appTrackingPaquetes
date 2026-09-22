@@ -10,7 +10,7 @@ import type {
 interface CabeceraSeguimiento {
   idOrigen: string;
   fechaEntradaCola: Date;
-  excluidoSla: boolean;
+  esEspecial: boolean;
   huellaActual: string | null;
   modificadoEn: Date | null;
   modificadoPor: string | null;
@@ -161,7 +161,7 @@ export class SeguimientoPedidoRepositorio {
     for (const { pedido } of nuevos) {
       const fechaEntradaCola = obtenerFechaEntradaCola(pedido);
       estado.cabeceras.set(pedido.idOrigen, {
-        idOrigen: pedido.idOrigen, fechaEntradaCola, excluidoSla: Boolean(pedido.excluidoSla),
+        idOrigen: pedido.idOrigen, fechaEntradaCola, esEspecial: Boolean(pedido.esEspecial),
         huellaActual: detalleCompleto ? huella(detallesNormalizados(pedido)) : null,
         modificadoEn: null, modificadoPor: null,
       });
@@ -197,7 +197,7 @@ export class SeguimientoPedidoRepositorio {
       if (!cabecera) continue;
       Object.assign(articulo, {
         fechaEntradaCola: cabecera.fechaEntradaCola.toISOString(),
-        excluidoSla: cabecera.excluidoSla,
+        esEspecial: cabecera.esEspecial,
         modificado: cabecera.modificadoEn !== null,
         modificadoPor: cabecera.modificadoPor,
       });
@@ -212,7 +212,7 @@ export class SeguimientoPedidoRepositorio {
       const cabecera = estado.cabeceras.get(pedido.idOrigen);
       if (!cabecera) continue;
       pedido.fechaEntradaCola = cabecera.fechaEntradaCola.toISOString();
-      pedido.excluidoSla = cabecera.excluidoSla;
+      pedido.esEspecial = cabecera.esEspecial;
       pedido.modificado = cabecera.modificadoEn !== null;
       pedido.modificadoEn = cabecera.modificadoEn?.toISOString() ?? null;
       pedido.modificadoPor = cabecera.modificadoPor;
@@ -229,7 +229,8 @@ export class SeguimientoPedidoRepositorio {
     const parametros = unicos.map((_, indice) => `@id${indice}`);
     const solicitud = obtenerPoolPedidosBodega().request();
     unicos.forEach((id, indice) => solicitud.input(`id${indice}`, sql.NVarChar(150), id));
-    const resultado = await solicitud.query(`SELECT idOrigen, fechaEntradaCola, excluidoSla,
+    const resultado = await solicitud.query(`SELECT idOrigen, fechaEntradaCola,
+        excluidoSla AS esEspecial,
         huellaActual, modificadoEn, modificadoPor
       FROM dbo.SeguimientoPedido WHERE idOrigen IN (${parametros.join(',')});
       SELECT idOrigen, identificadorDetalle, codigoArticulo, descripcion, cantidad, codigoAlmacen
@@ -270,7 +271,7 @@ export class SeguimientoPedidoRepositorio {
     const datos = nuevos.map(({ pedido, detalles, huella: valorHuella }) => ({
       idOrigen: pedido.idOrigen, origenPedido: pedido.origenPedido,
       fechaEntradaCola: obtenerFechaEntradaCola(pedido).toISOString(),
-      codigoUsuarioOrigen: texto(pedido.codigoUsuarioOrigen), excluidoSla: Boolean(pedido.excluidoSla),
+      codigoUsuarioOrigen: texto(pedido.codigoUsuarioOrigen), esEspecial: Boolean(pedido.esEspecial),
       huella: valorHuella, detalles,
     }));
     await obtenerPoolPedidosBodega().request().input('datos', sql.NVarChar(sql.MAX), JSON.stringify(datos))
@@ -280,10 +281,10 @@ export class SeguimientoPedidoRepositorio {
           codigoUsuarioOrigen, excluidoSla, huellaActual)
         OUTPUT inserted.idOrigen INTO @Nuevos(idOrigen)
         SELECT entrada.idOrigen, entrada.origenPedido, entrada.fechaEntradaCola,
-          entrada.codigoUsuarioOrigen, entrada.excluidoSla, entrada.huella
+          entrada.codigoUsuarioOrigen, entrada.esEspecial, entrada.huella
         FROM OPENJSON(@datos) WITH (
           idOrigen nvarchar(150), origenPedido varchar(3), fechaEntradaCola datetimeoffset(3),
-          codigoUsuarioOrigen nvarchar(50), excluidoSla bit, huella nvarchar(max),
+          codigoUsuarioOrigen nvarchar(50), esEspecial bit, huella nvarchar(max),
           detalles nvarchar(max) AS JSON) entrada
         WHERE NOT EXISTS (SELECT 1 FROM dbo.SeguimientoPedido actual WHERE actual.idOrigen = entrada.idOrigen);
 

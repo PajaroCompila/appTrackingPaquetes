@@ -83,8 +83,9 @@ describe('HistorialComponent', () => {
         identificadorDetalle: '1', numeroPedido: filtros.clasificacion === 'especial' ? '200' : '100',
         codigoArticulo: filtros.clasificacion === 'especial' ? 'ESPECIAL' : 'NORMAL',
         descripcion: 'Artículo', cantidad: 1, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Bodega',
-        fechaHoraPedido: '2026-09-14T10:00:00', nombreVendedor: 'Vendedor',
-        excluidoSla: filtros.clasificacion === 'especial',
+        fechaHoraPedido: '2026-09-14T10:00:00', fechaEntradaCola: '2026-09-14T10:04:00.000Z',
+        despachadoEn: '2026-09-14T10:20:00.000Z', nombreVendedor: 'Vendedor',
+        esEspecial: filtros.clasificacion === 'especial',
       }],
       paginacion: { pagina: filtros.pagina, cantidadPorPagina: 25,
         cantidadDevuelta: 1, totalRegistros: 50, hayMas: true },
@@ -115,6 +116,9 @@ describe('HistorialComponent', () => {
     expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
     expect(fixture.nativeElement.textContent).toContain('NORMAL');
     expect(fixture.nativeElement.textContent).toContain('ESPECIAL');
+    const tiempos = [...fixture.nativeElement.querySelectorAll('.tiempo-total-despacho')]
+      .map((elemento: HTMLElement) => elemento.textContent?.trim());
+    expect(tiempos).toEqual(['16:00', '16:00']);
 
     fixture.componentInstance.irPagina('especiales', 2);
     expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({

@@ -609,7 +609,6 @@ tbody tr:hover, tbody tr:has(:focus-visible) { background: #f5f8fb; }
   white-space: nowrap;
 }
 .vista-pedidos .tiempo-sla .pi { font-size: .7rem; }
-.vista-pedidos .tiempo-excluido, .vista-pedidos .pedido-excluido { color: #a65f00; }
 .vista-pedidos .tiempo-total-despacho { white-space: nowrap; color: var(--azul-900); }
 .vista-pedidos .ancho-tiempo-total { width: 7.5rem; }
 .vista-pedidos .boton-asignar {

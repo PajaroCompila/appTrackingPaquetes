@@ -184,8 +184,8 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     [599000, 'advertencia', '09:59'], [600000, 'critica', '10:00']] as const)('SLA visual idéntico en normales y especiales a los %s ms', (transcurrido, estado, tiempo) => {
     iniciar(); const componente = fixture.componentInstance;
     const entrada = '2026-09-17T14:00:00.000Z';
-    const normal = { ...pedido, fechaEntradaCola: entrada, excluidoSla: false };
-    const especial = { ...normal, idOrigen: 'R1:TCIR01:ESPECIAL', excluidoSla: true };
+    const normal = { ...pedido, fechaEntradaCola: entrada, esEspecial: false };
+    const especial = { ...normal, idOrigen: 'R1:TCIR01:ESPECIAL', esEspecial: true };
     componente.ahoraSlaMs.set(Date.parse(entrada) + transcurrido);
     expect(componente.estadoTiempoSla(normal)).toBe(estado);
     expect(componente.estadoTiempoSla(especial)).toBe(estado);
@@ -193,9 +193,9 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     expect(componente.tiempoSla(especial)).toBe(tiempo);
   });
 
-  it.each(['articulos', 'pedido'] as const)('pinta ambas secciones sin Excluido en vista %s', vista => {
+  it.each(['articulos', 'pedido'] as const)('pinta ambas secciones con tiempo en vista %s', vista => {
     iniciar(); const componente = fixture.componentInstance;
-    const especial = { ...pedido, idOrigen: 'R1:TCIR01:ESPECIAL', excluidoSla: true,
+    const especial = { ...pedido, idOrigen: 'R1:TCIR01:ESPECIAL', esEspecial: true,
       fechaEntradaCola: '2026-09-17T14:00:00.000Z' };
     componente.pedidos.set([especial]); componente.pedidosEspeciales.set([especial]);
     componente.vista.set(vista); componente.ahoraSlaMs.set(Date.parse(especial.fechaEntradaCola) + 600000); fixture.detectChanges();
@@ -203,6 +203,5 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     expect(relojes.length).toBeGreaterThanOrEqual(2);
     expect(relojes.every(r => r.textContent?.trim() === '10:00')).toBe(true);
     expect(fixture.nativeElement.querySelectorAll('.fila-sla-critica').length).toBeGreaterThanOrEqual(2);
-    expect(fixture.nativeElement.textContent).not.toContain('Excluido');
   });
 });
