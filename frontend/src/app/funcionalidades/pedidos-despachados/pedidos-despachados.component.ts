@@ -26,6 +26,7 @@ import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from '../
 import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/confirmacion-impresion.component';
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
+import { ImpresionPedidoPosService } from '../pedidos/impresion-pedido-pos.service';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -82,6 +83,7 @@ export class PedidosDespachadosComponent implements OnInit {
   private readonly destruirRef = inject(DestroyRef);
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly inyector = inject(Injector);
+  private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
   private readonly actualizarAhora = new Subject<boolean>();
   private haCargado = false;
   private consultaEnCurso = false;
@@ -171,7 +173,10 @@ export class PedidosDespachadosComponent implements OnInit {
   });
 
   public ngOnInit(): void {
-    this.destruirRef.onDestroy(() => clearTimeout(this.temporizadorImpresion));
+    this.destruirRef.onDestroy(() => {
+      clearTimeout(this.temporizadorImpresion);
+      this.impresionPedidoPos.finalizar();
+    });
     const idOrigen = this.ruta.snapshot.paramMap.get('idOrigen');
     this.idOrigen.set(idOrigen);
     if (idOrigen) {
@@ -329,6 +334,22 @@ export class PedidosDespachadosComponent implements OnInit {
     this.lineasSeleccionadasImpresion.set(seleccion);
   }
 
+  public pedidoSeleccionadoParaImpresion(pedido: Despachado): boolean {
+    const disponibles = pedido.articulos.filter((articulo) => articulo.identificadorDetalle?.trim());
+    return disponibles.length > 0
+      && disponibles.every((articulo) => this.estaSeleccionadoParaImpresion(pedido, articulo));
+  }
+
+  public alternarPedidoImpresion(pedido: Despachado, seleccionado: boolean): void {
+    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const seleccion = new Set(this.lineasSeleccionadasImpresion());
+    pedido.articulos.filter((articulo) => articulo.identificadorDetalle?.trim())
+      .forEach((articulo) => seleccionado
+        ? seleccion.add(this.claveImpresion(pedido, articulo))
+        : seleccion.delete(this.claveImpresion(pedido, articulo)));
+    this.lineasSeleccionadasImpresion.set(seleccion);
+  }
+
   public imprimirSeleccionados(): void {
     if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
     const elegidos = this.lineasImpresionVisibles().filter(({ pedido, articulo }) =>
@@ -340,7 +361,7 @@ export class PedidosDespachadosComponent implements OnInit {
       identificadorDetalle: articulo.identificadorDetalle!.trim(),
       codigoArticulo: articulo.codigoArticulo?.trim() || null,
     }));
-    this.articulosImpresion.set(elegidos.map(({ pedido, articulo }) => ({
+    this.articulosImpresion.set(this.impresionPedidoPos.preparar(elegidos.map(({ pedido, articulo }) => ({
       idPedido: pedido.idOrigen,
       numeroPedido: pedido.numeroPedido,
       codigo: articulo.codigoArticulo?.trim() || '—',
@@ -349,19 +370,20 @@ export class PedidosDespachadosComponent implements OnInit {
       bodega: articulo.codigoAlmacen?.trim() || '—',
       vendedor: pedido.nombreVendedor?.trim() || 'Sin vendedor',
       asignadoA: articulo.usuarioAsignado?.trim() || 'Sin asignar',
-    })));
+    }))));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.errorRegistroImpresion.set('');
     this.preparandoImpresion.set(true);
     this.temporizadorImpresion = setTimeout(() => {
       this.esperandoCierreImpresion = true;
-      try { window.print(); } catch { this.descartarRegistroImpresion(); }
+      try { this.impresionPedidoPos.imprimir(); } catch { this.descartarRegistroImpresion(); }
     });
   }
 
   @HostListener('window:afterprint')
   public alCerrarImpresion(): void {
     if (!this.esperandoCierreImpresion || !this.loteImpresion) return;
+    this.impresionPedidoPos.finalizar();
     this.esperandoCierreImpresion = false;
     this.preparandoImpresion.set(false);
     this.confirmarImpresion.set(true);
@@ -369,6 +391,7 @@ export class PedidosDespachadosComponent implements OnInit {
 
   public descartarRegistroImpresion(): void {
     if (this.guardandoImpresion()) return;
+    this.impresionPedidoPos.finalizar();
     clearTimeout(this.temporizadorImpresion);
     this.esperandoCierreImpresion = false;
     this.loteImpresion = null;

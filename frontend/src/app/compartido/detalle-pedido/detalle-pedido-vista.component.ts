@@ -40,6 +40,7 @@ import {
   VistaImpresionPedidoComponent,
   type ArticuloImpresionPedido,
 } from '../../funcionalidades/pedidos/vista-impresion-pedido.component';
+import { ImpresionPedidoPosService } from '../../funcionalidades/pedidos/impresion-pedido-pos.service';
 
 @Component({
   selector: 'app-detalle-pedido-vista',
@@ -51,6 +52,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
   private readonly impresionesService = inject(ImpresionesService);
   private readonly destruirRef = inject(DestroyRef);
   private readonly inyector = inject(Injector);
+  private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
 
   @Input({ required: true }) public configuracion!: ConfiguracionDetallePedido;
   @Input() public pedido: PedidoDetalleVisual | null = null;
@@ -97,6 +99,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
   public constructor() {
     this.destruirRef.onDestroy(() => {
       clearTimeout(this.temporizadorImpresion);
+      this.impresionPedidoPos.finalizar();
       this.loteImpresion = null;
       this.esperandoCierreImpresion = false;
     });
@@ -314,7 +317,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
     }));
     this.errorRegistroImpresion.set('');
 
-    this.articulosImpresion.set(elegidos.map((articulo) => ({
+    this.articulosImpresion.set(this.impresionPedidoPos.preparar(elegidos.map((articulo) => ({
       idPedido: this.pedido!.idOrigen,
       numeroPedido: this.pedido!.numeroPedido?.trim() || '—',
       codigo: articulo.codigo?.trim() || '—',
@@ -324,13 +327,13 @@ export class DetallePedidoVistaComponent implements OnChanges {
       vendedor: this.pedido?.vendedor?.trim() || 'Sin vendedor',
       asignadoA: asignacionesPorLinea.get(claveArticuloAsignado(this.identidad(articulo)!))
         ?.nombreAsignado?.trim() || articulo.responsable?.trim() || articulo.usuario?.trim() || 'Sin asignar',
-    })));
+    }))));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.preparandoImpresion.set(true);
     this.temporizadorImpresion = setTimeout(() => {
       this.esperandoCierreImpresion = true;
       try {
-        window.print();
+        this.impresionPedidoPos.imprimir();
       } catch {
         this.descartarRegistroImpresion();
         this.mensajeImpresion.set('No se pudo abrir la impresión.');
@@ -464,6 +467,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
   public alCerrarImpresion(): void {
     // Este evento indica que el diálogo terminó, no que hubo una impresión.
     if (!this.esperandoCierreImpresion || !this.loteImpresion) return;
+    this.impresionPedidoPos.finalizar();
     this.esperandoCierreImpresion = false;
     this.preparandoImpresion.set(false);
     this.confirmarImpresion.set(true);
@@ -471,6 +475,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
 
   public descartarRegistroImpresion(forzar = false): void {
     if (this.guardandoImpresion() && !forzar) return;
+    this.impresionPedidoPos.finalizar();
     clearTimeout(this.temporizadorImpresion);
     this.esperandoCierreImpresion = false;
     this.loteImpresion = null;

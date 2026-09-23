@@ -136,20 +136,22 @@
       <p>No hay pedidos con esos filtros.</p>
     </div>
   } @else {
-    @if (vista() === 'articulos') { <div class="acciones-transferencia">
+    <div class="acciones-transferencia">
       <button
         class="boton boton-secundario boton-imprimir-seleccionados"
         type="button"
         [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
         (click)="imprimirSeleccionados()"
       >Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
+      @if (vista() === 'articulos') {
       <button
         class="boton boton-primario"
         type="button"
         [disabled]="lineasSeleccionadasTransferencia().size === 0 || transfiriendo()"
         (click)="transferir()"
       >Transferir a despachados ({{ lineasSeleccionadasTransferencia().size }})</button>
-    </div> }
+      }
+    </div>
     @if (mensajeTransferencia()) { <p class="mensaje-transferencia" role="status">{{ mensajeTransferencia() }}</p> }
     @if (mensajeImpresion()) { <p class="mensaje-impresion" role="alert">{{ mensajeImpresion() }}</p> }
     @if (mensajeAsignacion()) {
@@ -333,7 +335,10 @@
     </div> } @else {
       <div class="panel tabla-contenedor tabla-pedidos-agrupados" role="tabpanel">
         <table>
-          <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Vendedor</th><th>Asignado a</th><th>Modificado por</th><th>Ver detalle</th></tr></thead>
+          <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Vendedor</th><th>Asignado a</th><th>Modificado por</th><th>Ver detalle</th><th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+            etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
+            [bloqueado]="!puedeSeleccionarImpresiones(grupo.clave)"
+            (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th></tr></thead>
           <tbody>
             @for (pedido of grupo.pedidos; track pedido.idOrigen) {
               @let estadoSla = estadoTiempoSla(pedido);
@@ -354,6 +359,15 @@
                 <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle"
                   [routerLink]="['/pedidos', pedido.idOrigen]"
                   [queryParams]="{ retorno: rutaRetorno(), codigoAlmacen: filtrosFormulario.codigosAlmacen }">Ver detalle</a></td>
+                <td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+                  <label class="selector-linea selector-impresion" title="Seleccionar pedido para imprimir">
+                    <input type="checkbox" [checked]="pedidoSeleccionadoParaImpresion(pedido)"
+                      [disabled]="preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+                      [attr.aria-label]="'Seleccionar pedido ' + pedido.numeroPedido + ' para imprimir'"
+                      (change)="alternarPedidoImpresion(pedido, $any($event.target).checked)" />
+                    <span aria-hidden="true">✓</span>
+                  </label>
+                </td>
               </tr>
             }
           </tbody>

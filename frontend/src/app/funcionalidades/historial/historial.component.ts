@@ -26,6 +26,7 @@ import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from '../
 import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/confirmacion-impresion.component';
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
+import { ImpresionPedidoPosService } from '../pedidos/impresion-pedido-pos.service';
 
 const claveFiltrosHistorial = 'historial';
 const intervaloActualizacionHistorialMs = 15000;
@@ -58,6 +59,7 @@ export class HistorialComponent implements OnInit {
   private readonly enrutador = inject(Router);
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly inyector = inject(Injector);
+  private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
   private temporizador?: ReturnType<typeof setInterval>;
   private temporizadorImpresion?: ReturnType<typeof setTimeout>;
   private loteImpresion: LineaRegistroImpresion[] | null = null;
@@ -168,7 +170,10 @@ export class HistorialComponent implements OnInit {
   }
 
   public ngOnInit(): void {
-    this.destruirRef.onDestroy(() => clearTimeout(this.temporizadorImpresion));
+    this.destruirRef.onDestroy(() => {
+      clearTimeout(this.temporizadorImpresion);
+      this.impresionPedidoPos.finalizar();
+    });
     const idOrigen = this.ruta.snapshot.paramMap.get('idOrigen');
     this.idOrigen.set(idOrigen);
     if (idOrigen) {
@@ -274,9 +279,25 @@ export class HistorialComponent implements OnInit {
     this.lineasSeleccionadasImpresion.set(seleccion);
   }
 
+  public pedidoSeleccionadoParaImpresion(pedido: HistorialValidado): boolean {
+    const disponibles = this.articulosPedido(pedido).filter((articulo) => articulo.identificadorDetalle?.trim());
+    return disponibles.length > 0
+      && disponibles.every((articulo) => this.estaSeleccionadoParaImpresion(articulo));
+  }
+
+  public alternarPedidoImpresion(pedido: HistorialValidado, seleccionado: boolean): void {
+    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const seleccion = new Set(this.lineasSeleccionadasImpresion());
+    this.articulosPedido(pedido).filter((articulo) => articulo.identificadorDetalle?.trim())
+      .forEach((articulo) => seleccionado
+        ? seleccion.add(this.claveImpresion(articulo))
+        : seleccion.delete(this.claveImpresion(articulo)));
+    this.lineasSeleccionadasImpresion.set(seleccion);
+  }
+
   public imprimirSeleccionados(): void {
     if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
-    const elegidos = [...this.articulos(), ...this.articulosEspeciales()]
+    const elegidos = [...this.articulosGrupo('normales'), ...this.articulosGrupo('especiales')]
       .filter((articulo) => articulo.identificadorDetalle?.trim()
         && this.lineasSeleccionadasImpresion().has(this.claveImpresion(articulo)));
     if (elegidos.length === 0) return;
@@ -285,7 +306,7 @@ export class HistorialComponent implements OnInit {
       identificadorDetalle: articulo.identificadorDetalle!.trim(),
       codigoArticulo: articulo.codigoArticulo?.trim() || null,
     }));
-    this.articulosImpresion.set(elegidos.map((articulo) => ({
+    this.articulosImpresion.set(this.impresionPedidoPos.preparar(elegidos.map((articulo) => ({
       idPedido: articulo.idOrigen,
       numeroPedido: articulo.numeroPedido,
       codigo: articulo.codigoArticulo?.trim() || '—',
@@ -294,19 +315,20 @@ export class HistorialComponent implements OnInit {
       bodega: articulo.codigoAlmacen?.trim() || '—',
       vendedor: articulo.nombreVendedor?.trim() || 'Sin vendedor',
       asignadoA: articulo.usuarioAsignado?.trim() || 'Sin asignar',
-    })));
+    }))));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.errorRegistroImpresion.set('');
     this.preparandoImpresion.set(true);
     this.temporizadorImpresion = setTimeout(() => {
       this.esperandoCierreImpresion = true;
-      try { window.print(); } catch { this.descartarRegistroImpresion(); }
+      try { this.impresionPedidoPos.imprimir(); } catch { this.descartarRegistroImpresion(); }
     });
   }
 
   @HostListener('window:afterprint')
   public alCerrarImpresion(): void {
     if (!this.esperandoCierreImpresion || !this.loteImpresion) return;
+    this.impresionPedidoPos.finalizar();
     this.esperandoCierreImpresion = false;
     this.preparandoImpresion.set(false);
     this.confirmarImpresion.set(true);
@@ -314,6 +336,7 @@ export class HistorialComponent implements OnInit {
 
   public descartarRegistroImpresion(): void {
     if (this.guardandoImpresion()) return;
+    this.impresionPedidoPos.finalizar();
     clearTimeout(this.temporizadorImpresion);
     this.esperandoCierreImpresion = false;
     this.loteImpresion = null;
@@ -346,7 +369,33 @@ export class HistorialComponent implements OnInit {
   }
 
   private articulosGrupo(grupo: 'normales' | 'especiales'): ArticuloHistorial[] {
-    return grupo === 'normales' ? this.articulos() : this.articulosEspeciales();
+    if (this.vista() === 'articulos') {
+      return grupo === 'normales' ? this.articulos() : this.articulosEspeciales();
+    }
+    const pedidos = grupo === 'normales' ? this.registros() : this.registrosEspeciales();
+    return pedidos.flatMap((pedido) => this.articulosPedido(pedido));
+  }
+
+  private articulosPedido(pedido: HistorialValidado): ArticuloHistorial[] {
+    return pedido.articulos.map((articulo) => ({
+      estadoHistorial: pedido.estadoHistorial,
+      entregaSap: pedido.entregaSap,
+      idOrigen: pedido.idOrigen,
+      identificadorDetalle: articulo.identificadorDetalle ?? null,
+      numeroPedido: pedido.numeroPedido,
+      codigoArticulo: articulo.codigoArticulo,
+      descripcion: articulo.descripcion,
+      cantidad: articulo.cantidad,
+      codigoAlmacen: articulo.codigoAlmacen,
+      nombreAlmacen: articulo.nombreAlmacen,
+      fechaHoraPedido: pedido.fechaHoraPedido,
+      despachadoEn: articulo.transferidoEn ?? pedido.despachadoEn,
+      nombreVendedor: pedido.nombreVendedor,
+      usuarioAsignado: articulo.usuarioAsignado ?? null,
+      esEspecial: pedido.esEspecial,
+      modificado: pedido.modificado,
+      modificadoPor: pedido.modificadoPor,
+    }));
   }
 
   private claveImpresion(articulo: ArticuloHistorial): string {
@@ -358,7 +407,7 @@ export class HistorialComponent implements OnInit {
   }
 
   private reconciliarSeleccionImpresion(): void {
-    const visibles = new Set([...this.articulos(), ...this.articulosEspeciales()]
+    const visibles = new Set([...this.articulosGrupo('normales'), ...this.articulosGrupo('especiales')]
       .filter((articulo) => articulo.identificadorDetalle?.trim())
       .map((articulo) => this.claveImpresion(articulo)));
     this.lineasSeleccionadasImpresion.set(new Set(

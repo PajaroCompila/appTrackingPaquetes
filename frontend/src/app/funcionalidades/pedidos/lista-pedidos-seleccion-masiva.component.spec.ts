@@ -249,6 +249,23 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     expect(imprimir).toHaveBeenCalledOnce();
   });
 
+  it('la vista Pedido imprime con el mismo flujo POS y conserva responsables', async () => {
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    estadosAsignacion.set('R1:NORMAL:1\u00001', asignacion('R1:NORMAL:1', '1', 'gcruz', 'Gregorio Cruz'));
+    estadosAsignacion.set('R1:NORMAL:1\u00002', asignacion('R1:NORMAL:1', '2', 'mperez', 'Marcos Perez'));
+    componente.vista.set('pedido');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('IMPRIMIR TODO');
+    componente.alternarPedidoImpresion(componente.pedidos()[0]!, true);
+    componente.imprimirSeleccionados();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(componente.articulosImpresion().map(({ asignadoA }) => asignadoA))
+      .toEqual(['Gregorio Cruz', 'Marcos Perez']);
+    expect(imprimir).toHaveBeenCalledOnce();
+  });
+
   it('limpia selecciones al cambiar de vista', () => {
     componente.seleccionarTodasTransferencias('normales');
     componente.seleccionarTodasImpresiones('especiales');

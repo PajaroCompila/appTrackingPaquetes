@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
@@ -6,8 +7,57 @@ import { AlmacenesService } from '../pedidos/almacenes.service';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { HistorialComponent } from './historial.component';
 import { HistorialService } from './historial.service';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
+import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 
 describe('HistorialComponent', () => {
+  it('imprime el detalle de historial con el mismo componente POS', async () => {
+    vi.useFakeTimers();
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const detallePedido = {
+      idOrigen: 'R1:H1', origenPedido: 'R1', creadoEnR1: true, sapDocEntry: null,
+      folioPedido: '300', numeroPedido: '300', codigoVenta: null, codigoVendedor: 1,
+      nombreVendedor: 'Vendedor historial', codigosAlmacen: ['BSPS01'], nombresBodega: 'Principal',
+      fechaHoraPedido: '2026-09-22T08:00:00-06:00', codigoEstadoVenta: 'C',
+      codigoSincronizacion: 'N', estadoLocal: 'VALIDADO', despachadoEn: '2026-09-22T09:00:00-06:00',
+      validadoDetectadoEn: '2026-09-22T10:00:00-06:00', usuarioDespacho: 'Gregorio Cruz',
+      articulos: [{ identificadorDetalle: '1', codigoArticulo: 'A-H1', descripcion: 'Artículo historial',
+        cantidad: 1, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Principal', usuarioAsignado: 'Gregorio Cruz' }],
+    };
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { obtener: () => of({ datos: detallePedido }) } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: () => of({ datos: [] }) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ImpresionesService, useValue: { consultar: () => of({ datos: [] }), registrar: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({ idOrigen: 'R1:H1' }), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-vista-impresion-pedido')).toHaveLength(1);
+    const detalle = fixture.debugElement.query(By.directive(DetallePedidoVistaComponent))
+      .componentInstance as DetallePedidoVistaComponent;
+    detalle.seleccionarTodos();
+    detalle.imprimirSeleccionados();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(detalle.articulosImpresion().map(({ numeroPedido, vendedor, asignadoA }) =>
+      ({ numeroPedido, vendedor, asignadoA }))).toEqual([{
+      numeroPedido: '300', vendedor: 'Vendedor historial', asignadoA: 'Gregorio Cruz',
+    }]);
+    expect(imprimir).toHaveBeenCalledOnce();
+    fixture.destroy();
+    imprimir.mockRestore();
+    vi.useRealTimers();
+  });
+
   it('muestra chips desde el filtro real y sincroniza su eliminación', async () => {
     sessionStorage.clear();
     vi.useFakeTimers();

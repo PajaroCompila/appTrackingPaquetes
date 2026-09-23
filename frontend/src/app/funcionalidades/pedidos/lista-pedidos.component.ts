@@ -34,6 +34,7 @@ import type { LineaRegistroImpresion } from '../../compartido/impresiones/impres
 import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 import { AsignacionImpresionComponent } from '../../compartido/detalle-pedido/asignacion-impresion.component';
 import type { ArticuloDetalleVisual } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
+import { ImpresionPedidoPosService } from './impresion-pedido-pos.service';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -88,6 +89,7 @@ export class ListaPedidosComponent implements OnInit {
   private readonly notificaciones = inject(PedidosNotificacionesService);
   private readonly facturadosPendientesService = inject(FacturadosPendientesService);
   private readonly impresionesService = inject(ImpresionesService);
+  private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
   private readonly actualizarAhora = new Subject<boolean>();
   private primeraConsulta = true;
   private consultaEnCurso = false;
@@ -153,7 +155,10 @@ export class ListaPedidosComponent implements OnInit {
   ]);
 
   public ngOnInit(): void {
-    this.destruirRef.onDestroy(() => clearTimeout(this.temporizadorImpresion));
+    this.destruirRef.onDestroy(() => {
+      clearTimeout(this.temporizadorImpresion);
+      this.impresionPedidoPos.finalizar();
+    });
     this.cargarAlmacenes();
     this.cargarUsuariosAsignables();
     this.iniciarActualizacionFacturadosPendientes();
@@ -602,6 +607,27 @@ export class ListaPedidosComponent implements OnInit {
     this.mensajeImpresion.set('');
   }
 
+  public pedidoSeleccionadoParaImpresion(pedido: PedidoResumen): boolean {
+    const disponibles = pedido.articulos.flatMap((articulo, indice) =>
+      articulo.identificadorDetalle?.trim() && this.puedeOperarArticulo(pedido, articulo)
+        ? [this.claveEstableLinea(pedido, articulo, indice)] : []);
+    return disponibles.length > 0
+      && disponibles.every((clave) => this.lineasSeleccionadasImpresion().has(clave));
+  }
+
+  public alternarPedidoImpresion(pedido: PedidoResumen, seleccionado: boolean): void {
+    if (this.hayFlujoAsignacionImpresion() || this.preparandoImpresion()
+      || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const seleccion = new Set(this.lineasSeleccionadasImpresion());
+    pedido.articulos.forEach((articulo, indice) => {
+      if (!articulo.identificadorDetalle?.trim() || !this.puedeOperarArticulo(pedido, articulo)) return;
+      const clave = this.claveEstableLinea(pedido, articulo, indice);
+      if (seleccionado) seleccion.add(clave); else seleccion.delete(clave);
+    });
+    this.lineasSeleccionadasImpresion.set(seleccion);
+    this.mensajeImpresion.set('');
+  }
+
   public imprimirSeleccionados(): void {
     if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()
       || this.hayFlujoAsignacionImpresion() || this.lineasSeleccionadasImpresion().size === 0) return;
@@ -625,7 +651,7 @@ export class ListaPedidosComponent implements OnInit {
       identificadorDetalle: articulo.identificadorDetalle!.trim(),
       codigoArticulo: articulo.codigoArticulo?.trim() || null,
     }));
-    this.articulosImpresion.set(elegidos.map(({ pedido, articulo }) => ({
+    this.articulosImpresion.set(this.impresionPedidoPos.preparar(elegidos.map(({ pedido, articulo }) => ({
       idPedido: pedido.idOrigen,
       numeroPedido: pedido.numeroPedido,
       codigo: articulo.codigoArticulo?.trim() || '—',
@@ -636,7 +662,7 @@ export class ListaPedidosComponent implements OnInit {
       asignadoA: asignacionesPorLinea.get(claveArticuloAsignado(this.identidadAsignacion(pedido, articulo)!))
         ?.nombreAsignado?.trim() || this.asignacionActual(pedido, articulo)?.nombreAsignado?.trim()
         || articulo.usuarioAsignado?.trim() || 'Sin asignar',
-    })));
+    }))));
     this.fechaHoraImpresion.set(formatearFechaHoraHonduras(new Date(), true));
     this.errorRegistroImpresion.set('');
     this.mensajeImpresion.set('');
@@ -644,7 +670,7 @@ export class ListaPedidosComponent implements OnInit {
     this.temporizadorImpresion = setTimeout(() => {
       this.esperandoCierreImpresion = true;
       try {
-        window.print();
+        this.impresionPedidoPos.imprimir();
       } catch {
         this.descartarRegistroImpresion();
         this.mensajeImpresion.set('No se pudo abrir la impresión.');
@@ -770,6 +796,7 @@ export class ListaPedidosComponent implements OnInit {
   @HostListener('window:afterprint')
   public alCerrarImpresion(): void {
     if (!this.esperandoCierreImpresion || !this.loteImpresion) return;
+    this.impresionPedidoPos.finalizar();
     this.esperandoCierreImpresion = false;
     this.preparandoImpresion.set(false);
     this.confirmarImpresion.set(true);
@@ -777,6 +804,7 @@ export class ListaPedidosComponent implements OnInit {
 
   public descartarRegistroImpresion(): void {
     if (this.guardandoImpresion()) return;
+    this.impresionPedidoPos.finalizar();
     clearTimeout(this.temporizadorImpresion);
     this.esperandoCierreImpresion = false;
     this.loteImpresion = null;

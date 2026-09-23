@@ -1,9 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { PedidosDespachadosComponent } from './pedidos-despachados.component';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
+import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 
 const pedido = {
   idOrigen: 'R1:F1',
@@ -14,6 +16,7 @@ const pedido = {
   fechaHoraPedido: '2026-08-03T10:00:00Z',
   fechaEntradaCola: '2026-08-03T11:54:30Z',
   nombreVendedor: 'Vendedor',
+  codigosAlmacen: ['B1', 'B2'],
   articulos: [
     { identificadorDetalle: '1', codigoArticulo: 'A1', descripcion: 'Artículo uno', cantidad: 1, codigoAlmacen: 'B1', usuarioAsignado: 'Jorge Lara' },
     { identificadorDetalle: '2', codigoArticulo: 'A2', descripcion: 'Artículo dos', cantidad: 2, codigoAlmacen: 'B2', usuarioAsignado: 'Ana Calix' },
@@ -104,9 +107,13 @@ describe('PedidosDespachadosComponent', () => {
     const http = TestBed.inject(HttpTestingController);
     responderListados(http, [pedido]);
     http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [] });
+    fixture.componentInstance.vista.set('pedido');
     fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('IMPRIMIR TODO');
 
-    fixture.componentInstance.seleccionarTodasImpresiones('normales');
+    fixture.componentInstance.alternarPedidoImpresion(
+      fixture.componentInstance.pedidos()[0]!, true,
+    );
     fixture.componentInstance.imprimirSeleccionados();
     await vi.advanceTimersByTimeAsync(0);
 
@@ -144,7 +151,9 @@ describe('PedidosDespachadosComponent', () => {
     } }));
   });
 
-  it('consulta por idOrigen y muestra todas las líneas del pedido', () => {
+  it('consulta por idOrigen e imprime el detalle con el mismo componente POS', async () => {
+    vi.useFakeTimers();
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     configurar('R1:F1', '/pedidos-despachados?pagina=2&cantidadPorPagina=25');
     const fixture = TestBed.createComponent(PedidosDespachadosComponent);
     fixture.detectChanges();
@@ -152,12 +161,27 @@ describe('PedidosDespachadosComponent', () => {
       solicitud.url.endsWith('/pedidos-despachados/R1%3AF1'),
     ).flush({ datos: pedido });
     fixture.detectChanges();
+    TestBed.inject(HttpTestingController).expectOne((solicitud) =>
+      solicitud.url.endsWith('/impresiones/consultar'),
+    ).flush({ datos: [] });
 
     const texto = fixture.nativeElement.textContent as string;
     expect(texto).toContain('Pedido #100');
     expect(texto).toContain('Artículo uno');
     expect(texto).toContain('Artículo dos');
     expect(texto).toContain('Sistemas');
+    expect(fixture.nativeElement.querySelectorAll('app-vista-impresion-pedido')).toHaveLength(1);
+    const detalle = fixture.debugElement.query(By.directive(DetallePedidoVistaComponent))
+      .componentInstance as DetallePedidoVistaComponent;
+    detalle.seleccionarTodos();
+    detalle.imprimirSeleccionados();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(detalle.articulosImpresion().map(({ asignadoA }) => asignadoA))
+      .toEqual(['Jorge Lara', 'Ana Calix']);
+    expect(imprimir).toHaveBeenCalledOnce();
+    fixture.destroy();
+    imprimir.mockRestore();
+    vi.useRealTimers();
   });
 
   it('regresa al listado conservando página y cantidad por página', () => {
