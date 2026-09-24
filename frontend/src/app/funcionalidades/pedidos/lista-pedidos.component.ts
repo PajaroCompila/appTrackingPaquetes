@@ -286,7 +286,7 @@ export class ListaPedidosComponent implements OnInit {
   public puedeAsignarPedidos(): boolean {
     const usuario = this.autenticacion.usuario();
     return usuario?.codigoRol === 'ADMINISTRADOR'
-      || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
+      || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
   }
 
   public asignacionActual(
@@ -308,7 +308,7 @@ export class ListaPedidosComponent implements OnInit {
       ? this.seleccionesAsignacion().get(clave) ?? ''
       : this.asignacionActual(pedido, articulo)?.usuarioAsignado)
       ?? (identidad ? this.seleccionesAsignacion().get(claveArticuloAsignado(identidad)) : '')
-      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
+      ?? this.usuarioAsignableExclusivo(identidad?.idOrigen);
     return usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === usuarioAsignado)
       ? usuarioAsignado
       : '';
@@ -461,7 +461,7 @@ export class ListaPedidosComponent implements OnInit {
     if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
       || this.asignacionGuardando(pedido, articulo)) return false;
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad))
-      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
+      ?? this.usuarioAsignableExclusivo(identidad.idOrigen);
     return Boolean(seleccion
       && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
   }
@@ -474,7 +474,7 @@ export class ListaPedidosComponent implements OnInit {
     if (!identidad || !this.puedeConfirmarAsignacion(pedido, articulo)) return;
     const clave = claveArticuloAsignado(identidad);
     const usuarioAsignado = this.seleccionesAsignacion().get(clave)
-      ?? (this.esUsuarioTommy() ? 'tlopez' : '');
+      ?? this.usuarioAsignableExclusivo(identidad.idOrigen);
     if (!usuarioAsignado) return;
     this.asignacionesGuardando.update((actuales) => new Set([...actuales, clave]));
     this.mensajeAsignacion.set('');
@@ -1329,9 +1329,10 @@ export class ListaPedidosComponent implements OnInit {
             && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR' || usuarioActual === 'gcruz');
           const visibles = asignaTodos
             ? datos
-            : usuarioActual === 'acalix' || usuarioActual === 'jlara' || usuarioActual === 'tlopez'
-              ? datos.filter(({ usuario }) => usuarioActual === 'tlopez'
-                ? usuario.trim().toLowerCase() === 'tlopez'
+            : usuarioActual === 'acalix' || usuarioActual === 'jlara'
+              || usuarioActual === 'tlopez' || usuarioActual === 'bodegatbm'
+              ? datos.filter(({ usuario }) => usuarioActual === 'tlopez' || usuarioActual === 'bodegatbm'
+                ? usuario.trim().toLowerCase() === usuarioActual
                 : ['jlara', 'acalix'].includes(usuario.trim().toLowerCase()))
               : [];
           this.usuariosAsignables.set(visibles);
@@ -1372,9 +1373,11 @@ export class ListaPedidosComponent implements OnInit {
             if (this.asignacionesDesbloqueadas().has(clave)) return;
             actuales.set(clave, asignacion);
             if (asignacion.usuarioAsignado) selecciones.delete(clave);
-            else if (this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
-              && asignacion.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
-              selecciones.set(clave, 'tlopez');
+            else {
+              const usuarioExclusivo = this.usuarioAsignableExclusivo(asignacion.idOrigen);
+              if (usuarioExclusivo) {
+                selecciones.set(clave, usuarioExclusivo);
+              }
             }
           });
           this.asignaciones.set(actuales);
@@ -1427,9 +1430,20 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   private esUsuarioTommy(): boolean {
-    return this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase() === 'tlopez'
-      || (this.usuariosAsignables().length === 1
-        && this.usuariosAsignables()[0]?.usuario.trim().toLowerCase() === 'tlopez');
+    return this.usuarioAsignableExclusivo() === 'tlopez';
+  }
+
+  private usuarioAsignableExclusivo(idOrigen?: string): string {
+    const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
+    const unico = usuarioActual === 'tlopez' || usuarioActual === 'bodegatbm'
+      ? usuarioActual
+      : this.usuariosAsignables().length === 1
+        ? this.usuariosAsignables()[0]?.usuario.trim().toLowerCase() ?? ''
+        : '';
+    if (unico !== 'tlopez' && unico !== 'bodegatbm') return '';
+    if (!idOrigen) return unico;
+    const prefijoPermitido = unico === 'tlopez' ? 'R1:TCIR01:' : 'R1:TTBM01:';
+    return idOrigen.toUpperCase().startsWith(prefijoPermitido) ? unico : '';
   }
 
   private finalizarGuardadoAsignacion(clave: string): void {

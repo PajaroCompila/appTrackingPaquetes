@@ -742,6 +742,42 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
+  it('muestra únicamente a Kevin Carranza para pedidos de TBM y no guarda sin pulsar Asignar', () => {
+    usuarioSesion.set({
+      usuarioId: '9C2A096F-1B58-49A1-8490-A3A2265312C8', nombreUsuario: 'bodegatbm',
+      nombreVisible: 'Bodega TBM', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+      debeCambiarContrasena: false,
+    });
+    asignacionesService.obtenerUsuarios.mockReturnValue(of({
+      puedeAsignar: true,
+      puedeAsignarTodos: false,
+      datos: [{ usuario: 'bodegatbm', nombre: 'Kevin Carranza' }],
+    }));
+    pedidosService.obtenerPedidos.mockReturnValue(of({
+      ...respuestaLista,
+      datos: [{ ...respuestaLista.datos[0], idOrigen: 'R1:TTBM01:F1' }],
+    }));
+    asignacionesService.consultar.mockReturnValue(of({ datos: [{
+      idOrigen: 'R1:TTBM01:F1', identificadorDetalle: '1',
+      usuarioAsignado: null, nombreAsignado: null, actualizadoEn: null,
+    }] }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
+    expect([...selector.options].map(({ value, text }) => ({ value, text }))).toEqual([
+      { value: '', text: 'Sin asignar' },
+      { value: 'bodegatbm', text: 'Kevin Carranza' },
+    ]);
+    expect(selector.value).toBe('bodegatbm');
+    expect(fixture.nativeElement.textContent).not.toContain('Gregorio Cruz');
+    expect(fixture.nativeElement.textContent).not.toContain('Marcos Perez');
+    expect(asignacionesService.consultar).toHaveBeenCalledWith(
+      [{ idOrigen: 'R1:TTBM01:F1', identificadorDetalle: '1' }],
+    );
+    expect(asignacionesService.guardar).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['acalix', 'Ana Calix'],
     ['jlara', 'Jorge Lara'],

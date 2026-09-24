@@ -26,12 +26,13 @@ const usuarioNormal = {
 };
 
 describe('asignaciones de artículos', () => {
-  it('permite asignar a administradores, gcruz, acalix, jlara y Tommy', () => {
+  it('permite asignar a administradores, gcruz, acalix, jlara, Tommy y bodega TBM', () => {
     expect(puedeAsignarPedidos('ADMINISTRADOR', 'sistemas')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'GCRUZ')).toBe(true);
     expect(puedeAsignarPedidos('CONSULTA', 'ACALIX')).toBe(true);
     expect(puedeAsignarPedidos('CONSULTA', 'JLARA')).toBe(true);
     expect(puedeAsignarPedidos('CONSULTA', 'TLOPEZ')).toBe(true);
+    expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'BODEGATBM')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'otro')).toBe(false);
     expect(puedeAsignarPedidos('CONSULTA', 'otro')).toBe(false);
   });
@@ -80,6 +81,17 @@ describe('asignaciones de artículos', () => {
       'El usuario seleccionado no está disponible.');
   });
 
+  it('ofrece únicamente a Kevin Carranza para la asignación de bodega TBM', () => {
+    const kevin = { ...usuarioNormal, nombreUsuario: 'bodegatbm', nombreVisible: 'Bodega TBM' };
+    expect(usuariosAsignablesParaSesion(kevin)).toEqual([
+      { usuario: 'bodegatbm', nombre: 'Kevin Carranza' },
+    ]);
+    expect(resolverTecnicoAsignable(kevin, 'bodegatbm')).toEqual(
+      { usuario: 'bodegatbm', nombre: 'Kevin Carranza' });
+    expect(() => resolverTecnicoAsignable(kevin, 'gcruz')).toThrow(
+      'El usuario seleccionado no está disponible.');
+  });
+
   it('permite a Tommy confirmar solamente pedidos de Circunvalación', async () => {
     const guardar = vi.fn().mockResolvedValue({ confirmada: true, asignacion: {
       idOrigen: 'R1:TCIR01:F1', identificadorDetalle: '1', usuarioAsignado: 'tlopez',
@@ -98,6 +110,29 @@ describe('asignaciones de artículos', () => {
       .send({ idOrigen: 'R1:TCIR01:F1', identificadorDetalle: '1', usuarioAsignado: 'tlopez' });
     const rechazado = await solicitud(aplicacion).patch('/api/pedidos/asignaciones')
       .send({ idOrigen: 'R1:TSPS01:F2', identificadorDetalle: '1', usuarioAsignado: 'tlopez' });
+    expect(permitido.status).toBe(200);
+    expect(rechazado.status).toBe(403);
+    expect(guardar).toHaveBeenCalledOnce();
+  });
+
+  it('permite a Kevin confirmar solamente pedidos de TBM', async () => {
+    const guardar = vi.fn().mockResolvedValue({ confirmada: true, asignacion: {
+      idOrigen: 'R1:TTBM01:F1', identificadorDetalle: '1', usuarioAsignado: 'bodegatbm',
+      nombreAsignado: 'Kevin Carranza', actualizadoEn: new Date(),
+    } });
+    const aplicacion = express();
+    aplicacion.use(express.json());
+    aplicacion.use((peticion, _respuesta, siguiente) => { peticion.user = {
+      usuarioId: '00000000-0000-0000-0000-000000000001', nombreUsuario: 'bodegatbm',
+      nombreVisible: 'Bodega TBM', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+      sesionId: 'sesion-prueba', debeCambiarContrasena: false,
+    }; siguiente(); });
+    aplicacion.use('/api/pedidos/asignaciones', crearAsignacionRutas({ guardar } as unknown as AsignacionRepositorio));
+
+    const permitido = await solicitud(aplicacion).patch('/api/pedidos/asignaciones')
+      .send({ idOrigen: 'R1:TTBM01:F1', identificadorDetalle: '1', usuarioAsignado: 'bodegatbm' });
+    const rechazado = await solicitud(aplicacion).patch('/api/pedidos/asignaciones')
+      .send({ idOrigen: 'R1:TSPS01:F2', identificadorDetalle: '1', usuarioAsignado: 'bodegatbm' });
     expect(permitido.status).toBe(200);
     expect(rechazado.status).toBe(403);
     expect(guardar).toHaveBeenCalledOnce();
@@ -334,6 +369,7 @@ describe('reasignación restaurada y autenticada', () => {
     ['jlara', 'OPERADOR_BODEGA', 'acalix', 'R1:TSPS01:QA'],
     ['acalix', 'OPERADOR_BODEGA', 'jlara', 'R1:TSPS01:QA'],
     ['tlopez', 'OPERADOR_BODEGA', 'tlopez', 'R1:TCIR01:QA'],
+    ['bodegatbm', 'OPERADOR_BODEGA', 'bodegatbm', 'R1:TTBM01:QA'],
   ])('restaura %s sin ampliar su catálogo', async (nombreUsuario, codigoRol, destino, idOrigen) => {
     usuario = { ...usuario, nombreUsuario, codigoRol };
     expect(puedeReasignarPedidos(codigoRol, nombreUsuario)).toBe(true);
@@ -341,6 +377,7 @@ describe('reasignación restaurada y autenticada', () => {
     expect(catalogo.body.puedeReasignar).toBe(true);
     if (nombreUsuario === 'jlara' || nombreUsuario === 'acalix') expect(catalogo.body.datos.map((t: { usuario: string }) => t.usuario)).toEqual(['jlara', 'acalix']);
     if (nombreUsuario === 'tlopez') expect(catalogo.body.datos.map((t: { usuario: string }) => t.usuario)).toEqual(['tlopez']);
+    if (nombreUsuario === 'bodegatbm') expect(catalogo.body.datos.map((t: { usuario: string }) => t.usuario)).toEqual(['bodegatbm']);
     const cuerpo = { ...datos, idOrigen, usuarioAsignado: destino };
     await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token').send(cuerpo).expect(200);
     expect(reasignar).toHaveBeenCalledWith(cuerpo, expect.objectContaining({ usuario: destino }), usuario.usuarioId, new Date(actualizadoEn));
@@ -354,10 +391,11 @@ describe('reasignación restaurada y autenticada', () => {
     expect(reasignar).not.toHaveBeenCalled();
   });
 
-  it.each(['jlara', 'acalix', 'tlopez'])('%s no puede reasignar fuera de su lista', async (nombreUsuario) => {
+  it.each(['jlara', 'acalix', 'tlopez', 'bodegatbm'])('%s no puede reasignar fuera de su lista', async (nombreUsuario) => {
     usuario = { ...usuario, nombreUsuario, codigoRol: 'OPERADOR_BODEGA' };
     await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token')
-      .send({ ...datos, idOrigen: nombreUsuario === 'tlopez' ? 'R1:TCIR01:QA' : datos.idOrigen, usuarioAsignado: 'gcruz' }).expect(400);
+      .send({ ...datos, idOrigen: nombreUsuario === 'tlopez' ? 'R1:TCIR01:QA'
+        : nombreUsuario === 'bodegatbm' ? 'R1:TTBM01:QA' : datos.idOrigen, usuarioAsignado: 'gcruz' }).expect(400);
     expect(reasignar).not.toHaveBeenCalled();
   });
 
@@ -365,6 +403,13 @@ describe('reasignación restaurada y autenticada', () => {
     usuario = { ...usuario, nombreUsuario: 'tlopez', codigoRol: 'OPERADOR_BODEGA' };
     await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token')
       .send({ ...datos, usuarioAsignado: 'tlopez' }).expect(403);
+    expect(reasignar).not.toHaveBeenCalled();
+  });
+
+  it('Kevin conserva la restricción de TBM', async () => {
+    usuario = { ...usuario, nombreUsuario: 'bodegatbm', codigoRol: 'OPERADOR_BODEGA' };
+    await solicitud(app).patch('/api/pedidos/asignaciones/reasignar').set('Cookie', 'pb_sesion=token')
+      .send({ ...datos, usuarioAsignado: 'bodegatbm' }).expect(403);
     expect(reasignar).not.toHaveBeenCalled();
   });
 

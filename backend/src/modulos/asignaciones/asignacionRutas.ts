@@ -20,6 +20,7 @@ const tecnicosAsignablesAcalixJlara = [
   { usuario: 'acalix', nombre: 'Ana Calix' },
 ] as const;
 const tommyAsignable = [{ usuario: 'tlopez', nombre: 'Tommy López' }] as const;
+const kevinAsignable = [{ usuario: 'bodegatbm', nombre: 'Kevin Carranza' }] as const;
 
 const identidad = z.object({
   idOrigen: z.string().trim().min(1).max(150),
@@ -37,12 +38,12 @@ export const esquemaReasignar = esquemaGuardarAsignacion.extend({
 
 export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-    || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(nombreUsuario.trim().toLowerCase());
+    || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(nombreUsuario.trim().toLowerCase());
 }
 
 export function puedeReasignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-    || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(nombreUsuario.trim().toLowerCase());
+    || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(nombreUsuario.trim().toLowerCase());
 }
 
 export function usuariosAsignablesParaSesion(
@@ -50,6 +51,7 @@ export function usuariosAsignablesParaSesion(
 ): readonly TecnicoAsignable[] {
   const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
   if (nombreUsuario === 'tlopez') return tommyAsignable;
+  if (nombreUsuario === 'bodegatbm') return kevinAsignable;
   if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') return tecnicosAsignablesAcalixJlara;
   if (puedeAsignarPedidos(usuario.codigoRol, usuario.nombreUsuario)) return tecnicosAsignables;
   return [];
@@ -64,6 +66,11 @@ export function resolverTecnicoAsignable(
     if (usuarioAsignado !== 'tlopez') throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
       'El usuario seleccionado no está disponible.');
     return tommyAsignable[0];
+  }
+  if (nombreUsuario === 'bodegatbm') {
+    if (usuarioAsignado !== 'bodegatbm') throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
+      'El usuario seleccionado no está disponible.');
+    return kevinAsignable[0];
   }
   if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
     const tecnico = tecnicosAsignablesAcalixJlara.find(({ usuario: codigo }) => codigo === usuarioAsignado);
@@ -123,6 +130,11 @@ export function crearAsignacionRutas(
         throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
           'Solo puede asignarse pedidos de Circunvalación.');
       }
+      if (usuario.nombreUsuario.trim().toLowerCase() === 'bodegatbm'
+        && !datos.idOrigen.toUpperCase().startsWith('R1:TTBM01:')) {
+        throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
+          'Solo puede asignarse pedidos de TBM.');
+      }
       const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
       const resultado = await repositorio.guardar(datos, tecnico, usuario.usuarioId);
       if (!resultado.confirmada) {
@@ -160,6 +172,11 @@ export function crearAsignacionRutas(
         && !datos.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
         throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
           'Solo puede asignarse pedidos de Circunvalación.');
+      }
+      if (usuario.nombreUsuario.trim().toLowerCase() === 'bodegatbm'
+        && !datos.idOrigen.toUpperCase().startsWith('R1:TTBM01:')) {
+        throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
+          'Solo puede asignarse pedidos de TBM.');
       }
       const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
       const resultado = await repositorio.reasignar(

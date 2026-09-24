@@ -41,7 +41,8 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     servicio.obtenerUsuarios.mockImplementation(() => {
       const nombre = usuario().nombreUsuario;
       const todos = usuario().codigoRol === 'ADMINISTRADOR' || nombre === 'gcruz';
-      const permitidos = todos ? tecnicos : nombre === 'tlopez' ? ['tlopez'] : ['jlara', 'acalix'];
+      const permitidos = todos ? tecnicos
+        : nombre === 'tlopez' || nombre === 'bodegatbm' ? [nombre] : ['jlara', 'acalix'];
       return of({ datos: permitidos.map(usuario => ({ usuario, nombre: usuario })),
         puedeAsignar: true, puedeAsignarTodos: todos, puedeReasignar: true });
     });
@@ -90,6 +91,7 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     ['sistemas', 'ADMINISTRADOR', tecnicos], ['gcruz', 'OPERADOR_BODEGA', tecnicos],
     ['jlara', 'OPERADOR_BODEGA', ['jlara', 'acalix']], ['acalix', 'OPERADOR_BODEGA', ['jlara', 'acalix']],
     ['tlopez', 'OPERADOR_BODEGA', ['tlopez']],
+    ['bodegatbm', 'OPERADOR_BODEGA', ['bodegatbm']],
   ] as const)('muestra ambos botones y el catálogo vigente de %s', (nombreUsuario, codigoRol, lista) => {
     usuario.set({ ...usuario(), nombreUsuario, codigoRol }); iniciar();
     expect(fila().querySelectorAll('button')).toHaveLength(2);

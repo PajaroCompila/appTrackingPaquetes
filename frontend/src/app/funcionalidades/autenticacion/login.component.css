@@ -1,11 +1,19 @@
 :host { display: block; min-height: 100vh; }
 .pagina-login { display: grid; min-height: 100vh; grid-template-columns: minmax(20rem, 1fr) minmax(28rem, 1fr); background: #0b2035; }
-.panel-botanico { position: relative; min-height: 100vh; padding: 2rem; overflow: hidden; background: linear-gradient(180deg, rgb(3 13 31 / 4%), rgb(3 13 31 / 48%)), url('/imagenes/fondo-login-instrumentos.png') left center / cover no-repeat; }
-.logo-login { position: relative; z-index: 2; display: block; width: clamp(10rem, 18vw, 16rem); height: auto; filter: drop-shadow(0 .35rem .7rem rgb(0 0 0 / 35%)); }
+.panel-botanico { position: relative; isolation: isolate; width: 100%; height: 100%; min-height: 100vh; padding: 0; overflow: hidden; background: #061a36 url('/imagenes/fondo-login-pajaro-azul-sin-logo.png') center / cover no-repeat; }
+.logo-principal-login { position: absolute; z-index: 1; top: 42%; left: 50%; display: block; width: min(68%, 38rem); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 .35rem .8rem rgb(0 0 0 / 28%)); user-select: none; }
+.cinta-marcas { position: absolute; z-index: 2; right: 0; bottom: 4.25rem; left: 0; overflow: hidden; padding: .65rem 0; background: linear-gradient(90deg, rgb(2 17 39 / 72%), rgb(3 24 52 / 38%) 15%, rgb(3 24 52 / 38%) 85%, rgb(2 17 39 / 72%)); }
+.cinta-marcas::before, .cinta-marcas::after { position: absolute; z-index: 2; top: 0; bottom: 0; width: clamp(1.5rem, 5vw, 3.5rem); content: ''; pointer-events: none; }
+.cinta-marcas::before { left: 0; background: linear-gradient(90deg, #03152f 0 24%, rgb(3 21 47 / 92%) 52%, transparent); }
+.cinta-marcas::after { right: 0; background: linear-gradient(270deg, #03152f 0 24%, rgb(3 21 47 / 92%) 52%, transparent); }
+.cinta-marcas__pista { display: flex; width: max-content; will-change: transform; animation: desplazar-marcas 82s linear infinite; }
+.cinta-marcas__grupo { flex: none; padding-right: 2.625rem; }
+.cinta-marcas img { display: block; width: auto; max-width: none; height: clamp(2.4rem, 3.6vw, 3.25rem); user-select: none; }
+@keyframes desplazar-marcas { to { transform: translateX(-50%); } }
 .identidad-login { position: absolute; z-index: 2; right: 2rem; bottom: 2rem; left: 2rem; display: grid; color: white; text-shadow: 0 2px 10px rgb(0 0 0 / 55%); }
 .identidad-login span { color: rgb(255 255 255 / 78%); font-size: .82rem; }
 .panel-acceso { position: relative; isolation: isolate; display: grid; min-height: 100vh; padding: clamp(2rem, 7vw, 7rem); overflow: hidden; place-items: center; background: #0a1d3d; color: white; }
-.panel-acceso::before { position: absolute; z-index: -2; inset: -2rem; content: ''; background: url('/imagenes/fondo-login-instrumentos.png') right center / cover no-repeat; filter: blur(18px) saturate(.82); opacity: .56; transform: scale(1.06); }
+.panel-acceso::before { position: absolute; z-index: -2; inset: -2rem; content: ''; background: url('/imagenes/fondo-login-pajaro-azul-sin-logo.png') center / cover no-repeat; filter: blur(18px) saturate(.82); opacity: .56; transform: scale(1.06); }
 .panel-acceso::after { position: absolute; z-index: -1; inset: 0; content: ''; background: linear-gradient(135deg, rgb(6 24 52 / 88%), rgb(13 43 91 / 92%)); }
 .formulario-login { position: relative; z-index: 1; display: grid; width: min(100%, 30rem); gap: 1.75rem; }
 .encabezado-login { text-align: center; }
@@ -32,11 +40,12 @@
 @media (max-width: 760px) {
   .pagina-login { grid-template-columns: 1fr; }
   .panel-botanico { position: absolute; inset: 0; min-height: 100vh; }
+  .cinta-marcas { bottom: 3.25rem; padding: .45rem 0; }
+  .cinta-marcas img { height: 2.15rem; }
   .identidad-login { right: 1rem; bottom: 1rem; left: 1rem; display: block; text-align: center; }
   .panel-acceso { position: relative; z-index: 1; min-height: 100vh; padding: 1.25rem; background: rgb(8 30 49 / 72%); backdrop-filter: blur(5px); }
   .panel-acceso::before { background-position: 31% center; filter: blur(9px) saturate(.78); opacity: .64; }
   .panel-acceso::after { background: rgb(5 22 48 / 72%); }
   .formulario-login { padding: 2rem 1.25rem; border: 1px solid rgb(255 255 255 / 16%); border-radius: .85rem; background: rgb(9 31 51 / 78%); box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 28%); }
-  .logo-login { position: relative; z-index: 2; width: min(48vw, 13rem); }
 }
 @media (prefers-reduced-motion: reduce) { .boton-acceso, .campo-login input, .mostrar-contrasena { transition: none; }.boton-acceso:hover:not(:disabled), .boton-acceso:active:not(:disabled), .mostrar-contrasena:active { transform: none; } }
