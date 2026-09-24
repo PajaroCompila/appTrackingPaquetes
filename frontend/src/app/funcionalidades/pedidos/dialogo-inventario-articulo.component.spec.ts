@@ -44,6 +44,18 @@ describe('DialogoInventarioArticuloComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.existencia-baja')).toHaveLength(1);
   });
 
+  it('mantiene separados el encabezado, la fotografía y el texto de ayuda', () => {
+    const tarjeta = fixture.nativeElement.querySelector('.previsualizacion-articulo') as HTMLElement;
+    const imagen = tarjeta.querySelector('img') as HTMLImageElement;
+    imagen.dispatchEvent(new Event('load'));
+    fixture.detectChanges();
+
+    expect(tarjeta.children[0].id).toBe('titulo-imagen-articulo');
+    expect(tarjeta.children[1].classList).toContain('contenedor-imagen-articulo');
+    expect(tarjeta.children[2].tagName).toBe('SMALL');
+    expect(tarjeta.children[2].textContent).toContain('Clic para ampliar');
+  });
+
   it('abre la imagen con un clic y Escape cierra primero solo el visor', () => {
     const cerrar = vi.fn();
     fixture.componentInstance.cerrar.subscribe(cerrar);

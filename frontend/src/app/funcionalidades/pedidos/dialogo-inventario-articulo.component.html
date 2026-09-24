@@ -41,26 +41,29 @@
 
           <section class="previsualizacion-articulo" aria-labelledby="titulo-imagen-articulo">
             <p id="titulo-imagen-articulo" class="sobrelinea-dialogo">Fotografía del artículo</p>
-            @if (urlImagen && estadoImagen !== 'no-disponible') {
-              <img
-                [src]="urlImagen"
-                [alt]="'Fotografía de ' + inventario.codigoArticulo"
-                [class.imagen-visible]="estadoImagen === 'disponible'"
-                [attr.tabindex]="estadoImagen === 'disponible' ? 0 : null"
-                [attr.role]="estadoImagen === 'disponible' ? 'button' : null"
-                [attr.aria-label]="estadoImagen === 'disponible' ? 'Ampliar fotografía de ' + inventario.codigoArticulo : null"
-                (load)="imagenCargada()"
-                (error)="imagenNoDisponible()"
-                (click)="abrirVisorImagen()"
-                (keydown.enter)="abrirVisorImagen()"
-                (keydown.space)="abrirVisorImagen(); $event.preventDefault()"
-              />
-            }
-            @if (estadoImagen === 'cargando') {
-              <div class="estado-imagen" role="status"><span class="cargador" aria-hidden="true"></span><span>Cargando imagen…</span></div>
-            } @else if (estadoImagen === 'no-disponible') {
-              <div class="estado-imagen imagen-no-disponible" role="status"><i class="pi pi-image" aria-hidden="true"></i><span>Imagen no disponible</span></div>
-            } @else {
+            <div class="contenedor-imagen-articulo">
+              @if (urlImagen && estadoImagen !== 'no-disponible') {
+                <img
+                  [src]="urlImagen"
+                  [alt]="'Fotografía de ' + inventario.codigoArticulo"
+                  [class.imagen-visible]="estadoImagen === 'disponible'"
+                  [attr.tabindex]="estadoImagen === 'disponible' ? 0 : null"
+                  [attr.role]="estadoImagen === 'disponible' ? 'button' : null"
+                  [attr.aria-label]="estadoImagen === 'disponible' ? 'Ampliar fotografía de ' + inventario.codigoArticulo : null"
+                  (load)="imagenCargada()"
+                  (error)="imagenNoDisponible()"
+                  (click)="abrirVisorImagen()"
+                  (keydown.enter)="abrirVisorImagen()"
+                  (keydown.space)="abrirVisorImagen(); $event.preventDefault()"
+                />
+              }
+              @if (estadoImagen === 'cargando') {
+                <div class="estado-imagen" role="status"><span class="cargador" aria-hidden="true"></span><span>Cargando imagen…</span></div>
+              } @else if (estadoImagen === 'no-disponible') {
+                <div class="estado-imagen imagen-no-disponible" role="status"><i class="pi pi-image" aria-hidden="true"></i><span>Imagen no disponible</span></div>
+              }
+            </div>
+            @if (estadoImagen === 'disponible') {
               <small>Clic para ampliar</small>
             }
           </section>
