@@ -46,9 +46,14 @@
                 [src]="urlImagen"
                 [alt]="'Fotografía de ' + inventario.codigoArticulo"
                 [class.imagen-visible]="estadoImagen === 'disponible'"
+                [attr.tabindex]="estadoImagen === 'disponible' ? 0 : null"
+                [attr.role]="estadoImagen === 'disponible' ? 'button' : null"
+                [attr.aria-label]="estadoImagen === 'disponible' ? 'Ampliar fotografía de ' + inventario.codigoArticulo : null"
                 (load)="imagenCargada()"
                 (error)="imagenNoDisponible()"
-                (dblclick)="abrirVisorImagen()"
+                (click)="abrirVisorImagen()"
+                (keydown.enter)="abrirVisorImagen()"
+                (keydown.space)="abrirVisorImagen(); $event.preventDefault()"
               />
             }
             @if (estadoImagen === 'cargando') {
@@ -56,7 +61,7 @@
             } @else if (estadoImagen === 'no-disponible') {
               <div class="estado-imagen imagen-no-disponible" role="status"><i class="pi pi-image" aria-hidden="true"></i><span>Imagen no disponible</span></div>
             } @else {
-              <small>Doble clic para ampliar</small>
+              <small>Clic para ampliar</small>
             }
           </section>
         </div>
@@ -109,10 +114,14 @@
   </section>
 
   @if (visorImagenAbierto && estadoImagen === 'disponible') {
-    <div class="fondo-visor-imagen" role="presentation" (mousedown)="cerrarVisorImagen(); $event.stopPropagation()">
+    <div class="fondo-visor-imagen" role="presentation" (click)="cerrarVisorImagen(); $event.stopPropagation()">
       <section class="visor-imagen" role="dialog" aria-modal="true" aria-label="Fotografía ampliada del artículo" (mousedown)="$event.stopPropagation()">
         <button class="cerrar-visor" type="button" aria-label="Cerrar fotografía ampliada" (click)="cerrarVisorImagen()">×</button>
-        <img [src]="urlImagen" [alt]="'Fotografía ampliada de ' + (inventario?.codigoArticulo || 'artículo')" />
+        <img
+          [src]="urlImagen"
+          [alt]="'Fotografía ampliada de ' + (inventario?.codigoArticulo || 'artículo')"
+          (click)="cerrarVisorImagen(); $event.stopPropagation()"
+        />
       </section>
     </div>
   }

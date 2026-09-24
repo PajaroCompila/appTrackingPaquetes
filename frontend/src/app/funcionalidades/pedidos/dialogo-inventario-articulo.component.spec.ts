@@ -44,13 +44,13 @@ describe('DialogoInventarioArticuloComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.existencia-baja')).toHaveLength(1);
   });
 
-  it('abre la imagen con doble clic y Escape cierra primero solo el visor', () => {
+  it('abre la imagen con un clic y Escape cierra primero solo el visor', () => {
     const cerrar = vi.fn();
     fixture.componentInstance.cerrar.subscribe(cerrar);
     const imagen = fixture.nativeElement.querySelector('.previsualizacion-articulo img') as HTMLImageElement;
     imagen.dispatchEvent(new Event('load'));
     fixture.detectChanges();
-    imagen.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    imagen.click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.fondo-visor-imagen')).toBeTruthy();
 
@@ -69,10 +69,27 @@ describe('DialogoInventarioArticuloComponent', () => {
     const imagen = fixture.nativeElement.querySelector('.previsualizacion-articulo img') as HTMLImageElement;
     imagen.dispatchEvent(new Event('load'));
     fixture.detectChanges();
-    imagen.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    imagen.click();
     fixture.detectChanges();
 
     (fixture.nativeElement.querySelector('.cerrar-visor') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.fondo-visor-imagen')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.dialogo-inventario')).toBeTruthy();
+    expect(cerrar).not.toHaveBeenCalled();
+  });
+
+  it('cierra la imagen ampliada con un clic y conserva abierto el modal de inventario', () => {
+    const cerrar = vi.fn();
+    fixture.componentInstance.cerrar.subscribe(cerrar);
+    const imagen = fixture.nativeElement.querySelector('.previsualizacion-articulo img') as HTMLImageElement;
+    imagen.dispatchEvent(new Event('load'));
+    fixture.detectChanges();
+    imagen.click();
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.visor-imagen img') as HTMLImageElement).click();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.fondo-visor-imagen')).toBeNull();
@@ -98,5 +115,15 @@ describe('DialogoInventarioArticuloComponent', () => {
     (fixture.nativeElement.querySelector('footer button') as HTMLButtonElement).click();
 
     expect(cerrar).toHaveBeenCalledTimes(2);
+  });
+
+  it('elimina el manejo de Escape al destruir el componente', () => {
+    const cerrar = vi.fn();
+    fixture.componentInstance.cerrar.subscribe(cerrar);
+
+    fixture.destroy();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(cerrar).not.toHaveBeenCalled();
   });
 });
