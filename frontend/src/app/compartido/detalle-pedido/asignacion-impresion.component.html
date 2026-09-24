@@ -3,7 +3,7 @@
   <p>Estos artículos no tienen bodeguero asignado. Seleccioná un responsable antes de imprimir.</p>
   <ul aria-label="Artículos sin responsable">
     @for (articulo of articulos; track articulo.clave) {
-      <li><strong>{{ articulo.codigoAlmacen || 'Sin bodega' }} · {{ articulo.codigo }}</strong><span>{{ articulo.descripcion }}</span></li>
+      <li><strong>{{ articulo.codigoAlmacen || 'Sin bodega' }} · <span [appCodigoArticuloInventario]="articulo.codigo" [codigoAlmacenInventario]="articulo.codigoAlmacen">{{ articulo.codigo }}</span></strong><span>{{ articulo.descripcion }}</span></li>
     }
   </ul>
   <label for="responsable-impresion">Asignado a</label>

@@ -67,6 +67,12 @@ describe('PedidosService', () => {
     });
   });
 
+  it('construye una URL segura para cargar la fotografía en segundo plano', () => {
+    expect(servicio.obtenerUrlImagenArticulo('ART/001 CON ESPACIO')).toBe(
+      'http://localhost:3280/api/articulos/ART%2F001%20CON%20ESPACIO/imagen',
+    );
+  });
+
   it('envía únicamente identidades de líneas al transferir parcialmente', () => {
     const lineas = [
       { idOrigen: 'R1:F1', identificadorDetalle: '2' },

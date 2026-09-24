@@ -12,8 +12,8 @@
 .dialogo-inventario {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(62rem, 100%);
-  max-height: min(90vh, 52rem);
+  width: min(74rem, 94vw);
+  max-height: 92vh;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 30%);
   border-radius: .95rem;
@@ -34,13 +34,20 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .contenido-dialogo { min-height: 0; overflow-y: auto; }
 .estado-dialogo { display: grid; min-height: 18rem; place-content: center; justify-items: center; gap: .75rem; padding: 1.5rem; text-align: center; }
 .estado-dialogo > i { color: #7892aa; font-size: 2.1rem; }
-.datos-inventario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin: 0; padding: 1.25rem; }
+.resumen-articulo-inventario { display: grid; grid-template-columns: minmax(0, 2fr) minmax(15rem, .8fr); gap: 1rem; padding: 1.25rem; }
+.datos-inventario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin: 0; }
 .datos-inventario div { display: grid; min-width: 0; gap: .25rem; padding: .9rem; border: 1px solid #dbe3ea; border-radius: .7rem; background: white; }
 .datos-inventario dt { color: var(--gris-600); font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .datos-inventario dd { margin: 0; color: var(--azul-900); font-weight: 600; overflow-wrap: anywhere; }
 .datos-inventario .dato-descripcion { grid-column: span 2; }
 .datos-inventario .existencia { border-color: #b9cde0; background: #eaf2f9; }
 .datos-inventario .existencia dd { font-size: 1.5rem; line-height: 1.2; }
+.previsualizacion-articulo { position: relative; display: grid; min-height: 13rem; place-items: center; align-content: center; gap: .55rem; overflow: hidden; padding: 1rem; border: 1px solid #d5e0e9; border-radius: .8rem; background: white; }
+.previsualizacion-articulo > .sobrelinea-dialogo { position: absolute; inset: .8rem auto auto .9rem; }
+.previsualizacion-articulo img { width: 100%; height: 11rem; object-fit: contain; opacity: 0; transition: opacity .2s ease; }
+.previsualizacion-articulo img.imagen-visible { cursor: zoom-in; opacity: 1; }
+.estado-imagen { display: grid; place-items: center; gap: .6rem; color: var(--gris-600); }
+.estado-imagen > i { color: #7892aa; font-size: 2rem; }
 .minidashboard { margin: 0 1.25rem 1.25rem; padding: 1.15rem; border: 1px solid #d5e0e9; border-radius: .85rem; background: white; box-shadow: 0 5px 18px rgb(16 40 91 / 6%); }
 .encabezado-dashboard { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .encabezado-dashboard h3 { margin: 0; color: var(--azul-900); font-size: 1.15rem; }
@@ -48,7 +55,7 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .resumen-dashboard { display: flex; flex: 0 0 auto; gap: .55rem; }
 .resumen-dashboard span { display: grid; min-width: 6.5rem; padding: .55rem .7rem; border-radius: .6rem; background: var(--azul-100); color: var(--gris-600); font-size: .75rem; text-align: center; }
 .resumen-dashboard strong { color: var(--azul-900); font-size: 1rem; }
-.bodegas-inventario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.bodegas-inventario { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
 .bodegas-inventario li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; padding: .85rem; border: 1px solid #d8e3eb; border-radius: .72rem; background: #f8fafc; transition: border-color 180ms ease, background 180ms ease; }
 .identidad-bodega { display: flex; align-items: center; min-width: 0; gap: .7rem; }
 .icono-bodega { display: grid; flex: 0 0 2.3rem; height: 2.3rem; place-items: center; border-radius: .6rem; background: #dfeaf4; color: var(--azul-700); }
@@ -65,9 +72,21 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .sin-existencias { display: grid; min-height: 8rem; place-items: center; align-content: center; gap: .5rem; border: 1px dashed #b9c8d5; border-radius: .7rem; background: #f8fafc; color: var(--gris-600); text-align: center; }
 .sin-existencias i { font-size: 1.6rem; }
 .sin-existencias p { margin: 0; }
+.fondo-visor-imagen { position: fixed; z-index: 1600; inset: 0; display: grid; place-items: center; padding: 1.25rem; background: rgb(3 13 29 / 88%); }
+.visor-imagen { position: relative; display: grid; place-items: center; padding: 1rem; border-radius: .9rem; background: white; }
+.visor-imagen img { max-width: 88vw; max-height: 86vh; object-fit: contain; }
+.cerrar-visor { position: absolute; top: .6rem; right: .6rem; display: grid; width: 2.45rem; height: 2.45rem; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgb(255 255 255 / 94%); color: var(--azul-900); font-size: 1.75rem; cursor: pointer; }
+.cerrar-visor:hover, .cerrar-visor:focus-visible { background: var(--azul-100); }
 
 @keyframes aparecer-fondo { from { opacity: 0; } to { opacity: 1; } }
 @keyframes aparecer-dialogo { from { opacity: 0; transform: translateY(5px); } }
+@media (max-width: 1000px) {
+  .bodegas-inventario { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.fondo-dialogo[popover] { width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; }
+@media (max-width: 800px) {
+  .resumen-articulo-inventario { grid-template-columns: 1fr; }
+}
 @media (max-width: 680px) {
   .dialogo-inventario { max-height: 94vh; }
   .datos-inventario, .bodegas-inventario { grid-template-columns: 1fr; }
@@ -78,8 +97,8 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 }
 @media (max-width: 420px) {
   .fondo-dialogo { padding: .45rem; }
-  .datos-inventario, .minidashboard { margin-inline: .7rem; }
-  .datos-inventario { padding-inline: 0; }
+  .resumen-articulo-inventario { padding-inline: .7rem; }
+  .minidashboard { margin-inline: .7rem; }
   .bodegas-inventario li { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -140,6 +140,10 @@ describe('HistorialComponent', () => {
       paginacion: { pagina: filtros.pagina, cantidadPorPagina: 25,
         cantidadDevuelta: 1, totalRegistros: 50, hayMas: true },
     }));
+    const obtenerInventarioArticulo = vi.fn().mockReturnValue(of({
+      codigoArticulo: 'NORMAL', descripcion: 'Artículo', codigoAlmacen: 'BSPS01',
+      nombreAlmacen: 'Bodega', existenciaFisica: 1, existencias: [],
+    }));
     await TestBed.configureTestingModule({
       imports: [HistorialComponent],
       providers: [
@@ -147,7 +151,7 @@ describe('HistorialComponent', () => {
           obtener: vi.fn() } },
         { provide: AlmacenesService, useValue: { obtenerAlmacenes: vi.fn()
           .mockReturnValue(of({ datos: [] })) } },
-        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo } },
         { provide: ActivatedRoute, useValue: { snapshot: {
           paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
         } } },
@@ -177,6 +181,8 @@ describe('HistorialComponent', () => {
     expect(imprimir).toHaveBeenCalledOnce();
     expect(fixture.nativeElement.textContent).toContain('NORMAL');
     expect(fixture.nativeElement.textContent).toContain('ESPECIAL');
+    (fixture.nativeElement.querySelector('.codigo-articulo') as HTMLElement).click();
+    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('NORMAL', 'BSPS01');
     const tiempos = [...fixture.nativeElement.querySelectorAll('.tiempo-total-despacho')]
       .map((elemento: HTMLElement) => elemento.textContent?.trim());
     expect(tiempos).toEqual(['16:00', '16:00']);

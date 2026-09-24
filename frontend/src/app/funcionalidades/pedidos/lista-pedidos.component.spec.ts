@@ -36,6 +36,7 @@ describe('ListaPedidosComponent', () => {
     obtenerPedidos: ReturnType<typeof vi.fn>;
     obtenerDetallePedido: ReturnType<typeof vi.fn>;
     obtenerInventarioArticulo: ReturnType<typeof vi.fn>;
+    obtenerUrlImagenArticulo: ReturnType<typeof vi.fn>;
     despacharLineas: ReturnType<typeof vi.fn>;
   };
   let almacenesService: { obtenerAlmacenes: ReturnType<typeof vi.fn> };
@@ -72,6 +73,7 @@ describe('ListaPedidosComponent', () => {
           { codigoAlmacen: 'COD-COLA', nombreAlmacen: 'Bodega Principal SPS', existenciaFisica: 10 },
         ],
       })),
+      obtenerUrlImagenArticulo: vi.fn().mockReturnValue('/api/articulos/001234/imagen'),
       despacharLineas: vi.fn().mockReturnValue(of({ datos: {
         transferidas: [{ idOrigen: 'R1:F1', identificadorDetalle: '1' }],
         omitidas: [], rechazadas: [],
@@ -561,22 +563,19 @@ describe('ListaPedidosComponent', () => {
     expect(fixture.nativeElement.querySelector('.aviso-fuente')).toBeNull();
   });
 
-  it('abre el modal con doble clic usando código de artículo y almacén', () => {
+  it('no abre inventario al hacer clic en la descripción', () => {
     fixture.detectChanges();
-    const descripcion = fixture.nativeElement.querySelector('.descripcion-consultable') as HTMLElement;
-    descripcion.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const descripcion = fixture.nativeElement.querySelector('.columna-descripcion') as HTMLElement;
+    descripcion.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     fixture.detectChanges();
 
-    expect(pedidosService.obtenerInventarioArticulo).toHaveBeenCalledWith('001234', 'COD-COLA');
-    const consultaInventario = TestBed.inject(ConsultaInventarioArticuloService);
-    expect(consultaInventario.estado()).toBe('datos');
-    expect(consultaInventario.inventario()?.existenciaFisica).toBe(10);
+    expect(pedidosService.obtenerInventarioArticulo).not.toHaveBeenCalled();
   });
 
-  it('abre el mismo modal al hacer doble clic en el código del artículo', () => {
+  it('abre el modal con un clic en el código del artículo', () => {
     fixture.detectChanges();
     const codigo = fixture.nativeElement.querySelector('.codigo-consultable') as HTMLElement;
-    codigo.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    codigo.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     fixture.detectChanges();
 
     expect(pedidosService.obtenerInventarioArticulo).toHaveBeenCalledWith('001234', 'COD-COLA');

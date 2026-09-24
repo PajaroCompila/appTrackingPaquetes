@@ -32,8 +32,15 @@ export class CodigoArticuloInventarioDirective {
       : null;
   }
 
-  @HostListener('dblclick', ['$event'])
-  public abrirConDobleClic(evento: Event): void {
+  @HostBinding('attr.title')
+  public get ayuda(): string | null {
+    return this.consultable
+      ? `${this.codigoArticulo} — Clic para consultar inventario`
+      : null;
+  }
+
+  @HostListener('click', ['$event'])
+  public abrirConClic(evento: Event): void {
     this.abrir(evento);
   }
 

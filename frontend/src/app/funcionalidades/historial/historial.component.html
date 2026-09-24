@@ -124,13 +124,9 @@
           <tbody>@for (articulo of grupo.articulos; track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
             <tr><td data-label="Pedido"><strong>{{ numeroDocumento(articulo) }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
-                title="Doble clic para consultar inventario"
                 [appCodigoArticuloInventario]="articulo.codigoArticulo"
                 [codigoAlmacenInventario]="articulo.codigoAlmacen"><strong>{{ marcador(articulo.codigoArticulo) }}</strong></td>
-              <td class="dato-consultable" data-label="Descripción"
-                title="Doble clic para consultar inventario"
-                [appCodigoArticuloInventario]="articulo.codigoArticulo"
-                [codigoAlmacenInventario]="articulo.codigoAlmacen"><span class="texto-dos-lineas">{{ marcador(articulo.descripcion) }}</span></td>
+              <td data-label="Descripción"><span class="texto-dos-lineas">{{ marcador(articulo.descripcion) }}</span></td>
               <td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
               <td data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>
               <td data-label="Fecha y hora"><span class="texto-dos-lineas">{{ fechaHora(articulo.fechaHoraPedido, true) }}</span></td>

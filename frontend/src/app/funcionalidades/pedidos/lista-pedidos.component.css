@@ -154,8 +154,8 @@
 }
 .acciones-transferencia { display:flex; justify-content:flex-end; gap:.75rem; margin: 0 0 .75rem; }
 .mensaje-transferencia { margin:.5rem 0; color:var(--azul-700); font-weight:600; }
-  .codigo-consultable, .descripcion-consultable { cursor: pointer; }
-  .codigo-consultable:hover, .descripcion-consultable:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
+  .codigo-consultable { cursor: pointer; }
+  .codigo-consultable:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
 .columna-seleccion { width: 3.5rem; text-align: center; }
 .columna-pedido { width: 5.75rem; min-width: 5.75rem; max-width: 5.75rem; font-size: .78rem; white-space: nowrap; }
 .columna-pedido strong {

@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { FacturadosPendientesComponent } from './facturados-pendientes.component';
@@ -40,6 +40,12 @@ describe('Facturados pendientes: vista operativa aislada',()=> {
     expect(texto).toContain('Facturado');expect(texto).toContain('Pendiente de entrega');expect(texto).toContain('Responsable');
     expect(fixture.nativeElement.querySelectorAll('tbody tr').length).toBe(1);
     expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({codigosAlmacen:['BSPS04'],fechaDesde:'2026-09-21',fechaHasta:'2026-09-21'}));
+  });
+  it('consulta inventario con un clic sobre el código',()=> {
+    (fixture.nativeElement.querySelector('.codigo-inventario-consultable') as HTMLElement).click();
+    const consulta=TestBed.inject(HttpTestingController).expectOne(peticion=>peticion.url.endsWith('/articulos/ABC/inventario'));
+    expect(consulta.request.params.get('codigoAlmacen')).toBe('BSPS04');
+    consulta.flush({codigoArticulo:'ABC',descripcion:'Producto',codigoAlmacen:'BSPS04',nombreAlmacen:'Bodega 4',existenciaFisica:1,existencias:[]});
   });
   it('por pedido muestra 7/1/0/1/6 sin crear pendientes para las seis sin validación',()=> {
     fixture.componentInstance.cambiarVista('pedido');fixture.detectChanges();

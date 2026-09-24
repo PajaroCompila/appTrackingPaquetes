@@ -7,7 +7,6 @@ import { ConsultaInventarioArticuloService } from './consulta-inventario-articul
   imports: [CodigoArticuloInventarioDirective],
   template: `
     <span
-      title="Doble clic para consultar inventario"
       [appCodigoArticuloInventario]="codigo"
       [codigoAlmacenInventario]="almacen"
     >CÓDIGO RECORTADO…</span>
@@ -31,14 +30,14 @@ describe('CodigoArticuloInventarioDirective', () => {
     fixture = TestBed.createComponent(ComponentePrueba);
   });
 
-  it('envía el código completo y el almacén de la fila con doble clic', () => {
+  it('envía el código completo y el almacén de la fila con un clic', () => {
     fixture.detectChanges();
     const codigo = fixture.nativeElement.querySelector('span') as HTMLElement;
-    codigo.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    codigo.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(abrir).toHaveBeenCalledWith('COSMIC-SQ41-CODIGO-COMPLETO', 'BSPS05');
     expect(codigo.textContent).toContain('RECORTADO');
-    expect(codigo.getAttribute('title')).toBe('Doble clic para consultar inventario');
+    expect(codigo.getAttribute('title')).toBe('COSMIC-SQ41-CODIGO-COMPLETO — Clic para consultar inventario');
   });
 
   it('permite consultar con Enter y ofrece nombre accesible', () => {
@@ -56,7 +55,7 @@ describe('CodigoArticuloInventarioDirective', () => {
     fixture.componentInstance.almacen = null;
     fixture.detectChanges();
     const codigo = fixture.nativeElement.querySelector('span') as HTMLElement;
-    codigo.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    codigo.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(abrir).not.toHaveBeenCalled();
     expect(codigo.getAttribute('role')).toBeNull();

@@ -1,9 +1,11 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, Output, ViewChild } from '@angular/core';
 import type { TecnicoAsignable } from '../asignaciones/asignacion.interface';
 import type { ArticuloDetalleVisual } from './detalle-pedido-vista.interface';
+import { CodigoArticuloInventarioDirective } from '../inventario/codigo-articulo-inventario.directive';
 
 @Component({
   selector: 'app-asignacion-impresion',
+  imports: [CodigoArticuloInventarioDirective],
   templateUrl: './asignacion-impresion.component.html',
   styleUrl: './asignacion-impresion.component.css',
 })

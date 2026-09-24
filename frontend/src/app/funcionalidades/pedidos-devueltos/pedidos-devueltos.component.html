@@ -23,7 +23,7 @@
         <thead><tr><th class="columna-seleccion"><span class="solo-lectores">Seleccionar</span></th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Estado</th><th>Recibido por</th><th>Fecha/hora recepción</th></tr></thead>
         <tbody>@for (linea of pedido.lineas; track linea.identificadorDetalle) {
           <tr><td class="columna-seleccion"><input class="seleccion-linea" type="checkbox" [attr.aria-label]="'Seleccionar ' + linea.codigoArticulo" [checked]="estaSeleccionada(pedido, linea)" [disabled]="!puedeConfirmar(linea) || confirmando()" (change)="alternarLinea(pedido, linea)" /></td>
-            <td class="codigo-articulo" [title]="linea.codigoArticulo || ''"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
+            <td class="codigo-articulo" [appCodigoArticuloInventario]="linea.codigoArticulo" [codigoAlmacenInventario]="linea.codigoAlmacen"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
             <td><span class="texto-dos-lineas" [title]="linea.descripcion || ''">{{ linea.descripcion || '—' }}</span></td><td>{{ linea.cantidad }}</td><td>{{ linea.codigoAlmacen }}</td>
             <td><span class="etiqueta-estado">{{ linea.estado }}</span></td><td>{{ linea.recibidoPor || '—' }}</td><td>{{ fecha(linea.recibidoEn) }}</td>
           </tr>
@@ -160,7 +160,7 @@
               <tr>
                 <td class="columna-seleccion"><input class="seleccion-linea" type="checkbox" [attr.aria-label]="'Seleccionar ' + linea.codigoArticulo + ' del pedido ' + pedido.numeroPedido" [checked]="estaSeleccionada(pedido, linea)" [disabled]="!puedeConfirmar(linea) || confirmando()" (change)="alternarLinea(pedido, linea)" /></td>
                 <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
-                <td class="codigo-articulo" data-label="Código"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
+                <td class="codigo-articulo" data-label="Código" [appCodigoArticuloInventario]="linea.codigoArticulo" [codigoAlmacenInventario]="linea.codigoAlmacen"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
                 <td data-label="Descripción"><span class="texto-dos-lineas">{{ linea.descripcion || '—' }}</span></td>
                 <td data-label="Cantidad">{{ linea.cantidad }}</td>
                 <td data-label="Bodega destino">{{ linea.codigoAlmacen || '—' }}</td>

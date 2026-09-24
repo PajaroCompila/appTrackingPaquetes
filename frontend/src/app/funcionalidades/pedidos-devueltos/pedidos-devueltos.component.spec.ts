@@ -9,6 +9,7 @@ import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
 import type { PedidoDevuelto } from './pedidos-devueltos.interface';
+import { PedidosService } from '../pedidos/pedidos.service';
 const pedido:PedidoDevuelto={idClave:'a'.repeat(64),idOrigen:'R1:TSPS01:PE1',numeroPedido:'1001',nombreVendedor:'Vendedor original',
   origenPedido:'R1',fechaDespacho:'2026-09-16T14:00:00Z',fechaCancelacion:'2026-09-16T15:00:00Z',motivo:'Pedido cancelado',
   estado:'DEVOLUCIÓN PARCIAL',totalLineas:4,lineasRecibidas:2,lineas:[
@@ -20,6 +21,7 @@ describe('PedidosDevueltosComponent',()=>{
   let c:PedidosDevueltosComponent;
   let servicio:{listar:ReturnType<typeof vi.fn>;obtener:ReturnType<typeof vi.fn>;confirmar:ReturnType<typeof vi.fn>};
   let router:{navigate:ReturnType<typeof vi.fn>};
+  let obtenerInventarioArticulo:ReturnType<typeof vi.fn>;
   const usuario=signal<UsuarioSesion|null>(null);
   let id:string|null;
   beforeEach(()=>{
@@ -27,11 +29,13 @@ describe('PedidosDevueltosComponent',()=>{
     usuario.set({usuarioId:'1',nombreUsuario:'ana',nombreVisible:'Ana',codigoRol:'OPERADOR_BODEGA',codigoAlmacen:null,codigosAlmacenVisibles:['BSPS03'],debeCambiarContrasena:false});
     servicio={listar:vi.fn().mockReturnValue(of({datos:[],paginacion:{pagina:1,cantidadPorPagina:25,cantidadDevuelta:0,totalRegistros:0,hayMas:false}})),
       obtener:vi.fn().mockReturnValue(of({datos:pedido})),confirmar:vi.fn().mockReturnValue(of({exito:true}))};
+    obtenerInventarioArticulo=vi.fn().mockReturnValue(of({codigoArticulo:'A',descripcion:'Artículo original',codigoAlmacen:'BSPS03',nombreAlmacen:'Bodega',existenciaFisica:2,existencias:[]}));
     router={navigate:vi.fn().mockResolvedValue(true)};
   });
   async function crear(globales = false){
     await TestBed.configureTestingModule({imports:[PedidosDevueltosComponent],providers:[
       {provide:PedidosDevueltosService,useValue:servicio},{provide:AlmacenesService,useValue:{obtenerAlmacenes:()=>of({datos:[]})}},
+      {provide:PedidosService,useValue:{obtenerInventarioArticulo}},
       {provide:AutenticacionService,useValue:{usuario}},{provide:Router,useValue:router},
       {provide:ActivatedRoute,useValue:{paramMap:of(convertToParamMap(id?{idOrigen:id}:{})),queryParamMap:of(convertToParamMap({})),snapshot:{queryParamMap:convertToParamMap({})}}},
     ]}).compileComponents();
@@ -68,6 +72,11 @@ describe('PedidosDevueltosComponent',()=>{
     id=pedido.idClave;await crear();expect(servicio.obtener).toHaveBeenCalledWith(pedido.idClave);expect(servicio.listar).not.toHaveBeenCalled();
     const texto=fixture.nativeElement.textContent;expect(texto).toContain('Fecha despacho original');expect(texto).toContain('Jorge');expect(texto).toContain('Vendedor original');expect(texto).toContain('2 / 4');
     expect(fixture.nativeElement.querySelector('select')).toBeNull();
+  });
+  it('consulta inventario desde el código tanto en detalle como en artículos',async()=>{
+    id=pedido.idClave;await crear();
+    (fixture.nativeElement.querySelector('.codigo-articulo') as HTMLElement).click();
+    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('A','BSPS03');
   });
   it('error inicial no deja la pantalla vacía',async()=>{
     servicio.listar.mockReturnValue(throwError(()=>({error:{mensaje:'No disponible'}})));await crear();expect(fixture.nativeElement.textContent).toContain('No disponible');expect(c.cargando()).toBe(false);

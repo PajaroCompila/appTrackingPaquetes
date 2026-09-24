@@ -70,6 +70,10 @@ export class PedidosService {
     );
   }
 
+  public obtenerUrlImagenArticulo(codigoArticulo: string): string {
+    return `${environment.urlApi}/articulos/${encodeURIComponent(codigoArticulo)}/imagen`;
+  }
+
   public despacharLineas(lineas: { idOrigen: string; identificadorDetalle: string }[]) {
     return this.clienteHttp.post<{ datos: {
       transferidas: { idOrigen: string; identificadorDetalle: string }[];

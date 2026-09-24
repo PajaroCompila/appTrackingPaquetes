@@ -1,4 +1,4 @@
-<div class="fondo-dialogo" role="presentation" (mousedown)="cerrar.emit()">
+<div #fondoDialogo class="fondo-dialogo" role="presentation" [attr.popover]="soportaPopover ? 'manual' : null" (mousedown)="cerrar.emit()">
   <section
     class="dialogo-inventario"
     role="dialog"
@@ -31,12 +31,35 @@
           <p>No pudimos consultar el inventario. Probá de nuevo.</p>
         </div>
       } @else if (inventario) {
-        <dl class="datos-inventario">
-          <div><dt>Código</dt><dd class="codigo-articulo-en-linea">{{ inventario.codigoArticulo }}</dd></div>
-          <div class="dato-descripcion"><dt>Descripción</dt><dd>{{ inventario.descripcion }}</dd></div>
-          <div><dt>Almacén consultado</dt><dd>{{ inventario.codigoAlmacen }} — {{ inventario.nombreAlmacen }}</dd></div>
-          <div class="existencia"><dt>Existencia física en SAP</dt><dd>{{ formatearUnidades(inventario.existenciaFisica) }} unidades</dd></div>
-        </dl>
+        <div class="resumen-articulo-inventario">
+          <dl class="datos-inventario">
+            <div><dt>Código</dt><dd class="codigo-articulo-en-linea">{{ inventario.codigoArticulo }}</dd></div>
+            <div class="dato-descripcion"><dt>Descripción</dt><dd>{{ inventario.descripcion }}</dd></div>
+            <div><dt>Almacén consultado</dt><dd>{{ inventario.codigoAlmacen }} — {{ inventario.nombreAlmacen }}</dd></div>
+            <div class="existencia"><dt>Existencia física en SAP</dt><dd>{{ formatearUnidades(inventario.existenciaFisica) }} unidades</dd></div>
+          </dl>
+
+          <section class="previsualizacion-articulo" aria-labelledby="titulo-imagen-articulo">
+            <p id="titulo-imagen-articulo" class="sobrelinea-dialogo">Fotografía del artículo</p>
+            @if (urlImagen && estadoImagen !== 'no-disponible') {
+              <img
+                [src]="urlImagen"
+                [alt]="'Fotografía de ' + inventario.codigoArticulo"
+                [class.imagen-visible]="estadoImagen === 'disponible'"
+                (load)="imagenCargada()"
+                (error)="imagenNoDisponible()"
+                (dblclick)="abrirVisorImagen()"
+              />
+            }
+            @if (estadoImagen === 'cargando') {
+              <div class="estado-imagen" role="status"><span class="cargador" aria-hidden="true"></span><span>Cargando imagen…</span></div>
+            } @else if (estadoImagen === 'no-disponible') {
+              <div class="estado-imagen imagen-no-disponible" role="status"><i class="pi pi-image" aria-hidden="true"></i><span>Imagen no disponible</span></div>
+            } @else {
+              <small>Doble clic para ampliar</small>
+            }
+          </section>
+        </div>
 
         <section class="minidashboard" aria-labelledby="titulo-disponibilidad">
           <div class="encabezado-dashboard">
@@ -84,4 +107,13 @@
 
     <footer><button class="boton boton-secundario" type="button" (click)="cerrar.emit()">Cerrar</button></footer>
   </section>
+
+  @if (visorImagenAbierto && estadoImagen === 'disponible') {
+    <div class="fondo-visor-imagen" role="presentation" (mousedown)="cerrarVisorImagen(); $event.stopPropagation()">
+      <section class="visor-imagen" role="dialog" aria-modal="true" aria-label="Fotografía ampliada del artículo" (mousedown)="$event.stopPropagation()">
+        <button class="cerrar-visor" type="button" aria-label="Cerrar fotografía ampliada" (click)="cerrarVisorImagen()">×</button>
+        <img [src]="urlImagen" [alt]="'Fotografía ampliada de ' + (inventario?.codigoArticulo || 'artículo')" />
+      </section>
+    </div>
+  }
 </div>

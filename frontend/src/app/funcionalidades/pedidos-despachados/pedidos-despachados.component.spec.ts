@@ -98,6 +98,24 @@ describe('PedidosDespachadosComponent', () => {
     expect(fixture.nativeElement.querySelector('.tiempo-total-despacho').textContent).toContain('05:30');
   });
 
+  it('consulta inventario con un clic sobre el código del artículo', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    responderListados(http, [pedido]);
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.codigo-articulo-en-linea') as HTMLElement)
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const consulta = http.expectOne((solicitud) =>
+      solicitud.url.endsWith('/articulos/A1/inventario'));
+    expect(consulta.request.params.get('codigoAlmacen')).toBe('B1');
+    consulta.flush({ codigoArticulo: 'A1', descripcion: 'Artículo uno', codigoAlmacen: 'B1',
+      nombreAlmacen: 'Bodega 1', existenciaFisica: 1, existencias: [] });
+    fixture.destroy();
+  });
+
   it('imprime todo el listado conservando los responsables existentes', async () => {
     vi.useFakeTimers();
     configurar(null);

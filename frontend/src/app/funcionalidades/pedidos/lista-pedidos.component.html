@@ -227,16 +227,12 @@
                 <td
                   class="codigo-consultable codigo-articulo-en-linea columna-codigo"
                   data-label="Código"
-                  title="Doble clic para consultar inventario"
                   [appCodigoArticuloInventario]="articulo.codigoArticulo"
                   [codigoAlmacenInventario]="articulo.codigoAlmacen"
                 ><span class="columna-codigo-contenido">{{ marcador(articulo.codigoArticulo) }}</span></td>
                 <td
-                  class="descripcion-consultable columna-descripcion"
+                  class="columna-descripcion"
                   data-label="Descripción"
-                  title="Doble clic para consultar inventario"
-                  [appCodigoArticuloInventario]="articulo.codigoArticulo"
-                  [codigoAlmacenInventario]="articulo.codigoAlmacen"
                 ><span class="texto-maximo-dos-lineas">{{ marcador(articulo.descripcion) }}</span></td>
                 <td class="columna-cantidad" data-label="Cantidad">{{ marcador(articulo.cantidad) }}</td>
                 <td class="columna-bodega" data-label="Bodega">{{ marcador(articulo.codigoAlmacen) }}</td>

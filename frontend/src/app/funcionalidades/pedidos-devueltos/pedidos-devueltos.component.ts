@@ -3,6 +3,7 @@ import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@an
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
+import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, Subject, catchError, combineLatest, finalize, map, switchMap } from 'rxjs';
 import { esFechaCalendarioValida, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
@@ -17,7 +18,7 @@ import { PedidosDevueltosService, type RespuestaPedidosDevueltos } from './pedid
 
 @Component({
   selector: 'app-pedidos-devueltos',
-  imports: [CommonModule, FormsModule, RouterLink, PaginacionComponent, SelectorAlmacenesDirective],
+  imports: [CommonModule, FormsModule, RouterLink, PaginacionComponent, SelectorAlmacenesDirective, CodigoArticuloInventarioDirective],
   templateUrl: './pedidos-devueltos.component.html',
   styleUrls: ['../pedidos/lista-pedidos.component.css', './pedidos-devueltos.component.css'],
 })

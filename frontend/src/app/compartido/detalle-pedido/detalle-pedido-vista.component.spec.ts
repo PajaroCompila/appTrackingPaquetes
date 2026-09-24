@@ -83,7 +83,7 @@ describe('DetallePedidoVistaComponent', () => {
     fixture.detectChanges();
     const codigo = fixture.nativeElement.querySelector('.codigo-articulo') as HTMLElement;
 
-    codigo.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    codigo.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(abrirInventario).toHaveBeenCalledWith('ARTICULO-CODIGO-EXTENSO-001', 'BSPS01');
   });
