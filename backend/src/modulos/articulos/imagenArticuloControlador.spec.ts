@@ -31,6 +31,7 @@ describe('GET /api/articulos/:codigoArticulo/imagen', () => {
     expect(primera.status).toBe(200);
     expect(primera.headers['content-type']).toContain('image/png');
     expect(primera.headers['cache-control']).toBe('private, max-age=3600');
+    expect(primera.headers['cross-origin-resource-policy']).toBe('cross-origin');
     expect(primera.headers.etag).toBeTruthy();
     expect(obtener).toHaveBeenCalledWith('ART CON ESPACIO');
 

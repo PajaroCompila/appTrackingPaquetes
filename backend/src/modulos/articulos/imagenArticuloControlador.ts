@@ -29,6 +29,7 @@ export class ImagenArticuloControlador {
       respuesta.set({
         'Cache-Control': 'private, max-age=3600',
         'Content-Type': imagen.tipoContenido,
+        'Cross-Origin-Resource-Policy': 'cross-origin',
         ETag: etiqueta,
         'Last-Modified': imagen.modificadaEn.toUTCString(),
       });
