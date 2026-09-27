@@ -25,8 +25,8 @@ export class PedidosNotificacionesGlobalesService {
     this.iniciado = true;
 
     this.usuario$.pipe(
-      distinctUntilChanged((anterior, actual) => anterior?.usuarioId === actual?.usuarioId),
-      switchMap((usuario) => usuario
+      distinctUntilChanged((anterior, actual) => anterior?.usuarioId === actual?.usuarioId && anterior?.codigoRol === actual?.codigoRol),
+      switchMap((usuario) => usuario && usuario.codigoRol !== 'DASHBOARDS'
         ? timer(0, intervaloNotificacionesMs).pipe(
           exhaustMap(() => this.consultar()),
         )

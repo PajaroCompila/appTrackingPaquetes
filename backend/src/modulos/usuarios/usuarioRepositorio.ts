@@ -48,11 +48,17 @@ export class UsuarioRepositorio {
   public async editar(id:string,d:DatosUsuario){await obtenerPoolPedidosBodega().request().input('id',sql.UniqueIdentifier,id)
     .input('nombreCompleto',sql.NVarChar(150),d.nombreCompleto).input('nombreUsuario',sql.NVarChar(100),d.nombreUsuario)
     .input('correo',sql.NVarChar(254),d.correo||null).input('rol',sql.NVarChar(40),d.codigoRol).query(`
+      SET XACT_ABORT ON;
+      BEGIN TRANSACTION;
+      DECLARE @rolAnterior uniqueidentifier=(SELECT rolId FROM dbo.UsuarioAplicacion WITH (UPDLOCK) WHERE idUsuario=@id);
       DECLARE @rolId uniqueidentifier=(SELECT idRol FROM dbo.RolAplicacion WHERE codigo=@rol AND activo=1);
       IF @rolId IS NULL THROW 51001,'ROL_NO_ENCONTRADO',1;
       UPDATE dbo.UsuarioAplicacion SET nombreCompleto=@nombreCompleto,nombreVisible=@nombreCompleto,
         nombreUsuario=@nombreUsuario,correo=@correo,rolId=@rolId,codigoRol=@rol,actualizadoEn=SYSUTCDATETIME()
-      WHERE idUsuario=@id;`);return this.obtener(id);}
+      WHERE idUsuario=@id;
+      IF @rolAnterior <> @rolId
+        UPDATE dbo.SesionAutenticada SET revocadaEn=COALESCE(revocadaEn,SYSUTCDATETIME()) WHERE idUsuario=@id;
+      COMMIT TRANSACTION;`);return this.obtener(id);}
   public async contarAdministradoresActivos(){const r=await obtenerPoolPedidosBodega().request().query<{cantidad:number}>(`
     SELECT COUNT(*) cantidad FROM dbo.UsuarioAplicacion u JOIN dbo.RolAplicacion r ON r.idRol=u.rolId
     WHERE u.activo=1 AND r.codigo=N'ADMINISTRADOR';`);return Number(r.recordset[0]?.cantidad??0);}

@@ -16,7 +16,7 @@ export async function requerirAutenticacion(
       throw new ErrorAplicacion(401, 'SESION_REQUERIDA', 'DebÃ©s iniciar sesiÃ³n.');
     }
     solicitud.user = await servicio.validarToken(token);
-    siguiente();
+    requerirAccesoModulo(solicitud, _respuesta, siguiente);
   } catch (error) {
     siguiente(error);
   }
@@ -40,6 +40,21 @@ export function requerirContrasenaActualizada(
     siguiente(new ErrorAplicacion(403, 'CAMBIO_CONTRASENA_REQUERIDO',
       'Debés cambiar tu contraseña antes de continuar.'));
     return;
+  }
+  siguiente();
+}
+
+// Acceso de solo lectura para el rol DASHBOARDS.
+export function requerirAccesoModulo(
+  solicitud: Request, _respuesta: Response, siguiente: NextFunction,
+): void {
+  if (solicitud.user?.codigoRol === 'DASHBOARDS') {
+    const autenticacion = solicitud.baseUrl === '/api/autenticacion';
+    const dashboard = solicitud.baseUrl === '/api/dashboard' && solicitud.method === 'GET';
+    if (!autenticacion && !dashboard) {
+      siguiente(new ErrorAplicacion(403, 'PERMISO_REQUERIDO', 'Esta cuenta solo puede consultar dashboards.'));
+      return;
+    }
   }
   siguiente();
 }

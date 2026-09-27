@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { finalize } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import type { CodigoRol, RolLocal, UsuarioLocal } from './usuario.interface';
 import { UsuarioService } from './usuario.service';
@@ -23,6 +24,8 @@ export class UsuariosComponent implements OnInit {
   public readonly roles = signal<RolLocal[]>([]);
   public readonly cargando = signal(false);
   public readonly error = signal('');
+  public readonly guardando = signal(false);
+  public readonly mensaje = signal('');
   public readonly modal = signal<'crear' | 'editar' | 'restablecer' | 'almacenes' | null>(null);
   public readonly seleccionado = signal<UsuarioLocal | null>(null);
   public readonly pagina = signal(1);
@@ -96,10 +99,16 @@ export class UsuariosComponent implements OnInit {
   }
   public cerrar(): void { this.modal.set(null); this.error.set(''); }
   public guardar(): void {
+    if (this.guardando()) return;
+    this.error.set('');
+    this.mensaje.set('');
+    this.guardando.set(true);
     const operacion = this.modal() === 'crear' ? this.servicio.crear(this.form)
       : this.servicio.editar(this.seleccionado()!.usuarioId, this.form);
-    operacion.subscribe({ next: () => { this.cerrar(); this.cargar(); },
-      error: () => this.error.set('Revisá los datos. Ese usuario puede que ya exista.') });
+    operacion.pipe(finalize(() => this.guardando.set(false))).subscribe({
+      next: () => { this.cerrar(); this.mensaje.set('Usuario guardado correctamente.'); this.cargar(); },
+      error: (error) => this.error.set(error.error?.mensaje ?? 'No se pudo guardar el usuario. Intenta nuevamente.'),
+    });
   }
   public guardarContrasena(): void {
     this.servicio.restablecer(this.seleccionado()!.usuarioId, this.form.contrasena,

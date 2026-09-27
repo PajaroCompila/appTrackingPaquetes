@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, type UrlTree } from '@angular/router';
 import { routes } from '../../app.routes';
 import type { UsuarioSesion } from './autenticacion.interface';
-import { administradorGuard } from './autenticacion.guard';
+import { administradorGuard, dashboardGuard } from './autenticacion.guard';
 import { AutenticacionService } from './autenticacion.service';
 
 describe('administradorGuard', () => {
@@ -40,6 +40,6 @@ describe('administradorGuard', () => {
     const rutasDashboard = routes.filter(({ path }) => path?.startsWith('dashboard'));
 
     expect(rutasDashboard).toHaveLength(2);
-    expect(rutasDashboard.every(({ canActivate }) => canActivate?.includes(administradorGuard))).toBe(true);
+    expect(rutasDashboard.every(({ canActivate }) => canActivate?.includes(dashboardGuard))).toBe(true);
   });
 });

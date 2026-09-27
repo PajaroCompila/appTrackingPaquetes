@@ -12,7 +12,7 @@ const servicio = new DashboardServicio();
 const ventasVendedor = new VentasVendedorRepositorio();
 const detalleVentasVendedor = new DetalleVentasVendedorRepositorio();
 
-dashboardRutas.use(requerirRoles('ADMINISTRADOR'));
+dashboardRutas.use(requerirRoles('ADMINISTRADOR', 'DASHBOARDS'));
 
 dashboardRutas.get('/pedidos', async (solicitud, respuesta, siguiente) => {
   const filtros = esquemaFiltrosDashboard.safeParse(solicitud.query);
