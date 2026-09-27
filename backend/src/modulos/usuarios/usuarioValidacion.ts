@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const rolesPermitidos = ['ADMINISTRADOR', 'OPERADOR_BODEGA', 'CONSULTA'] as const;
+export const rolesPermitidos = ['ADMINISTRADOR', 'OPERADOR_BODEGA', 'CONSULTA', 'DASHBOARDS'] as const;
 const correo = z.union([z.string().trim().email().max(254), z.literal('')]).optional();
 export const esquemaListadoUsuarios = z.object({ busqueda: z.string().trim().max(150).optional(),
   rol: z.enum(rolesPermitidos).optional(), activo: z.enum(['true', 'false']).optional(),

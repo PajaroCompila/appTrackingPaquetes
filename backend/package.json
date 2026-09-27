@@ -5,6 +5,7 @@
   "main": "dist/servidor.js",
   "scripts": {
     "db:provision": "tsx scripts/aprovisionarBaseDatos.ts",
+    "db:migrate:dashboards": "tsx scripts/migrarRolDashboards.ts",
     "db:migrate:auth": "tsx scripts/migrarAutenticacion.ts",
     "db:migrate:despachos": "tsx scripts/migrarPedidosDespachados.ts",
     "db:migrate:despacho-parcial": "tsx scripts/migrarDespachoParcial.ts",

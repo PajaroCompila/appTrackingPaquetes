@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, type UrlTree } from '@angular/router';
 import { routes } from '../../app.routes';
 import type { UsuarioSesion } from './autenticacion.interface';
-import { administradorGuard } from './autenticacion.guard';
+import { dashboardGuard, accesoOperativoGuard, administradorGuard } from './autenticacion.guard';
 import { AutenticacionService } from './autenticacion.service';
 
 describe('administradorGuard', () => {
@@ -16,6 +16,16 @@ describe('administradorGuard', () => {
         { provide: AutenticacionService, useValue: { usuario } },
       ],
     });
+  });
+
+  it('redirige el rol DASHBOARDS y protege los modulos operativos', () => {
+    usuario.set({ usuarioId: '1', nombreUsuario: 'consulta_dashboard', nombreVisible: 'Marketing',
+      codigoRol: 'DASHBOARDS', codigoAlmacen: null, debeCambiarContrasena: false });
+    const resultado = TestBed.runInInjectionContext(() => accesoOperativoGuard()) as UrlTree;
+    expect(TestBed.inject(Router).serializeUrl(resultado)).toBe('/dashboard');
+    expect(TestBed.runInInjectionContext(() => dashboardGuard())).toBe(true);
+    const operativas = routes.filter(r => r.loadComponent && !['login', 'cambiar-contrasena'].includes(r.path!) && !r.path?.startsWith('dashboard'));
+    expect(operativas.every(r => r.canActivate?.includes(accesoOperativoGuard))).toBe(true);
   });
 
   it('permite ingresar al administrador', () => {
@@ -40,6 +50,6 @@ describe('administradorGuard', () => {
     const rutasDashboard = routes.filter(({ path }) => path?.startsWith('dashboard'));
 
     expect(rutasDashboard).toHaveLength(2);
-    expect(rutasDashboard.every(({ canActivate }) => canActivate?.includes(administradorGuard))).toBe(true);
+    expect(rutasDashboard.every(({ canActivate }) => canActivate?.includes(dashboardGuard))).toBe(true);
   });
 });

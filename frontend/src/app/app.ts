@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
@@ -16,6 +16,7 @@ export class App {
   private readonly destroyRef = inject(DestroyRef);
   public readonly esLogin = signal(this.router.url.startsWith('/login'));
   public readonly usuario = this.autenticacion.usuario;
+  public readonly soloDashboards = computed(() => this.usuario()?.codigoRol === 'DASHBOARDS');
 
   public constructor() {
     this.router.events.pipe(

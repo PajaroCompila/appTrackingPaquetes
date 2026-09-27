@@ -1,0 +1,170 @@
+<section class="pagina" aria-labelledby="titulo-pedidos-devueltos">
+  <div class="encabezado-pagina">
+    <div>
+      <p class="sobrelinea">Pedidos</p>
+      <h1 id="titulo-pedidos-devueltos">Pedidos devueltos, anulados y cancelados</h1>
+      <p>Controlá los productos que deben regresar físicamente a sus bodegas.</p>
+    </div>
+  </div>
+
+  <form class="panel filtros" (ngSubmit)="buscar()">
+    <div class="campo">
+      <label for="numeroPedido">Número de pedido</label>
+      <input id="numeroPedido" name="numeroPedido" [(ngModel)]="filtros().numeroPedido" />
+    </div>
+
+    <div class="campo">
+      <label for="fechaDesde">Fecha desde</label>
+      <input id="fechaDesde" name="fechaDesde" type="date" [(ngModel)]="filtros().fechaDesde" />
+    </div>
+
+    <div class="campo">
+      <label for="fechaHasta">Fecha hasta</label>
+      <input id="fechaHasta" name="fechaHasta" type="date" [(ngModel)]="filtros().fechaHasta" />
+    </div>
+
+    <div class="campo campo-amplio">
+      <span id="etiqueta-almacenes" class="etiqueta-campo">Almacenes</span>
+      <details class="selector-multiple">
+        <summary aria-labelledby="etiqueta-almacenes">{{ resumenAlmacenes() }}</summary>
+        <fieldset>
+          <legend class="solo-lectores">Seleccionar almacenes</legend>
+          <div class="opciones-almacenes">
+            @for (almacen of almacenes(); track almacen.codigoAlmacen) {
+              <label class="opcion-almacen">
+                <input
+                  type="checkbox"
+                  [checked]="estaSeleccionado(almacen.codigoAlmacen)"
+                  (change)="alternarAlmacen(almacen.codigoAlmacen, $any($event.target).checked)"
+                />
+                <span class="datos-almacen">
+                  <strong>{{ almacen.codigoAlmacen }}</strong>
+                  <small>{{ almacen.nombreAlmacen }}</small>
+                </span>
+              </label>
+            }
+          </div>
+          @if (filtros().codigosAlmacen.length > 0) {
+            <button class="limpiar-seleccion" type="button" (click)="limpiarAlmacenes()">Limpiar selección</button>
+          }
+        </fieldset>
+      </details>
+    </div>
+
+    <div class="campo">
+      <label for="estadoDevolucion">Estado de devolución</label>
+      <select id="estadoDevolucion" name="estadoDevolucion" [(ngModel)]="filtros().estado">
+        <option value="todos">Todos</option>
+        <option value="pendiente">Pendiente de devolución</option>
+        <option value="parcial">Devolución parcial</option>
+        <option value="devuelto">Devuelto</option>
+      </select>
+    </div>
+
+    <div class="campo">
+      <label for="cantidadPorPagina">Registros por página</label>
+      <select id="cantidadPorPagina" name="cantidadPorPagina" [(ngModel)]="filtros().cantidadPorPagina">
+        <option [ngValue]="25">25</option>
+        <option [ngValue]="50">50</option>
+        <option [ngValue]="100">100</option>
+      </select>
+    </div>
+
+    <div class="acciones-filtros">
+      <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
+      <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
+    </div>
+  </form>
+
+  @if (ultimaActualizacion()) {
+    <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a' }}</p>
+  }
+
+  <div class="pestanas-historial" role="tablist" aria-label="Vista de devoluciones">
+    <button type="button" role="tab" [attr.aria-selected]="vista() === 'pedido'" [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+    <button type="button" role="tab" [attr.aria-selected]="vista() === 'articulos'" [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+  </div>
+
+  @if (cargando()) {
+    <div class="estado-interfaz" role="status">
+      <p>Cargando pedidos devueltos…</p>
+    </div>
+  } @else if (pedidos().length === 0 && articulos().length === 0) {
+    <div class="panel tabla-contenedor">
+      <div class="estado-interfaz" role="status">
+        <h2>Sin resultados</h2>
+        <p>No hay pedidos devueltos con los filtros seleccionados.</p>
+      </div>
+    </div>
+  } @else {
+    @if (vista() === 'pedido') {
+      <div class="panel tabla-contenedor" role="tabpanel">
+        <table>
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Artículos</th>
+              <th>Bodegas</th>
+              <th>Vendedor responsable</th>
+              <th>Fecha cancelación</th>
+              <th>Progreso devolución</th>
+              <th>Estado</th>
+              <th>Ver detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>101476000</strong></td>
+              <td>4</td>
+              <td>BSPS03, BSPS02</td>
+              <td>SPS Juan Pérez</td>
+              <td>16/09/2026 10:30 a. m.</td>
+              <td>2 / 4</td>
+              <td><span class="etiqueta-estado">Devolución parcial</span></td>
+              <td><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos']">Ver detalle</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="panel tabla-contenedor" role="tabpanel">
+        <table>
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th>Cantidad</th>
+              <th>Bodega destino</th>
+              <th>Vendedor responsable</th>
+              <th>Fecha cancelación</th>
+              <th>Estado</th>
+              <th>Recibido por</th>
+              <th>Ver detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>101476000</strong></td>
+              <td><strong>ESM-PE-24</strong></td>
+              <td><span class="texto-dos-lineas">Articulo de prueba para devolución</span></td>
+              <td>1</td>
+              <td>BSPS03</td>
+              <td>SPS Juan Pérez</td>
+              <td>16/09/2026 10:30 a. m.</td>
+              <td><span class="etiqueta-estado">Pendiente</span></td>
+              <td>—</td>
+              <td><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos']">Ver detalle</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  <nav class="paginacion" aria-label="Paginación de pedidos devueltos">
+    <button class="boton boton-secundario" type="button" (click)="paginaAnterior()" [disabled]="pagina() === 1 || cargando()">Anterior</button>
+    <span>Página {{ pagina() }} · {{ vista() === 'pedido' ? '0 pedidos' : '0 partidas' }}</span>
+    <button class="boton boton-secundario" type="button" (click)="paginaSiguiente()" [disabled]="cargando()">Siguiente</button>
+  </nav>
+</section>

@@ -79,7 +79,7 @@ export class PedidoServicio {
       this.procesarErrorRepositorio(error, 'No fue posible consultar el pedido.');
     }
   }
-
+  
   private procesarErrorRepositorio(error: unknown, mensaje: string): never {
     if (error instanceof ErrorDependenciaDatos) {
       throw new ErrorAplicacion(503, 'SISTEMA_ORIGEN_NO_DISPONIBLE', 'SistemaOrigen no está disponible temporalmente.');

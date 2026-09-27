@@ -58,11 +58,9 @@ export class ListaPedidosComponent implements OnInit {
   public readonly totalRegistros = signal(0);
   public readonly cargando = signal(true);
   public readonly actualizando = signal(false);
-  public readonly avisoActualizacion = signal('');
   public readonly ultimaActualizacion = signal<Date | null>(null);
   public readonly error = signal<MensajeError | null>(null);
   public readonly errorAlmacenes = signal(false);
-  public readonly informacionIncompleta = signal(false);
   public readonly transfiriendo = signal(false);
   public readonly mensajeTransferencia = signal('');
   public readonly dialogoInventarioAbierto = signal(false);
@@ -442,7 +440,7 @@ export class ListaPedidosComponent implements OnInit {
   private iniciarActualizacionAutomatica(): void {
     merge(
       this.actualizarAhora,
-      timer(5000, 5000).pipe(map(() => true)),
+      timer(15000, 15000).pipe(map(() => true)),
     ).pipe(
       tap((esAutomatica) => {
         if (this.consultaEnCurso && !esAutomatica) this.actualizacionManualPendiente = true;
@@ -462,8 +460,6 @@ export class ListaPedidosComponent implements OnInit {
               this.hayMas.set(false);
               this.totalRegistros.set(0);
               this.error.set(obtenerMensajeError(error, 'listado'));
-            } else {
-              this.avisoActualizacion.set('No pudimos actualizar. La lista anterior sigue visible.');
             }
             this.cargando.set(false);
             this.actualizando.set(false);
@@ -480,7 +476,7 @@ export class ListaPedidosComponent implements OnInit {
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({ respuesta: { datos, paginacion, fuentes }, esAutomatica }) => {
+    ).subscribe(({ respuesta: { datos, paginacion }, esAutomatica }) => {
       if (!esAutomatica && datos.length === 0 && this.pagina() > 1) {
         this.transfiriendo.set(false);
         void this.actualizarRuta(this.pagina() - 1);
@@ -492,10 +488,6 @@ export class ListaPedidosComponent implements OnInit {
       this.pagina.set(paginacion.pagina);
       this.hayMas.set(paginacion.hayMas);
       this.totalRegistros.set(paginacion.totalRegistros ?? datos.length);
-      this.informacionIncompleta.set(
-        fuentes?.sap === 'no_disponible' || fuentes?.retailOne === 'no_disponible',
-      );
-      this.avisoActualizacion.set('');
       this.ultimaActualizacion.set(new Date());
       this.cargando.set(false);
       this.actualizando.set(false);

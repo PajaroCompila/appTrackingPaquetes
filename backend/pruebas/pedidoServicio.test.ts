@@ -54,17 +54,40 @@ describe('PedidoServicio', () => {
     ).rejects.toMatchObject({ estadoHttp: 503, codigo: 'SISTEMA_ORIGEN_NO_DISPONIBLE' });
   });
 
-  it('unifica R1 y SAP sin colisionar solo por el mismo número visible', async () => {
+  it('muestra R1 primero e incorpora SAP en la siguiente consulta', async () => {
     const r1 = crearRepositorio();
     vi.mocked(r1.buscarPedidos).mockResolvedValue({
       ...paginaVacia, pedidos: [crearPedido('R1', 'F1', '100')], totalRegistros: 1,
     });
     const sap = crearRepositorioSap([crearPedido('SAP', '22', '100')]);
-    const resultado = await new PedidoServicio(r1, sap).buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+    const servicio = new PedidoServicio(r1, sap);
+    const primeraConsulta = await servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+    await Promise.resolve();
+    const resultado = await servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
 
+    expect(primeraConsulta.pedidos.map((p) => p.idOrigen)).toEqual(['R1:F1']);
     expect(resultado.pedidos.map((p) => p.idOrigen).sort()).toEqual(['R1:F1', 'SAP:22']);
     expect(resultado.pedidos.find((p) => p.origenPedido === 'R1')?.creadoEnR1).toBe(true);
     expect(resultado.pedidos.find((p) => p.origenPedido === 'SAP')?.creadoEnR1).toBe(false);
+  });
+
+  it('no espera a SAP cuando RetailOne ya respondió', async () => {
+    const r1 = crearRepositorio();
+    vi.mocked(r1.buscarPedidos).mockResolvedValue({
+      ...paginaVacia, pedidos: [crearPedido('R1', 'F1', '100')], totalRegistros: 1,
+    });
+    let completarSap: (() => void) | undefined;
+    const sap = crearRepositorioSap();
+    vi.mocked(sap.buscarPedidos).mockImplementationOnce(() => new Promise((resolve) => {
+      completarSap = () => resolve(paginaVacia);
+    }));
+    const servicio = new PedidoServicio(r1, sap);
+
+    const resultado = await servicio.buscarPedidos({ pagina: 1, cantidadPorPagina: 25 });
+
+    expect(resultado.pedidos.map((p) => p.idOrigen)).toEqual(['R1:F1']);
+    expect(completarSap).toBeTypeOf('function');
+    completarSap?.();
   });
 
   it('conserva R1 e informa disponibilidad parcial cuando SAP falla', async () => {

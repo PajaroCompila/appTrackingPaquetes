@@ -1,0 +1,3878 @@
+DIAGNÓSTICO SAP — ENTREGAS, SALIDA DE INVENTARIO Y CICLO DE PEDIDOS
+Caso informado: 101475685
+Fecha de revisión: 16 de septiembre de 2026
+Fuentes: SAP PAJARO_AZUL, R1 principal y lecturas puntuales de PedidosBodega.
+Alcance: diagnóstico y propuesta. No se implementaron cambios.
+
+======================================================================
+1. CONCLUSIÓN PRINCIPAL
+======================================================================
+
+SÍ está demostrado en esta instalación que una Entrega SAP puede producir una
+salida de inventario sin pasar por un Pedido de venta y sin tener una Factura
+vinculada.
+
+El documento que demuestra ese flujo en el caso revisado es:
+
+Cotización SAP 100206148, DocEntry 160052
+    -> Entrega SAP 40968, DocEntry 6669
+    -> Salida de una unidad YAM-MODX7 de TSPS01
+    -> Salida de una unidad YAM-PA150 de BSPS03
+    -> Sin factura vinculada por INV1.BaseType = 15 / BaseEntry = 6669.
+
+La Entrega 40968 tiene:
+    ObjType = 15
+    DocStatus = O
+    CANCELED = N
+    Dos movimientos de inventario comprobados en OINM y OIVL.
+
+Sin embargo, hay una corrección indispensable respecto al número informado:
+
+101475685 SÍ ES un Pedido de venta en ORDR.
+Su DocEntry es 961461 y fue creado por Retail One.
+
+No es el número de la cotización ni el número de la entrega. Ese pedido existe,
+pero NO es el documento base de la Entrega 40968.
+
+Respuesta precisa:
+    ¿Existe el pedido 101475685? SÍ.
+    ¿Pasó la Entrega 40968 por ese pedido como documento base? NO.
+    ¿Existe una cotización base de la Entrega 40968? SÍ, 100206148.
+    ¿Existe una factura basada en la Entrega 40968? NO encontrada.
+    ¿Hubo salida contable de inventario por esa entrega? SÍ.
+
+La cadena formal y el contexto de R1 deben separarse. No debe borrarse el pedido
+ni marcarlo como entregado solamente porque tiene los mismos artículos.
+
+La evidencia de OINM/OIVL acredita la salida registrada en SAP. No demuestra,
+por sí sola, una recepción firmada, el nombre de quien retiró físicamente el
+producto o la hora real de entrega en mostrador. La entrega física fue informada
+por operación; el diagnóstico confirma su soporte documental e inventario.
+
+======================================================================
+2. ALCANCE, FUENTES Y RESTRICCIONES CUMPLIDAS
+======================================================================
+
+SAP:
+    Servidor 192.168.10.140
+    Base PAJARO_AZUL.
+
+R1 consultado:
+    Servidor principal configurado en backend/.env, 192.168.10.150.
+    No se hizo un barrido de las seis sucursales.
+    El folio principal identifica una operación SPS.
+
+PedidosBodega:
+    Servidor propio configurado, 192.168.10.150.
+    Solamente se leyeron asignaciones y despachos del caso concreto.
+
+Repositorios inspeccionados, sin editarlos:
+    C:\Users\alexander\DataBase\Proyectos\appPedidosBodega
+        Rama main; último commit observado: 06bf85a
+        Mensaje: feat: actualizar Pedidos Bodega para despliegue.
+
+    C:\Users\alexander\DataBase\Proyectos\appPedidosBodega-ultima-version
+        Último commit observado: 642dc70
+        Mensaje: merge: transferencia inmediata y alertas sonoras.
+
+Son dos copias diferentes. La explicación del código distingue ambas.
+No se verificó qué commit está desplegado en 192.168.10.153 ni se accedió a ese
+servidor para modificarlo. No se debe confundir una copia local con producción.
+
+Se ejecutaron únicamente SELECT en las bases. No se ejecutaron servicios de
+la aplicación, sincronizadores, endpoints de historial ni scripts de provisión,
+porque algunos pueden escribir en la base propia.
+
+No se ejecutaron INSERT, UPDATE, DELETE, MERGE, CREATE, ALTER, DROP, TRUNCATE,
+SELECT INTO, procedimientos ni migraciones.
+
+No se modificaron código, .env, configuración, jobs o servicios.
+No se reiniciaron back, front, SQL Server, SAP o R1.
+No se hicieron commits, merges ni pushes.
+El único archivo creado por esta solicitud es este informe TXT.
+
+Las lecturas se realizaron en varias consultas, no bajo una instantánea
+transaccional única. Los resultados describen lo observado durante la revisión;
+la operación puede cambiar después.
+
+======================================================================
+3. IDENTIFICACIÓN DEL NÚMERO 101475685
+======================================================================
+
+Se buscó DocNum con un parámetro entero en OQUT, ORDR, ODLN y OINV, sin asumir
+previamente el tipo documental.
+
+Resultado:
+    OQUT: sin coincidencia por DocNum.
+    ORDR: una coincidencia.
+    ODLN: sin coincidencia por DocNum.
+    OINV: sin coincidencia por DocNum.
+
+Cabecera encontrada en ORDR:
+    DocEntry: 961461
+    DocNum: 101475685
+    ObjType: 17
+    DocStatus: O
+    CANCELED: N
+    InvntSttus: O
+    CardCode: 9999
+    CardName: ABEL EDGARDO CEDILLO
+    GroupCode: 108
+    GroupName: Cliente Contado
+    SlpCode: 8
+    SlpName: SPS Hector Alvi Cedillo
+    DocDate: 2026-09-14
+    DocTime: 1204, equivalente a 12:04
+    CreateDate: 2026-09-14
+    CreateTS: 120457, equivalente a 12:04:57
+    UpdateDate: 2026-09-14
+    UpdateTS: 120457
+    UserSign: 1, usuario SAP manager
+    UserSign2: 1, usuario SAP manager
+    NumAtCard: SPSS03PE390619
+    Ref1: 101475685
+    Ref2: NULL
+    U_SO1_01RETAILONE: Y.
+
+Observación registrada:
+    "Basado en operación de Retail One SPSS04CO60265 .
+     Basado en operación de Retail One SPSS03PE390619.
+     Basado en pedido de Retail One SPSS03PE390619"
+
+La observación acredita una referencia textual a la cotización R1. No sustituye
+la relación por BaseType/BaseEntry/BaseLine entre documentos SAP.
+
+Una primera búsqueda por referencias sin límite de fecha agotó 15 segundos.
+Se repitió de forma acotada entre 2026-09-01 y 2026-09-17, buscando exactamente
+101475685 y SPSS03PE390619 en NumAtCard, Ref1, Ref2 y el folio R1 de OQUT,
+ODLN y OINV. No aparecieron coincidencias en ese rango.
+
+Esa ausencia acotada no garantiza que no exista alguna referencia fuera del
+rango, en comentarios libres o en otros campos no consultados.
+
+======================================================================
+4. LÍNEAS DEL PEDIDO 101475685
+======================================================================
+
+Línea SAP 0:
+    Artículo: YAM-MODX7
+    Descripción: SINTETIZADOR 76 TECLAS CON USB SIN ADAPTADOR DE CORRIENTE
+    Quantity: 1
+    OpenQty: 1
+    InvQty: 1
+    OpenInvQty: 1
+    NumPerMsr: 1
+    WhsCode: TSPS01
+    Bodega: Tienda Principal
+    LineStatus: O
+    BaseType: -1
+    BaseEntry: NULL
+    BaseLine: NULL
+    TargetType: -1
+    TrgetEntry: NULL
+    NoInvtryMv: N
+    U_Entregado: NULL.
+
+Línea SAP 1:
+    Artículo: YAM-PA150
+    Descripción: ADAPTADOR DE CORRIENTE 12V 1.5A
+    Quantity: 1
+    OpenQty: 1
+    InvQty: 1
+    OpenInvQty: 1
+    NumPerMsr: 1
+    WhsCode: BSPS03
+    Bodega: Circuitos y Repuestos
+    LineStatus: O
+    BaseType: -1
+    BaseEntry: NULL
+    BaseLine: NULL
+    TargetType: -1
+    TrgetEntry: NULL
+    NoInvtryMv: N
+    U_Entregado: NULL.
+
+No se encontraron:
+    Cotizaciones base mediante RDR1.BaseType = 23 / BaseEntry.
+    Entregas basadas en ORDR 961461 mediante DLN1.BaseType = 17.
+    Facturas basadas directamente en ORDR 961461 mediante INV1.BaseType = 17.
+
+Una consulta exploratoria de movimientos TransType = 17 para el pedido agotó
+el tiempo de respuesta. No se utiliza ese timeout para afirmar ausencia de
+movimientos. La evidencia positiva de la salida está asociada a la Entrega 6669,
+con TransType = 15.
+
+======================================================================
+5. COTIZACIÓN QUE SÍ ES BASE DE LA ENTREGA
+======================================================================
+
+Cabecera OQUT:
+    DocEntry: 160052
+    DocNum: 100206148
+    ObjType: 23
+    DocStatus: C
+    CANCELED: N
+    InvntSttus: C
+    CardCode: 9999
+    CardName: ABEL EDGARDO CEDILLO
+    SlpCode: 8
+    Vendedor: SPS Hector Alvi Cedillo
+    DocDate: 2026-09-14
+    DocTime: 845
+    CreateDate: 2026-09-14
+    CreateTS: 84505, equivalente a 08:45:05
+    UpdateDate: 2026-09-14
+    UpdateTS: 85238, equivalente a 08:52:38
+    UserSign: 1, manager
+    UserSign2: 55
+    NumAtCard: SPSS04CO60265
+    Ref1: 100206148
+    Ref2: NULL
+    U_SO1_01RETAILONE: Y
+    U_SO1_01FOLIORETAIL1: SPSS04CO60265.
+
+Comentario:
+    "Basado en operación de Retail One SPSS04CO60265"
+
+Líneas actuales QUT1:
+    LineNum 2: YAM-MODX7, Quantity 1, InvQty 1, TSPS01.
+    LineNum 3: YAM-PA150, Quantity 1, InvQty 1, BSPS03.
+
+Ambas:
+    LineStatus C
+    OpenQty 0
+    OpenInvQty 0
+    BaseType -1
+    TargetType 15
+    TrgetEntry 6669
+    U_Entregado NULL.
+
+IMPORTANTE:
+Las líneas de la cotización son 2 y 3, NO 0 y 1.
+No debe relacionarse una línea por su posición visual ni por el índice de un
+array. La llave real de la relación usa el LineNum guardado.
+
+La consulta inversa de RDR1 con BaseType 23 / BaseEntry 160052 devolvió cero
+pedidos enlazados formalmente. También se revisó INV1 con base directa en la
+cotización; no aparecieron facturas por esa relación.
+
+Por tanto, para la Entrega 40968:
+    Pedido intermedio en la cadena SAP: NO.
+    Pedido de R1 con referencias textuales al mismo contexto: SÍ existe.
+
+======================================================================
+6. ENTREGA SAP 40968
+======================================================================
+
+Cabecera ODLN:
+    DocEntry: 6669
+    DocNum: 40968
+    ObjType: 15
+    DocType: I
+    DocStatus: O
+    CANCELED: N
+    InvntSttus: O
+    CardCode: 9999
+    CardName: ABEL EDGARDO CEDILLO
+    SlpCode: 8
+    Vendedor: SPS Hector Alvi Cedillo
+    DocDate: 2026-09-14
+    DocTime: 902
+    CreateDate: 2026-09-14
+    CreateTS: 90201, equivalente a 09:02:01
+    UpdateDate: 2026-09-14
+    UpdateTS: 90202
+    UserSign: 55, usuario SAP PIERROT
+    UserSign2: 55
+    NumAtCard: SPSS04CO60265
+    Ref1: 40968
+    Ref2: NULL
+    TransId: 2169255
+    U_SO1_01RETAILONE: N
+    U_SO1_01FOLIORETAIL1: SPSS04CO60265.
+
+Comentario:
+    "Basado en operación de Retail One SPSS04CO60265
+     Basado en Ofertas de ventas 100206148."
+
+Línea DLN1 0:
+    YAM-MODX7
+    Quantity 1
+    InvQty 1
+    WhsCode TSPS01
+    BaseType 23
+    BaseEntry 160052
+    BaseLine 2.
+
+Línea DLN1 1:
+    YAM-PA150
+    Quantity 1
+    InvQty 1
+    WhsCode BSPS03
+    BaseType 23
+    BaseEntry 160052
+    BaseLine 3.
+
+Ambas líneas:
+    NumPerMsr 1
+    LineStatus O
+    OpenQty 1
+    OpenInvQty 1
+    TargetType -1
+    TrgetEntry NULL
+    NoInvtryMv N
+    U_Entregado NULL.
+
+El estado abierto y OpenQty = 1 en una ENTREGA no significan que esa unidad
+siga pendiente de salir de inventario. En este caso la unidad ya salió, como
+demuestran OINM y OIVL. No se debe reutilizar el significado de OpenQty de un
+pedido como si fuera idéntico en cualquier documento.
+
+También queda demostrado que:
+    Cotización creada en R1: U_SO1_01RETAILONE Y.
+    Entrega creada en SAP sobre esa cotización: U_SO1_01RETAILONE N.
+
+La marca de creación debe interpretarse para cada tipo de documento. No basta
+aplicarle a ODLN la clasificación diseñada únicamente para ORDR.
+
+======================================================================
+7. CADENA DOCUMENTAL Y CRONOLOGÍA
+======================================================================
+
+Cadena SAP formal comprobada por línea:
+
+OQUT 160052 / DocNum 100206148 / ObjType 23
+    QUT1.LineNum 2
+        -> DLN1.BaseType 23, BaseEntry 160052, BaseLine 2
+        -> ODLN 6669 / DocNum 40968 / línea 0 / YAM-MODX7.
+
+    QUT1.LineNum 3
+        -> DLN1.BaseType 23, BaseEntry 160052, BaseLine 3
+        -> ODLN 6669 / DocNum 40968 / línea 1 / YAM-PA150.
+
+QUT1 confirma también la dirección inversa:
+    TargetType 15 y TrgetEntry 6669.
+
+No aparece ORDR como eslabón intermedio de esas líneas.
+No aparece INV1 con BaseType 15 y BaseEntry 6669.
+
+Contexto separado de R1:
+    SPSS04CO60265, tipo CO, referencia SAP 100206148.
+    SPSS03PE390619, tipo PE, referencia SAP 101475685.
+    El comentario de ORDR refiere ambos folios, pero sus líneas no tienen base
+    en la cotización.
+
+Cronología leída para el 14 de septiembre:
+    08:43       R1: cotización SPSS04CO60265.
+    08:45:05    SAP: creación de cotización 100206148.
+    08:52:38    SAP: última actualización registrada de la cotización.
+    08:55       R1: pedido SPSS03PE390619.
+    09:02:01    SAP: creación de Entrega 40968.
+    09:02       OINM: salida de los dos artículos.
+    12:04:57    SAP: creación de Pedido 101475685.
+
+La creación del pedido SAP ocurrió 3 horas, 2 minutos y 56 segundos después de
+la creación de la Entrega. Eso no significa que el pedido R1 también se haya
+creado después: R1 conserva 08:55.
+
+No se investigaron colas o logs del integrador R1 para explicar el retraso de
+la creación SAP. Podría haber una diferencia de sincronización, pero no está
+demostrada y no se atribuye una causa técnica sin esos registros.
+
+Las fechas de documentos SAP son valores SQL sin zona horaria. El driver las
+serializa con formato ISO; su sufijo Z no convierte DocTime en UTC. Para la
+cronología se usaron DocDate/DocTime y CreateDate/CreateTS tal como están
+guardados, sin restar seis horas a la fecha de documento.
+
+======================================================================
+8. SALIDA REAL REGISTRADA EN INVENTARIO
+======================================================================
+
+La relación comprobada es:
+
+    OIVL.TransType = 15
+    OIVL.CreatedBy = ODLN.DocEntry
+    OIVL.DocLineNum = DLN1.LineNum
+    OIVL.ItemCode = DLN1.ItemCode
+    OIVL.LocCode = DLN1.WhsCode.
+
+En OINM se comprueba la misma identidad con Warehouse en lugar de LocCode.
+
+Artículo      Bodega   Entrega  Línea  TransSeq  InQty  OutQty
+YAM-MODX7     TSPS01   40968    0      2983881   0      1
+YAM-PA150     BSPS03   40968    1      2983882   0      1
+
+OINM:
+    TransNum 2983881 y 2983882.
+    TransType 15.
+    CreatedBy 6669.
+    BASE_REF 40968.
+    DocDate 2026-09-14.
+    DocTime 902.
+    Cantidades de entrada 0 y salida 1 en cada línea.
+
+OIVL:
+    TransSeq 2983881 y 2983882.
+    TransType 15.
+    CreatedBy 6669.
+    BASE_REF 40968.
+    DocLineNum 0 y 1.
+    Las mismas bodegas y cantidades.
+
+Resultado:
+    Cambio neto por movimiento YAM-MODX7 / TSPS01: -1.
+    Cambio neto por movimiento YAM-PA150 / BSPS03: -1.
+
+ANTES / MOVIMIENTO / DESPUÉS:
+    Si el saldo anterior era S, el movimiento probado deja S - 1.
+    Se intentó obtener S desde el acumulado de OIVL de esos dos artículos y
+    bodegas, limitado por TransSeq. La consulta agotó 15 segundos.
+    No se obtuvo un saldo anterior absoluto verificable.
+    NO se presenta un número anterior inventado.
+
+Existencias actuales OITW, observadas durante esta revisión:
+    YAM-MODX7 / TSPS01: OnHand 0.
+    YAM-PA150 / BSPS03: OnHand 457.
+
+Esos valores son actuales, no una fotografía del momento anterior al 14 de
+septiembre. No puede afirmarse que fueran 1 y 458 antes de la Entrega, porque
+pudieron existir otras operaciones entre ambos momentos.
+
+OINM y OIVL no deben sumarse entre sí: son dos evidencias del mismo movimiento,
+no dos salidas diferentes. Tampoco debe multiplicarse la cantidad al unir
+líneas con capas de valoración, lotes, series u otras tablas uno-a-muchos.
+
+Se consultaron devoluciones y notas de crédito con base directa en Entrega 6669:
+    ORDN/RDN1: cero filas.
+    ORIN/RIN1: cero filas.
+
+Eso descarta una reversión por esas relaciones directas al momento de la
+consulta. No descarta un ajuste independiente sin vínculo base ni una operación
+posterior. Los movimientos históricos de otros ejemplos no recibieron una
+conciliación completa de reversos porque esa consulta agotó el tiempo.
+
+======================================================================
+9. FACTURA POSTERIOR
+======================================================================
+
+Para la Entrega 6669 se buscó:
+
+    INV1.BaseType = 15
+    INV1.BaseEntry = 6669
+    OINV.DocEntry = INV1.DocEntry.
+
+Resultado: cero líneas de factura, incluyendo documentos cancelados.
+No se encontró factura directamente basada en esa Entrega.
+
+También:
+    No se encontró factura basada en ORDR 961461.
+    No se encontró factura basada directamente en OQUT 160052.
+    La búsqueda de referencias exactas en septiembre no encontró una factura
+    con 101475685 o SPSS03PE390619.
+
+Conclusión financiera que sí puede sostenerse:
+    Entrega sin factura documentalmente vinculada.
+
+No se afirma que no exista ninguna factura independiente para el cliente fuera
+de esas relaciones o del rango revisado. Una factura sin referencia no puede
+asignarse a esta entrega por coincidir en cliente o artículos.
+
+Tiempo hasta una factura posterior del caso:
+    No aplica: no apareció factura vinculada.
+
+La existencia de una factura no debe ser requisito para detectar la salida.
+La ausencia de factura tampoco debe mantener la entrega como pendiente de
+inventario cuando OIVL/OINM ya registran la salida.
+
+======================================================================
+10. ESTADOS ABIERTA, CERRADA Y CANCELADA
+======================================================================
+
+Comportamiento demostrado en la instalación:
+
+Entrega abierta:
+    40968: DocStatus O, CANCELED N.
+    Tiene salida de inventario y no tiene factura vinculada.
+    Por tanto, abierta NO equivale a producto todavía sin entregar.
+
+Entrega cerrada:
+    Se encontraron entregas DocStatus C, CANCELED N con movimientos de salida.
+    Varias entregas desde cotización están cerradas y no muestran factura
+    vinculada mediante INV1.BaseType 15.
+    Por tanto, cerrada NO basta para decir "Facturado".
+
+Entrega cancelada:
+    No se encontraron ODLN con CANCELED distinto de N en el rango de fechas
+    2000-01-01 hasta antes de 2026-09-17.
+    No se pudo reconstruir un caso real cancelado.
+    Esto NO demuestra que SAP no permita cancelarlas.
+
+Referencia estándar, separada de la evidencia local:
+    La referencia oficial ODLN documenta:
+        DocStatus O: abierto.
+        DocStatus C: cerrado.
+        CANCELED N: no cancelado.
+        CANCELED Y: cancelado.
+        CANCELED C: documento de cancelación.
+    Fuente:
+    https://help.sap.com/doc/089315d8d0f8475a9fc84fb919b501a3/10.0/en-US/SDKhelp/ODLN.html
+
+    SAP documenta la cancelación de documentos comerciales mediante documentos
+    de cancelación. Se incluye como contexto de diseño, no como una cancelación
+    observada en PAJARO_AZUL:
+    https://help.sap.com/docs/SAP_BUSINESS_ONE/68a2e87fb29941b5bf959a184d9c6727/4d881a18c4524b6d9090d2e2f1831582.html
+
+Regla conservadora propuesta, NO implementada:
+    Admitir entregas originales con CANCELED = N.
+    No exigir DocStatus = C.
+    Comprobar cantidades y movimientos por línea.
+    Mantener devoluciones y anulaciones como eventos separados que ajustan el
+    estado neto, sin borrar la trazabilidad histórica.
+
+Para certificar el tratamiento de Y/C en esta empresa falta un ejemplo real
+cancelado, con sus movimientos de reversión. No se recomienda crear uno durante
+este diagnóstico ni probarlo sobre producción.
+
+Campos que NO sirven solos como prueba:
+    DocStatus C: no prueba factura.
+    InvntSttus O/C: no reemplaza el libro de movimientos.
+    U_Entregado: existe en QUT1/RDR1/DLN1/INV1, pero en el caso es NULL aunque
+    hay salida. CUFD no proporcionó un catálogo de valores para ese campo.
+    Printed o el estado local de impresión: no prueban entrega.
+
+======================================================================
+11. TRES ANTECEDENTES ADICIONALES SIN PEDIDO INTERMEDIO
+======================================================================
+
+Se amplió la búsqueda de Entregas desde cotización al rango 2000-01-01 /
+2026-09-17. Además del caso principal se encontraron estos tres antecedentes
+con cero ORDR/RDR1 relacionados por BaseType 23 / BaseEntry de la cotización.
+
+ANTECEDENTE 1
+    Cotización: 100201353, DocEntry 148567.
+    Entrega: 40917, DocEntry 6432.
+    Fecha/hora Entrega: 2026-03-14 10:54; CreateTS 105423.
+    DocStatus: C.
+    CANCELED: N.
+    Pedido base/intermedio: NO.
+    Otros pedidos enlazados formalmente a esa cotización: 0.
+    Facturas vigentes basadas en esa Entrega: 0.
+    Movimiento inventario: SÍ.
+
+    Evidencia OIVL:
+        BEHR-XE-QX1832USB / BSPS01 / OutQty 1 / TransSeq 2779370.
+        TOR-T15 / BSPS04 / OutQty 2 / TransSeq 2779371.
+        HER-SS200BB / BSPS04 / OutQty 1 / TransSeq 2779372.
+        P53-Y-007-15 / BSPS02 / OutQty 1 / TransSeq 2779373.
+        P53-PNXX-001-30 / BSPS02 / OutQty 2 / TransSeq 2779374.
+        Todos: TransType 15, CreatedBy 6432, InQty 0.
+
+ANTECEDENTE 2
+    Cotización: 100185279, DocEntry 108680.
+    Entrega: 100155080, DocEntry 4198.
+    Fecha/hora: 2024-07-31 08:18; CreateTS 81844.
+    DocStatus: C.
+    CANCELED: N.
+    Pedido base/intermedio: NO.
+    Otros pedidos enlazados formalmente a esa cotización: 0.
+    Facturas vigentes basadas en esa Entrega: 0.
+    Movimiento inventario: SÍ.
+
+    Evidencia OIVL:
+        IRF3205 / BSPS03 / OutQty 2 / TransSeq 2128042.
+        220X1/4W / TSPS01 / OutQty 3 / TransSeq 2128043.
+        Todos: TransType 15, CreatedBy 4198, InQty 0.
+
+ANTECEDENTE 3
+    Cotización: 100147486, DocEntry 21387.
+    Entrega: 36339, DocEntry 1164.
+    Fecha/hora: 2020-03-03 16:26; CreateTS 162625.
+    DocStatus: C.
+    CANCELED: N.
+    Pedido base/intermedio: NO.
+    Otros pedidos enlazados formalmente a esa cotización: 0.
+    Facturas vigentes basadas en esa Entrega: 0.
+    Movimiento inventario: SÍ.
+
+    Evidencia OIVL:
+        CRC-209 / BSPS03 / OutQty 57 / TransSeq 475584.
+        CRC-208 / BSPS03 / OutQty 20 / TransSeq 475585.
+        CRC-208 / TSPS01 / OutQty 16 / TransSeq 475586.
+        AD-1223 / BSPS03 / OutQty 57 / TransSeq 475587.
+        CABLE 14ROL 1K / BSPS02 / OutQty 1 / TransSeq 475588.
+        ET-11 / BSPS03 / OutQty 5 / TransSeq 475589.
+        Todos: TransType 15, CreatedBy 1164, InQty 0.
+
+Se encontró también Cotización 100201496 / DocEntry 148910 -> Entrega 40920 /
+DocEntry 6435. La Entrega tiene base directa en cotización, pero existe otro
+pedido relacionado con esa cotización. Por eso NO se cuenta entre los tres
+ejemplos con cero pedidos relacionados.
+
+En los tres antecedentes, "sin factura" significa sin factura basada en la
+Entrega. No equivale a una conciliación financiera de todas las ventas del
+cliente. Se confirmó el movimiento de salida original; falta certificar sus
+posibles ajustes independientes o devoluciones históricas.
+
+======================================================================
+12. ENTREGA DIRECTA SIN COTIZACIÓN NI PEDIDO
+======================================================================
+
+SÍ existen documentos de Entrega con todas sus líneas BaseType = -1.
+
+Ejemplo confirmado:
+    ODLN.DocEntry 4432.
+    DocNum 200016780.
+    DocStatus C.
+    CANCELED N.
+    DocDate 2024-08-26.
+    DocTime 1209.
+    CreateTS 120936.
+    Una línea, sin base documental.
+    Artículo ALI-AWR-100N, TSPS01.
+    OIVL.TransType 15.
+    OIVL.CreatedBy 4432.
+    OIVL.DocLineNum 0.
+    TransSeq 2160488.
+    InQty 0 / OutQty 1.
+    No se encontró factura basada en esa Entrega en el lote consultado.
+
+Otro ejemplo:
+    DocEntry 4421.
+    DocNum 200016779.
+    DocStatus C.
+    CANCELED N.
+    Fecha 2024-08-22.
+    DocTime 1119.
+    Una línea con BaseType -1.
+    Su inventario individual no se verificó en esta revisión.
+
+La falta de base en DLN1 indica que no fue copiada documentalmente desde
+cotización o pedido. No garantiza ausencia de acuerdos, documentos externos
+o referencias manuales.
+
+El historial futuro debe poder representar estos documentos sin inventar
+número de Pedido y sin exigir primero un despacho local.
+
+======================================================================
+13. VALIDACIÓN DE CASOS A–H
+======================================================================
+
+A. Cotización -> Pedido -> Entrega -> Factura
+    CONFIRMADO por vínculos de línea.
+    OQUT 152732 / 100203121
+        -> ORDR 919780 / 101459807
+        -> ODLN 6618 / 100155642
+        -> OINV 881777 / 201646148.
+    La factura tiene BaseType 15, BaseEntry 6618, BaseLine 0 a 4.
+    Otra cadena:
+        OQUT 152716 / 100203115
+        -> ORDR 919724 / 101459783
+        -> ODLN 6598 / 100155622
+        -> OINV 881721 / 201646136.
+    No se calculó el intervalo creación Entrega/Factura de estos ejemplos.
+
+B. Cotización -> Entrega -> Factura
+    NO demostrado en los ejemplos de entrega directa encontrados.
+    Se localizaron cinco pares cotización/entrega; el conteo de facturas
+    vigentes con base en cada una fue cero.
+    No se afirma que el flujo no sea posible; falta un caso comprobado.
+
+C. Cotización -> Entrega -> sin factura
+    CONFIRMADO.
+    Principal: 100206148 -> 40968.
+    Tres antecedentes adicionales detallados en la sección 11.
+
+D. Pedido -> Entrega -> sin factura
+    CONFIRMADO.
+    ORDR 957059 / 101474074
+        -> ODLN 6668 / 40967, 2026-09-04 17:06.
+    ORDR 956425 / 101473857
+        -> ODLN 6667 / 40966, 2026-09-03 09:18.
+    Ambas Entregas DocStatus O y CANCELED N.
+    No se encontraron facturas vigentes basadas en esas Entregas.
+    En las líneas consultadas InvQty de la Entrega coincide con InvQty del
+    Pedido y OpenInvQty del Pedido es cero.
+
+E. Entrega directa sin pedido/cotización
+    CONFIRMADO.
+    ODLN 4432 / 200016780, con movimiento OutQty 1.
+
+F. Entrega cancelada
+    NO encontrado en el rango documental revisado.
+    No se validó una reversión real de cancelación en la instalación.
+
+G. Entrega parcial
+    NO demostrado con un ejemplo real durante esta revisión.
+    La búsqueda histórica general agotó el límite de 15 segundos.
+    Una búsqueda posterior para pedidos con entregas DocEntry 6000–6669
+    terminó correctamente y devolvió cero líneas con InvQty de Entrega
+    menor que InvQty de la línea base del Pedido.
+    Esa muestra no cubre todo el historial ni todos los flujos desde cotización.
+
+H. Varias entregas de la misma línea origen
+    NO encontrado en las consultas completadas.
+    Un primer agregado histórico por fecha agotó el tiempo.
+    El agregado de las últimas 1000 Entregas vigentes devolvió cero grupos.
+    Un agregado posterior sobre DLN1/ODLN, agrupado por BaseType, BaseEntry,
+    BaseLine e ItemCode y filtrado por CANCELED N, también devolvió cero grupos
+    con más de un DocEntry de Entrega.
+    No se puede afirmar que SAP impida múltiples entregas: únicamente que no
+    aparecieron bajo la relación exacta consultada.
+    Varios documentos sin vínculo base no pueden agruparse por artículos para
+    convertirlos en entregas parciales de un origen supuesto.
+
+======================================================================
+14. CÓMO DETECTAR PARCIALES Y MÚLTIPLES EN UNA REGLA FUTURA
+======================================================================
+
+Esta sección es diseño preventivo. Los casos G/H no quedaron demostrados con
+ejemplos reales y no se está implementando nada.
+
+Relación base de una línea:
+    (BaseType, BaseEntry, BaseLine).
+
+Tipos observados:
+    23: cotización.
+    17: pedido.
+    15: entrega.
+    13: factura.
+
+Entrega acumulada de una línea origen:
+    Sumar las unidades de inventario de líneas de Entregas originales vigentes
+    que señalen exactamente esa línea origen.
+
+Usar InvQty para comparar unidades de inventario y revisar NumPerMsr/UoM cuando
+Quantity esté en otra unidad. En el caso principal NumPerMsr = 1, de modo que
+Quantity e InvQty coinciden.
+
+Esquema conceptual:
+    cantidadOrigen = unidades originales de esa línea.
+    cantidadSalida = suma de salidas documentales válidas de esa línea.
+    cantidadDevuelta = unidades de devoluciones vinculadas con entrada real.
+    cantidadNeta = cantidadSalida - cantidadDevuelta.
+
+    cantidadNeta = 0 -> sin salida neta por esa relación.
+    0 < cantidadNeta < cantidadOrigen -> entrega parcial.
+    cantidadNeta >= cantidadOrigen -> línea cubierta, validando sobreentrega.
+
+No aplicar cantidadSalida sin revisar cancelaciones y devoluciones.
+Una nota de crédito financiera sin movimiento físico no debe restar inventario
+automáticamente; comprobar su efecto y NoInvtryMv.
+
+No deducir que todo el Pedido está entregado porque una sola línea tiene Entrega.
+Evaluar todas las líneas relevantes y sus cantidades.
+
+Para cotización -> pedido -> entrega:
+    La Entrega apunta al Pedido.
+    Para llegar a la cotización, unir la línea exacta RDR1 indicada por BaseLine
+    y después su BaseType/BaseEntry/BaseLine de cotización.
+
+Evitar contar la misma Entrega dos veces por ambas rutas.
+TargetType/TrgetEntry sirve como corroboración o pista, pero la búsqueda inversa
+en líneas destino es necesaria para no depender de un único destino.
+
+OpenQty = 0 de un origen tampoco prueba por sí solo entrega completa: debe
+distinguirse cierre manual, cancelación, factura directa u otro destino.
+
+======================================================================
+15. FLUJO R1 Y SUS CAMPOS REALES
+======================================================================
+
+Pedido R1 revisado:
+    Name: SPSS03PE390619
+    U_SO1_DOCUMENTOSBO: 101475685
+    U_SO1_TIPO: PE
+    U_SO1_VERIFICADO: N
+    U_SO1_STATUS: A
+    U_SO1_SINCRONIZADO: N
+    U_SO1_FACTURA: Y
+    Fecha/hora: 2026-09-14 08:55
+    U_SO1_FECHAENTREGA: 2026-09-14
+    U_SO1_HORAENTREGA: NULL
+    U_SO1_FECHACIERREDOC: NULL
+    U_SO1_VENDEDOR: 8
+    Vendedor: SPS Hector Alvi Cedillo
+    Sucursal: SPS.
+
+Líneas R1:
+    Partida 1: YAM-MODX7, cantidad 1, TSPS01.
+    Partida 2: YAM-PA150, cantidad 1, BSPS03.
+
+Cotización R1:
+    Name: SPSS04CO60265
+    U_SO1_DOCUMENTOSBO: 100206148
+    U_SO1_TIPO: CO
+    U_SO1_VERIFICADO: N
+    U_SO1_STATUS: C
+    U_SO1_FACTURA: N
+    Fecha/hora: 2026-09-14 08:43.
+
+CUFD/UFD1 en la base SAP confirmó el catálogo:
+    SO1_TIPO PE: Pedido.
+    SO1_TIPO CO: Cotización.
+    SO1_TIPO ED: Entrega directa.
+    SO1_STATUS A: Abierto.
+    SO1_STATUS C: Cerrado.
+    SO1_STATUS N: Cancelada.
+    SO1_VERIFICADO Y: Sí.
+    SO1_VERIFICADO N: No.
+    SO1_FACTURA Y/N: Sí/No.
+
+La consulta CUFD/UFD1 en la base R1 consultada devolvió cero definiciones para
+los campos buscados. El catálogo citado proviene de SAP, no de un supuesto
+resultado en R1.
+
+NO confundir:
+    U_SO1_STATUS C es "Cerrado", no "Cancelado".
+    U_SO1_FACTURA Y es un indicador sí/no. No es DocNum de OINV ni constituye
+    por sí solo prueba de factura: en el pedido revisado es Y aunque no se
+    encontró una factura vinculada.
+    U_SO1_FECHAENTREGA está poblado en un pedido no verificado. Por tanto, no
+    acredita por sí sola entrega ya realizada ni hora exacta de validación.
+
+Ejemplos R1 verificados encontrados el 16 de septiembre:
+    SPSS09PE388894 / SAP 101475796 / 08:56 / verificado Y / status C.
+    SPSS09PE388893 / SAP 101475795 / 08:54 / verificado Y / status C.
+    SPSS06PE388720 / SAP 101475794 / 08:48 / verificado Y / status C.
+
+Los tres tienen U_SO1_FACTURA Y y U_SO1_HORAENTREGA NULL.
+No se reconstruyeron individualmente sus entregas/facturas SAP.
+
+Se revisaron además campos potenciales de origen:
+    U_SO1_PEDIDO: N en ambos folios.
+    U_SO1_REFERENCIA: vacío en ambos.
+    U_SO1_ORIGENDOCUMENT: NULL en ambos.
+    U_SO1_COMPONENORIGEN: 01 en ambos.
+
+Esos valores no proporcionaron un enlace estructurado pedido R1 -> cotización
+R1 para automatizar este caso. U_SO1_PEDIDO no contiene el número de Pedido en
+estas filas y no debe interpretarse así por su nombre.
+
+Regla operativa existente:
+    R1 Verificado Y representa entrega confirmada según el contrato empresarial
+    ya usado por Pedidos Bodega.
+    El catálogo únicamente lo llama "Verificado"; su significado de entrega
+    física corresponde a ese contrato operativo, no a una definición universal
+    probada por CUFD.
+
+Propuesta:
+    Mantener esa regla R1, sin sustituirla por un campo de SAP.
+    Separar el reconocimiento logístico SAP por Entrega y cantidades.
+    No normalizar ambos orígenes únicamente mediante la palabra "Facturado".
+
+======================================================================
+16. ASIGNACIÓN Y DESPACHO LOCAL DEL CASO
+======================================================================
+
+SELECT en PedidosBodega encontró:
+
+AsignacionArticuloPedido:
+    idOrigen: R1:TSPS01:SPSS03PE390619
+    identificadorDetalle: 2
+    usuarioAsignado: acalix
+    nombreAsignado: Ana Calix
+    creadoEn: 2026-09-14 14:56:34.356
+    actualizadoEn: 2026-09-14 14:56:34.356.
+
+PedidoDespachado:
+    idOrigen: R1:TSPS01:SPSS03PE390619
+    origenPedido: R1
+    folioPedido: SPSS03PE390619
+    sapDocEntry: NULL
+    numeroPedido almacenado: SPSS03PE390619
+    estadoLocal: DESPACHADO
+    despachadoEn: 2026-09-14 14:56:37.248
+    validadoDetectadoEn: NULL.
+
+No aparecieron asignaciones/despachos para las identidades SAP:961461 y
+SAP:6669 consultadas.
+
+SAP:6669 es solamente una búsqueda de compatibilidad con el esquema actual;
+NO es una identidad recomendada para entrega, porque el código actual interpreta
+SAP:{DocEntry} como ORDR. El nuevo tipo debe llevar ObjType explícito.
+
+La asignación Ana Calix corresponde a la partida R1 2, YAM-PA150.
+No se debe atribuirle automáticamente toda la Entrega SAP ni el sintetizador.
+Tampoco debe confundirse usuario SAP PIERROT con bodeguero asignado.
+
+El número de pedido almacenado localmente todavía conserva el folio R1 en esa
+fila. Buscar por número SAP 101475685 en la tabla local sin considerar el folio
+podría no encontrarla. En este diagnóstico se usó también idOrigen.
+
+Para un historial futuro:
+    Conservar la responsabilidad local real cuando haya una relación demostrada.
+    Si no hay registro de asignación para la entrega, mostrar ausencia de
+    asignación, sin inventar a Gregorio, Ana u otro bodeguero.
+    Mantener usuario SAP creador en un campo separado.
+    No copiar responsabilidades por mera coincidencia de ItemCode.
+
+======================================================================
+17. CÓDIGO ACTUAL EN appPedidosBodega
+======================================================================
+
+17.1 Cola SAP
+
+Archivo:
+    backend/src/modulos/pedidos/pedidoSapRepositorio.ts
+
+Consulta únicamente ORDR/RDR1:
+    U_SO1_01RETAILONE N.
+    OCRD.GroupCode en 103 y 113.
+    ORDR.CANCELED N.
+    ORDR.DocStatus O.
+    RDR1.LineStatus O y OpenQty > 0.
+
+Devuelve:
+    idOrigen SAP:{ORDR.DocEntry}.
+    Cantidad pendiente = RDR1.OpenQty.
+
+No consulta OQUT/QUT1, ODLN/DLN1 u OINV/INV1.
+
+Consecuencia:
+    Una Entrega directa desde cotización no tiene entrada propia.
+    El pedido 101475685 se excluye de la fuente SAP porque su marca R1 es Y
+    y pertenece al grupo 108, no a los dos grupos admitidos por esa copia.
+    Debe aparecer, cuando corresponda, por R1.
+
+17.2 Transferencia a despachados
+
+Archivos:
+    backend/src/modulos/despachos/despachoServicio.ts
+    backend/src/modulos/despachos/lineaDespachoOrigenRepositorio.ts
+    backend/src/modulos/despachos/despachoRepositorio.ts
+
+La transferencia:
+    Valida las líneas existentes/disponibles de R1 o ORDR.
+    Para SAP exige pedido abierto, no cancelado, de los grupos admitidos.
+    Guarda un despacho propio en PedidoDespachado y PedidoDespachadoDetalle.
+    No crea Entrega SAP ni mueve inventario SAP.
+
+Por tanto:
+    "Despachado por Bodega" local y "Entrega SAP registrada" son hechos distintos.
+
+17.3 Historial
+
+Archivos:
+    backend/src/modulos/historial/historialServicio.ts
+    backend/src/modulos/historial/historialRepositorio.ts
+    backend/src/modulos/historial/historialR1Repositorio.ts
+
+La conciliación toma despachos origen R1.
+    Verificado Y -> marca local VALIDADO.
+    Status C sin Verificado Y -> marca local CERRADO.
+
+La consulta visible de historial del servicio usa HistorialR1Repositorio:
+    Tipo PE.
+    Verificado Y.
+    Número SAP válido.
+    Filtros de fecha/bodega.
+
+No hay detección de Entrega SAP en esa implementación.
+No hay requisito explícito de factura mediante OINV/INV1: esas tablas no se
+consultan. El problema principal es que el ciclo de Entregas SAP no está cubierto.
+
+Además, marcarValidados actualiza solamente filas estadoLocal DESPACHADO,
+aunque obtenerDespachadosPendientes también devuelve CERRADO.
+Una fila previamente CERRADO que después sea verificada puede no pasar a
+VALIDADO en la copia local por ese UPDATE. Es una observación de código,
+no una falla reproducida mediante ejecución en esta revisión.
+
+17.4 Actualización
+
+backend/src/modulos/historial/sincronizadorHistorial.ts:
+    Ejecuta la conciliación al iniciar y cada 5 segundos.
+    No se ejecutó durante este diagnóstico.
+
+Que el sincronizador sea frecuente no arregla una fuente documental omitida.
+Repetir el SELECT de R1 no descubrirá una Entrega directa SAP si no se consulta
+ODLN ni se define su identidad.
+
+======================================================================
+18. DIFERENCIAS DE appPedidosBodega-ultima-version
+======================================================================
+
+Se inspeccionó esta segunda copia porque conserva cambios posteriores de la
+aplicación. No se editó ni se arrancó.
+
+18.1 Cola
+
+Archivo:
+    backend/src/modulos/pedidos/gruposClienteSap.ts
+
+Grupos SAP admitidos:
+    100 a 118 inclusive.
+
+pedidoSapRepositorio.ts sigue usando:
+    ORDR/RDR1.
+    Creado R1 N.
+    No cancelado.
+    Pedido abierto.
+    Líneas con OpenQty > 0.
+
+Ampliar grupos permite más Pedidos ORDR, pero no incorpora Entregas sin Pedido.
+
+18.2 Historial SAP
+
+Archivos:
+    backend/src/modulos/historial/historialServicio.ts
+    backend/src/modulos/historial/historialRepositorio.ts
+
+El servicio incluye:
+    Despachos SAP pendientes.
+    Conservación de ORDR cerrados sin despacho local.
+    Mezcla de historial R1 con historial propio SAP.
+
+obtenerCerradosSap:
+    Consulta ORDR por DocEntry y DocStatus C.
+    No exige CANCELED N en esa consulta puntual de candidatos.
+
+conservarCerradosSapSinDespacho:
+    ORDR creado R1 N.
+    Grupos admitidos.
+    CANCELED N.
+    DocStatus C.
+    Ventana por UpdateDate o DocDate.
+    Guarda cabeceras/líneas en PedidoSapHistorial.
+
+Existe también una recuperación de pedidos creados R1:
+    R1 tipo PE, status C, no verificado.
+    Confirma ORDR creado R1 Y, no cancelado y DocStatus C.
+    No confirma Entrega mediante ODLN/DLN1.
+
+No hay consulta ODLN/DLN1 ni OINV/INV1 en el módulo de historial inspeccionado.
+La condición efectiva SAP es cierre de ORDR, NO existencia de Factura ni
+existencia de Entrega con cantidades comprobadas.
+
+18.3 Texto visible
+
+Archivos:
+    frontend/src/app/funcionalidades/historial/historial.component.html
+    frontend/src/app/funcionalidades/historial/historial.component.ts
+
+La etiqueta es "Facturado", incluso para registros procedentes de cierre SAP
+que no han sido verificados contra una factura.
+
+Riesgo:
+    Una etiqueta financiera se usa para un criterio de cierre documental.
+    El código puede conservar un ORDR cerrado manualmente como historial sin
+    demostrar salida o factura.
+    Una Entrega directa desde cotización puede quedar fuera porque no hay ORDR
+    base que cerrar.
+    Un pedido parcialmente cubierto debe evaluarse por cantidades, no solamente
+    por cierre de cabecera.
+
+La condición estadoLocal DESPACHADO en marcarValidados también está presente
+en esa segunda copia.
+
+No se verificó en ejecución qué pantalla del servidor usa cada versión.
+Antes de implementar debe confirmarse el repositorio desplegado y su commit.
+
+======================================================================
+19. POR QUÉ ESTE CASO NO SE RESUELVE CON LA REGLA ACTUAL
+======================================================================
+
+Para el pedido R1 SPSS03PE390619:
+    Verificado N.
+    Status A.
+    ORDR 961461 abierto.
+    Despacho local DESPACHADO.
+
+Para la Entrega SAP 40968:
+    Base cotización 160052.
+    Inventario ya salió.
+    No factura vinculada.
+    Sin Pedido SAP base.
+
+La regla R1 actual no lo considera validado.
+La regla de ORDR cerrado tampoco lo considera cerrado.
+La Entrega directa no tiene representación propia.
+
+No es simplemente "esperar a que llegue la Factura".
+Se está observando un documento de origen distinto al que produjo la salida.
+
+Tampoco se puede arreglar marcando el pedido 101475685 entregado por artículo:
+    Hay dos ramas documentales.
+    RDR1 no tiene BaseType 23.
+    DLN1 no tiene BaseType 17.
+    Los campos R1 de origen revisados no proporcionan una llave estructurada
+    entre ambas operaciones.
+
+La solución segura debe:
+    Reconocer la Entrega directa como entidad propia.
+    Conservar la referencia de cotización.
+    Mantener separado el pedido R1 mientras no exista una relación confirmada
+    que permita conciliarlo.
+    Señalar el vínculo textual como contexto, no como prueba de cantidades
+    entregadas de ORDR.
+
+======================================================================
+20. REGLA FUTURA MÍNIMA RECOMENDADA
+======================================================================
+
+NO IMPLEMENTADA.
+
+ORIGEN R1:
+    Mantener Verificado Y como confirmación según la regla empresarial vigente.
+    Mantener Cierre/Cancelación como estados distintos.
+    No usar U_SO1_FACTURA como número o prueba universal de factura.
+
+ORIGEN SAP:
+    Detectar Entrega ODLN/DLN1 original, CANCELED N.
+    Admitir DocStatus O y C.
+    Relacionar sus líneas al origen con BaseType/BaseEntry/BaseLine.
+    Confirmar salida en unidades y documento de inventario cuando aplique.
+    Evaluar cantidad neta y devoluciones antes de declarar completo.
+
+ESTADO FINANCIERO:
+    Factura documentalmente vinculada mediante OINV/INV1.
+    CANCELED N para una factura vigente.
+    Evaluar cantidades facturadas, no solo existencia de una cabecera.
+    Distinguir pendiente de facturación, facturado parcial y facturado.
+    Si hay documentos independientes sin relación, mantener "no vinculado"
+    o revisión pendiente, no asumir inexistencia financiera absoluta.
+
+Falta una definición empresarial para casos de factura directa que mueve
+inventario sin Entrega ODLN. Este diagnóstico demuestra la Entrega sin Factura,
+pero no valida todos los escenarios de factura directa/reserva.
+No se recomienda volver invisible un flujo ya existente al introducir una
+regla que acepte exclusivamente ODLN.
+
+Dos ejes independientes:
+    Logístico:
+        Pendiente / Despachado local / Salida SAP parcial / Salida SAP completa /
+        Devuelto / Entrega cancelada.
+
+    Financiero:
+        Sin factura vinculada / Facturado parcial / Facturado /
+        Factura cancelada / Revisión de vínculo pendiente.
+
+"Entrega directa SAP" describe el tipo/origen del evento.
+"Entregado sin factura" combina ambos ejes.
+No deben mezclarse como si fueran una única lista de estados excluyentes.
+
+======================================================================
+21. REPRESENTACIÓN RECOMENDADA EN HISTORIAL
+======================================================================
+
+Registro propuesto para la Entrega comprobada:
+
+    Origen: SAP
+    Empresa/base: PAJARO_AZUL
+    Tipo de evento: Entrega desde cotización
+    ObjType: 15
+    DocEntry: 6669
+    Número Entrega SAP: 40968
+    Pedido base: No aplica
+    Cotización base: 100206148 / DocEntry 160052
+    Referencia R1: SPSS04CO60265
+    Fecha creación SAP: 2026-09-14 09:02:01
+    Estado logístico: Salida de inventario registrada / Entregado SAP
+    Estado financiero: Sin factura vinculada
+    CANCELED: N
+    DocStatus: O
+    Artículos:
+        Línea 0: YAM-MODX7, 1, TSPS01, base cotización línea 2.
+        Línea 1: YAM-PA150, 1, BSPS03, base cotización línea 3.
+    Usuario creador SAP: PIERROT
+    Responsable Bodega de la entrega: no atribuido sin relación comprobada.
+
+La asignación Ana Calix encontrada en R1 debe conservarse en su entidad y partida.
+No se inventa un bodeguero para una Entrega creada fuera del flujo local.
+
+La creación del historial logístico no debe requerir:
+    Un Pedido ORDR inexistente en la cadena.
+    Un despacho local previo.
+    DocStatus C en ODLN.
+    Una Factura posterior.
+    Una impresión del ticket.
+
+El Pedido 101475685 debe seguir representado como Pedido real, no renombrarse
+a Cotización ni reemplazarse por el número 40968.
+
+Para un documento totalmente directo, como Entrega 200016780:
+    Pedido: No aplica.
+    Cotización: No aplica.
+    Identidad documental propia de Entrega.
+    Nunca reutilizar un folio artificial como si fuera ORDR.DocNum.
+
+======================================================================
+22. IDENTIDAD ESTABLE Y PREVENCIÓN DE DUPLICADOS
+======================================================================
+
+Identidad recomendada de documento:
+    (origen, empresa, ObjType, DocEntry).
+
+Ejemplo legible:
+    SAP:PAJARO_AZUL:15:6669.
+
+Identidad de línea:
+    (origen, empresa, ObjType, DocEntry, LineNum).
+
+Ejemplos:
+    SAP:PAJARO_AZUL:15:6669:0
+    SAP:PAJARO_AZUL:15:6669:1.
+
+DocEntry sirve como clave interna dentro del tipo/empresa.
+DocNum sirve como número visible del documento.
+No usar DocNum solo como llave universal entre tipos, series o empresas.
+
+El esquema actual SAP:{DocEntry} apunta a Pedido ORDR.
+No reutilizar SAP:6669 sin distinguir ObjType, porque podría confundirse con
+ORDR.DocEntry 6669.
+
+Para el origen:
+    Guardar BaseType, BaseEntry, BaseLine por cada línea.
+    Un documento puede contener líneas de distintas bases: no forzar una única
+    cotización o pedido para toda la cabecera.
+    Guardar referencias R1 en campos separados.
+
+Idempotencia futura:
+    Una Entrega original se conserva una vez por su identidad estable.
+    Un refresh actualiza sus hechos/estado, no crea otra Entrega.
+    Las cancelaciones y devoluciones son eventos vinculados, no duplicados.
+    La misma línea de inventario se reconoce por su identidad de movimiento;
+    no sumar OINM + OIVL.
+    No deduplicar por ItemCode + cliente + cantidad.
+    No deduplicar por número visible sin tipo y empresa.
+    No importar a la vez un Pedido cerrado y su Entrega como dos salidas.
+
+Para vistas por Pedido y por Artículo:
+    Deben provenir del mismo conjunto de hechos.
+    Los totales y cantidades deben usar la misma clasificación/logística.
+    El agregado por Pedido no debe borrar el detalle de cantidades por línea.
+
+======================================================================
+23. QUÉ ESTADOS SE PUEDEN OBTENER CON LA EVIDENCIA ACTUAL
+======================================================================
+
+PENDIENTE:
+    Sí como estado documental ORDR abierto / cantidades pendientes.
+    No garantiza pendiente físico si hay una rama de Entrega sin vínculo.
+
+DESPACHADO POR BODEGA:
+    Sí desde el registro local PedidoDespachado.
+    No equivale automáticamente a salida SAP.
+
+ENTREGADO EN SAP:
+    Sí como Entrega original y salida documental comprobada.
+    No acredita por sí solo una firma física del cliente.
+
+ENTREGA DIRECTA SAP:
+    Sí desde las líneas base:
+        Desde cotización sin Pedido intermedio.
+        Sin documento base, BaseType -1.
+
+ENTREGADO SIN FACTURA:
+    Sí en el sentido de salida y ausencia de factura vinculada.
+    Principal: Entrega 40968.
+
+ENTREGADO Y FACTURADO:
+    Sí técnicamente desde Entrega y Factura enlazadas.
+    Se confirmó la cadena A; el inventario individual de ese ejemplo agotó una
+    consulta conjunta, por lo que no se afirma conciliación de su movimiento.
+
+ENTREGA CANCELADA:
+    Campo estándar disponible, pero falta un ejemplo real validado de Y/C.
+
+ENTREGA PARCIAL:
+    Datos de base/línea/cantidad disponibles.
+    Falta un ejemplo real demostrado durante esta revisión.
+
+VARIAS ENTREGAS:
+    Identificables por grupo de línea origen y distintos DocEntry.
+    No aparecieron grupos múltiples en el agregado completado.
+
+RESPONSABLE:
+    Sí cuando haya asignación local documentada.
+    No inferible solamente de UserSign SAP o nombre del vendedor.
+
+======================================================================
+24. FOXPRO
+======================================================================
+
+Se buscaron archivos DBF/PRG y, en la segunda copia del proyecto, DBF/PRG/DBC/FPT.
+No se localizaron fuentes o tablas FoxPro en los dos repositorios revisados.
+
+La documentación local de fases anteriores describe una pantalla/flujo anterior,
+pero no demuestra una rutina FoxPro que transforme Cotización en Entrega ni un
+campo DBF equivalente que pueda adoptarse.
+
+No se abrió ni ejecutó un programa FoxPro.
+No se buscó de forma indiscriminada en discos, perfiles o directorios externos.
+No se encontró una conexión o ruta autorizada al sistema FoxPro anterior.
+
+Conclusión:
+    No hay evidencia accesible suficiente para reconstruir su lógica histórica.
+    La regla recomendada se apoya en los documentos y movimientos reales SAP.
+    Si se aporta una ruta a DBF/PRG/configuración/documentación, podrá hacerse
+    otra lectura controlada. No es requisito para reconocer la Entrega probada.
+
+======================================================================
+25. RENDIMIENTO OBSERVADO Y DISEÑO FUTURO
+======================================================================
+
+Consultas puntuales inicialmente completadas:
+    Búsqueda DocNum en cuatro cabeceras: 397 ms.
+    Cabecera ORDR del caso: 80 ms.
+    Líneas ORDR: 18 ms.
+    Destinos directos del Pedido: 37 ms.
+    Cabecera ODLN 6669: 19 ms.
+    Líneas DLN1 6669: 10 ms.
+    Facturas de Entrega 6669: 21 ms.
+    OINM de Entrega 6669: 178 ms.
+    OIVL de Entrega 6669: 13 ms.
+    Referencias por fecha de septiembre: 263 ms.
+    R1 cabecera del caso: 79 ms.
+    R1 detalle del caso: 19 ms.
+    Asignación propia del caso: 36 ms.
+    Despacho propio del caso: 25 ms.
+    OITW de los dos artículos/bodegas: 130 ms.
+
+Búsquedas históricas:
+    Distribución de Entregas: 1171 ms.
+    Cotización -> Entrega: 246 ms.
+    Cadena completa de ejemplo A: 2444 ms.
+    Reintento por lote de inventario de antecedentes: 2592 ms.
+    Agregado final de múltiples Entregas: 3947 ms.
+
+Se observaron también:
+    Timeouts de 15 segundos en referencias amplias, parciales, múltiples,
+    metadata de índices, acumulado histórico de existencias y otros lotes.
+    Timeouts de 8 segundos en reintentos de metadata de índices.
+    Un fallo de conexión/reconexión a SAP dentro de 5000 ms.
+    Una consulta con tiempo total registrado de 18956 ms que terminó; el total
+    medido por el script incluye adquisición/espera de conexión y no representa
+    solamente ejecución SQL.
+
+No se capturaron planes reales, waits, CPU, red o contadores del servidor.
+Por tanto NO puede atribuirse la variación a un índice faltante, SQL Server,
+red, antivirus o carga de SAP con certeza.
+
+Estos tiempos no son una prueba de carga ni una garantía de 200 ms.
+Las consultas consumen recursos de lectura y pueden competir con la operación,
+aunque no escriban datos. Se aplicaron timeouts y consultas por lote; no se
+recalculó el inventario de todo el sistema.
+
+El primer inventario de antecedentes falló; el reintento puntual sí devolvió
+los movimientos. Un timeout no debe interpretarse como cero filas en producción.
+
+Recomendación futura, sin implementar:
+    No sumar todo OIVL por artículo durante cada refresh.
+    No consultar documento por documento para todo el sistema.
+    Consultar por lotes de DocEntry de Entrega y de líneas origen.
+    Separar el descubrimiento de Entregas de la lectura rápida de pantalla.
+    Mantener datos disponibles cuando otra fuente no responde.
+    No reemplazar datos válidos por listas vacías provenientes de error.
+    Diferenciar resultado completo vacío, resultado parcial y fuente caída.
+    Usar cursor incremental con solapamiento acotado y paginación estable.
+    Revisar altas y cambios/cancelaciones/devoluciones, no solamente DocDate.
+    El backfill histórico debe ser separado y limitado.
+    Actualizar en la base propia solo cuando una implementación posterior sea
+    autorizada; esta tarea no hizo esas escrituras.
+
+Índices:
+    Se intentó leer sys.indexes/sys.index_columns/sys.columns.
+    Las consultas de índices agotaron sus límites.
+    NO se obtuvo una lista fiable de índices físicos presentes.
+    No se afirma que falten índices ni se propone crearlos en SAP directamente.
+
+Campos importantes para revisar el plan con el DBA:
+    ODLN.DocEntry; DocDate; CreateDate/CreateTS; UpdateDate/UpdateTS; CANCELED.
+    DLN1.DocEntry/LineNum; BaseType/BaseEntry/BaseLine.
+    INV1.BaseType/BaseEntry/BaseLine y DocEntry.
+    QUT1.DocEntry/LineNum; RDR1.DocEntry/LineNum.
+    OIVL.TransType/CreatedBy/DocLineNum; TransSeq.
+    OINM es una vista: verificar el plan sobre sus tablas reales.
+    OITW.ItemCode/WhsCode.
+    R1 Name y U_SO1_FOLIO para cabecera/detalle.
+
+Son llaves/campos de acceso recomendados; no una certificación de índices
+existentes. Cualquier cambio de índices SAP debe validarse con soporte/DBA.
+
+======================================================================
+26. VALIDACIONES PENDIENTES ANTES DE IMPLEMENTAR
+======================================================================
+
+1. Confirmar el commit y carpeta realmente desplegados en el servidor.
+2. Definir con operación si Entrega SAP basta como confirmación logística o si
+   se requiere una recepción/entrega física adicional fuera de SAP.
+3. Obtener un caso real cancelado y su reversión, sin crearlo en producción.
+4. Obtener un caso real parcial y, si existe, uno de varias Entregas.
+5. Revisar devoluciones antiguas de los tres antecedentes.
+6. Obtener un ejemplo cotización -> Entrega -> Factura si existe.
+7. Definir tratamiento de factura directa y factura de reserva.
+8. Confirmar relación estructurada R1 CO -> PE en tablas del integrador no
+   cubiertas por esta revisión; los campos examinados no la proporcionaron.
+9. Acordar cómo conciliar ramas excepcionales sin trasladar cantidades por
+   coincidencia de artículos.
+10. Definir cuándo y cómo llevar responsabilidad local a una Entrega manual.
+11. Revisar índices y planes con el DBA en una ventana de baja carga.
+12. Diseñar y probar una conciliación incremental que no dependa de consultas
+    históricas pesadas en cada refresh.
+13. Ajustar posteriormente la etiqueta financiera del Historial con un criterio
+    de Factura real, manteniendo aparte el estado logístico.
+
+No es necesario esperar una Factura para reconocer la salida comprobada.
+Sí es necesario resolver esas validaciones para una corrección integral y
+segura de todos los flujos.
+
+======================================================================
+27. CONFIRMACIÓN FINAL
+======================================================================
+
+CERO escrituras de datos efectuadas por este diagnóstico en SAP.
+CERO escrituras de datos efectuadas por este diagnóstico en R1.
+CERO escrituras de datos efectuadas por este diagnóstico en PedidosBodega.
+CERO cambios de código/configuración/servicios.
+CERO commits, merges o pushes.
+
+La tarea produjo solamente este TXT con diagnóstico y propuesta.
+
+Hallazgo decisivo:
+    La Entrega 40968 sí registra la salida sin Factura y sin Pedido base.
+    El número 101475685 sí corresponde a un Pedido R1/SAP separado.
+    Pedidos Bodega no contempla esa Entrega directa como entidad propia.
+    La regla futura debe distinguir salida logística y facturación, conservar
+    la identidad de Entrega y no inventar relaciones ni números de Pedido.
+
+Los anexos siguientes contienen SELECT ejecutados y resultados registrados.
+Los fallos se conservan explícitos. No se presentan como ausencias de documentos.
+
+======================================================================
+ANEXO A. PARÁMETROS Y SELECT EJECUTADOS
+======================================================================
+
+Los parámetros se enlazaron con mssql; no se concatenaron números/folios del
+usuario dentro de las consultas. No se incluyen credenciales.
+
+Parámetros del caso:
+    @numero = 101475685 (Int en SAP/R1; texto en la consulta local).
+    @pedido = 961461 (Int).
+    @numTexto = '101475685' (NVarChar).
+    @folio = 'SPSS03PE390619' (NVarChar).
+    @cotizacion = 'SPSS04CO60265' (NVarChar).
+
+Ventana de consultas iniciales de septiembre:
+    @desde = 2026-09-01; @hasta = 2026-09-17 (Date).
+    Incluye desde @desde; excluye @hasta.
+
+Ventana de consultas con sufijo _historico, parciales y multiples:
+    @desde = 2000-01-01; @hasta = 2026-09-17 (Date).
+
+Consultas finales acotadas:
+    Entregas 6000–6669 para una búsqueda parcial desde Pedido.
+    Últimas 500/1000 Entregas para otros intentos.
+    El agregado multiplesHistoricoFinal no restringe por fecha, sí por
+    CANCELED N y BaseType 17/23.
+
+Local:
+    @r1 = 'R1:TSPS01:SPSS03PE390619'.
+    @pedidoSap = 'SAP:961461'.
+    @entregaSap = 'SAP:6669' (búsqueda de compatibilidad, no identidad futura).
+
+SAP: límite de conexión 5000 ms; consultas 15000 ms en general.
+Últimos reintentos: límite de consulta 8000 ms.
+R1: límites de consulta 10000/15000 ms según lote.
+Local: 10000 ms.
+Los tiempos registrados por el script incluyen espera de conexión/pool.
+
+Consulta inicial general de metadatos SAP:
+La salida fue demasiado extensa y quedó truncada en consola. Posteriormente se
+repitió con filtro de columnas. No se incluye aquí una supuesta salida completa.
+
+SELECT t.name tabla,c.name campo,ty.name tipo
+FROM sys.objects t
+JOIN sys.columns c ON c.object_id=t.object_id
+JOIN sys.types ty ON ty.user_type_id=c.user_type_id
+WHERE t.name IN ('OQUT','QUT1','ORDR','RDR1','ODLN','DLN1','OINV','INV1',
+'OINM','OIVL','ORDN','RDN1','ORIN','RIN1','OITM','OITW','OADM','ADOC')
+ORDER BY t.name,c.column_id;
+
+
+--- SELECT 1. SAP: schema ---
+
+SELECT o.name tabla,c.name campo,ty.name tipo FROM sys.objects o JOIN sys.columns c ON c.object_id=o.object_id JOIN sys.types ty ON ty.user_type_id=c.user_type_id WHERE o.name IN ('OQUT','QUT1','ORDR','RDR1','ODLN','DLN1','OINV','INV1','OINM','OIVL','ORDN','RDN1','ORIN','RIN1') AND c.name IN ('DocEntry','DocNum','ObjType','DocStatus','CANCELED','CardCode','CardName','SlpCode','DocDate','DocTime','CreateDate','CreateTS','UpdateDate','UpdateTS','UserSign','UserSign2','NumAtCard','Ref1','Ref2','Comments','InvntSttus','DocType','TransId','LineNum','BaseType','BaseEntry','BaseLine','TargetType','TrgetEntry','ItemCode','Dscription','Quantity','OpenQty','InvQty','OpenInvQty','NumPerMsr','WhsCode','LineStatus','NoInvtryMv','TransNum','TransType','CreatedBy','BASE_REF','DocLineNum','Warehouse','InQty','OutQty','TransValue','TransSeq','LocCode','U_Entregado') ORDER BY o.name,c.column_id;
+
+Resultado: 325 filas; tiempo total 197 ms.
+
+--- SELECT 2. SAP: documento ---
+
+SELECT 'OQUT' tabla,DocEntry,DocNum,ObjType,DocStatus,CANCELED,CardCode,CardName,SlpCode,DocDate,DocTime,CreateDate,UpdateDate,UserSign,UserSign2,NumAtCard,Ref1,Ref2 FROM OQUT WHERE DocNum=@numero UNION ALL SELECT 'ORDR',DocEntry,DocNum,ObjType,DocStatus,CANCELED,CardCode,CardName,SlpCode,DocDate,DocTime,CreateDate,UpdateDate,UserSign,UserSign2,NumAtCard,Ref1,Ref2 FROM ORDR WHERE DocNum=@numero UNION ALL SELECT 'ODLN',DocEntry,DocNum,ObjType,DocStatus,CANCELED,CardCode,CardName,SlpCode,DocDate,DocTime,CreateDate,UpdateDate,UserSign,UserSign2,NumAtCard,Ref1,Ref2 FROM ODLN WHERE DocNum=@numero UNION ALL SELECT 'OINV',DocEntry,DocNum,ObjType,DocStatus,CANCELED,CardCode,CardName,SlpCode,DocDate,DocTime,CreateDate,UpdateDate,UserSign,UserSign2,NumAtCard,Ref1,Ref2 FROM OINV WHERE DocNum=@numero;
+
+Resultado: 1 filas; tiempo total 397 ms.
+
+--- SELECT 3. SAP: cabeceraCaso ---
+
+SELECT o.DocEntry,o.DocNum,o.ObjType,o.DocStatus,o.CANCELED,o.InvntSttus,o.CardCode,o.CardName,c.GroupCode,g.GroupName,o.SlpCode,s.SlpName,o.DocDate,o.DocTime,o.CreateDate,o.CreateTS,o.UpdateDate,o.UpdateTS,o.UserSign,u.USER_CODE usuarioCreacion,u.U_NAME nombreUsuarioCreacion,o.UserSign2,u2.USER_CODE usuarioActualizacion,o.NumAtCard,o.Ref1,o.Ref2,o.Comments,o.U_SO1_01RETAILONE FROM ORDR o LEFT JOIN OCRD c ON c.CardCode=o.CardCode LEFT JOIN OCRG g ON g.GroupCode=c.GroupCode LEFT JOIN OSLP s ON s.SlpCode=o.SlpCode LEFT JOIN OUSR u ON u.USERID=o.UserSign LEFT JOIN OUSR u2 ON u2.USERID=o.UserSign2 WHERE o.DocNum=@numero;
+
+Resultado: 1 filas; tiempo total 80 ms.
+
+--- SELECT 4. SAP: lineasCaso ---
+
+SELECT l.DocEntry,l.LineNum,l.ItemCode,l.Dscription,l.Quantity,l.OpenQty,l.InvQty,l.OpenInvQty,l.NumPerMsr,l.WhsCode,w.WhsName,l.LineStatus,l.BaseType,l.BaseEntry,l.BaseLine,l.TargetType,l.TrgetEntry,l.NoInvtryMv,l.U_Entregado FROM RDR1 l LEFT JOIN OWHS w ON w.WhsCode=l.WhsCode WHERE l.DocEntry=@pedido ORDER BY l.LineNum;
+
+Resultado: 2 filas; tiempo total 18 ms.
+
+--- SELECT 5. SAP: basesCaso ---
+
+SELECT DISTINCT q.DocEntry,q.DocNum,q.ObjType,q.DocStatus,q.CANCELED,q.CardCode,q.CardName,q.SlpCode,s.SlpName,q.DocDate,q.DocTime,q.CreateDate,q.CreateTS,q.UpdateDate,q.UserSign,q.UserSign2,q.NumAtCard FROM OQUT q JOIN RDR1 l ON l.BaseType=23 AND l.BaseEntry=q.DocEntry LEFT JOIN OSLP s ON s.SlpCode=q.SlpCode WHERE l.DocEntry=@pedido;
+
+Resultado: 0 filas; tiempo total 28 ms.
+
+--- SELECT 6. SAP: destinosCaso ---
+
+SELECT 'DLN1' tabla,h.DocEntry,h.DocNum,h.ObjType,h.DocStatus,h.CANCELED,h.CardCode,h.CardName,h.SlpCode,h.DocDate,h.DocTime,h.CreateDate,h.CreateTS,h.UpdateDate,h.UserSign,h.UserSign2,h.NumAtCard,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,l.InvQty,l.OpenQty,l.WhsCode,l.TargetType,l.TrgetEntry FROM DLN1 l JOIN ODLN h ON h.DocEntry=l.DocEntry WHERE l.BaseType=17 AND l.BaseEntry=@pedido UNION ALL SELECT 'INV1',h.DocEntry,h.DocNum,h.ObjType,h.DocStatus,h.CANCELED,h.CardCode,h.CardName,h.SlpCode,h.DocDate,h.DocTime,h.CreateDate,h.CreateTS,h.UpdateDate,h.UserSign,h.UserSign2,h.NumAtCard,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,l.InvQty,l.OpenQty,l.WhsCode,l.TargetType,l.TrgetEntry FROM INV1 l JOIN OINV h ON h.DocEntry=l.DocEntry WHERE l.BaseType=17 AND l.BaseEntry=@pedido;
+
+Resultado: 0 filas; tiempo total 37 ms.
+
+--- SELECT 7. SAP: referencias ---
+
+SELECT 'OQUT' tabla,DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2 FROM OQUT WHERE NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio) UNION ALL SELECT 'ORDR',DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2 FROM ORDR WHERE NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio) UNION ALL SELECT 'ODLN',DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2 FROM ODLN WHERE NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio) UNION ALL SELECT 'OINV',DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2 FROM OINV WHERE NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio);
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 8. SAP: udfEntrega ---
+
+SELECT TableID,FieldID,AliasID,Descr,TypeID,EditType FROM CUFD WHERE TableID IN ('ORDR','RDR1','ODLN','DLN1','OQUT','QUT1','OINV','INV1','@SO1_01VENTA') AND (AliasID LIKE '%ENTREG%' OR AliasID LIKE '%VERIFIC%' OR AliasID LIKE '%STATUS%' OR AliasID LIKE '%RETAIL%' OR AliasID LIKE '%DOCUMENTOSBO%') ORDER BY TableID,FieldID;
+
+Resultado: 19 filas; tiempo total 56 ms.
+
+--- SELECT 9. SAP: patronesEntregas ---
+
+SELECT h.CANCELED,h.DocStatus,l.BaseType,COUNT_BIG(*) lineas,COUNT(DISTINCT h.DocEntry) documentos FROM ODLN h JOIN DLN1 l ON l.DocEntry=h.DocEntry WHERE h.DocDate>=@desde AND h.DocDate<@hasta GROUP BY h.CANCELED,h.DocStatus,l.BaseType ORDER BY h.CANCELED,h.DocStatus,l.BaseType;
+
+Resultado: 2 filas; tiempo total 150 ms.
+
+--- SELECT 10. SAP: cotizacionEntrega ---
+
+SELECT DISTINCT TOP (4) q.DocEntry cotizacionEntry,q.DocNum cotizacionNum,d.DocEntry entregaEntry,d.DocNum entregaNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,s.SlpName vendedor,(SELECT COUNT(DISTINCT r.DocEntry) FROM RDR1 r WHERE r.BaseType=23 AND r.BaseEntry=q.DocEntry) pedidosRelacionados,(SELECT COUNT(DISTINCT i.DocEntry) FROM INV1 i JOIN OINV ih ON ih.DocEntry=i.DocEntry WHERE i.BaseType=15 AND i.BaseEntry=d.DocEntry AND ih.CANCELED='N') facturasVigentes FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry JOIN OQUT q ON l.BaseType=23 AND l.BaseEntry=q.DocEntry LEFT JOIN OSLP s ON s.SlpCode=d.SlpCode WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta ORDER BY d.DocEntry DESC;
+
+Resultado: 1 filas; tiempo total 166 ms.
+
+--- SELECT 11. SAP: entregaSinBase ---
+
+SELECT TOP (3) d.DocEntry,d.DocNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.CardCode,d.SlpCode,COUNT(*) lineas FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta AND NOT EXISTS (SELECT 1 FROM DLN1 b WHERE b.DocEntry=d.DocEntry AND b.BaseType<>-1) GROUP BY d.DocEntry,d.DocNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.CardCode,d.SlpCode ORDER BY d.DocEntry DESC;
+
+Resultado: 0 filas; tiempo total 72 ms.
+
+--- SELECT 12. SAP: entregaCancelada ---
+
+SELECT TOP (4) d.DocEntry,d.DocNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.CardCode,d.Comments FROM ODLN d WHERE d.CANCELED<>'N' AND d.DocDate>=@desde AND d.DocDate<@hasta ORDER BY d.DocEntry DESC;
+
+Resultado: 0 filas; tiempo total 28 ms.
+
+--- SELECT 13. SAP: pedidoEntregaSinFactura ---
+
+SELECT DISTINCT TOP (3) r.DocEntry pedidoEntry,r.DocNum pedidoNum,d.DocEntry entregaEntry,d.DocNum entregaNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,l.BaseType,l.BaseEntry FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry JOIN ORDR r ON l.BaseType=17 AND l.BaseEntry=r.DocEntry WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta AND NOT EXISTS (SELECT 1 FROM INV1 i JOIN OINV h ON h.DocEntry=i.DocEntry WHERE i.BaseType=15 AND i.BaseEntry=d.DocEntry AND h.CANCELED='N') ORDER BY d.DocEntry DESC;
+
+Resultado: 2 filas; tiempo total 145 ms.
+
+--- SELECT 14. SAP: cadenaCompleta ---
+
+SELECT DISTINCT TOP (3) q.DocEntry cotizacionEntry,q.DocNum cotizacionNum,r.DocEntry pedidoEntry,r.DocNum pedidoNum,d.DocEntry entregaEntry,d.DocNum entregaNum,i.DocEntry facturaEntry,i.DocNum facturaNum FROM ODLN d JOIN DLN1 dl ON dl.DocEntry=d.DocEntry JOIN ORDR r ON dl.BaseType=17 AND dl.BaseEntry=r.DocEntry JOIN RDR1 rl ON rl.DocEntry=r.DocEntry AND rl.LineNum=dl.BaseLine JOIN OQUT q ON rl.BaseType=23 AND rl.BaseEntry=q.DocEntry JOIN INV1 il ON il.BaseType=15 AND il.BaseEntry=d.DocEntry AND il.BaseLine=dl.LineNum JOIN OINV i ON i.DocEntry=il.DocEntry AND i.CANCELED='N' WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta ORDER BY d.DocEntry DESC;
+
+Resultado: 0 filas; tiempo total 85 ms.
+
+--- SELECT 15. SAP: cotizacion160052 ---
+
+SELECT q.DocEntry,q.DocNum,q.ObjType,q.DocStatus,q.CANCELED,q.InvntSttus,q.CardCode,q.CardName,q.SlpCode,s.SlpName,q.DocDate,q.DocTime,q.CreateDate,q.CreateTS,q.UpdateDate,q.UpdateTS,q.UserSign,u.USER_CODE usuarioCreacion,q.UserSign2,q.NumAtCard,q.Ref1,q.Ref2,q.Comments,q.U_SO1_01RETAILONE,q.U_SO1_01FOLIORETAIL1 FROM OQUT q LEFT JOIN OSLP s ON s.SlpCode=q.SlpCode LEFT JOIN OUSR u ON u.USERID=q.UserSign WHERE q.DocEntry=160052;
+
+Resultado: 1 filas; tiempo total 61 ms.
+
+--- SELECT 16. SAP: lineasCotizacion160052 ---
+
+SELECT DocEntry,LineNum,ItemCode,Dscription,Quantity,OpenQty,InvQty,OpenInvQty,WhsCode,LineStatus,BaseType,BaseEntry,BaseLine,TargetType,TrgetEntry,U_Entregado FROM QUT1 WHERE DocEntry=160052 ORDER BY LineNum;
+
+Resultado: 2 filas; tiempo total 23 ms.
+
+--- SELECT 17. SAP: entrega6669 ---
+
+SELECT d.DocEntry,d.DocNum,d.ObjType,d.DocStatus,d.CANCELED,d.InvntSttus,d.DocType,d.CardCode,d.CardName,d.SlpCode,s.SlpName,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.UpdateDate,d.UpdateTS,d.UserSign,u.USER_CODE usuarioCreacion,d.UserSign2,d.NumAtCard,d.Ref1,d.Ref2,d.Comments,d.TransId,d.U_SO1_01RETAILONE,d.U_SO1_01FOLIORETAIL1 FROM ODLN d LEFT JOIN OSLP s ON s.SlpCode=d.SlpCode LEFT JOIN OUSR u ON u.USERID=d.UserSign WHERE d.DocEntry=6669;
+
+Resultado: 1 filas; tiempo total 19 ms.
+
+--- SELECT 18. SAP: lineasEntrega6669 ---
+
+SELECT DocEntry,LineNum,ItemCode,Dscription,Quantity,OpenQty,InvQty,OpenInvQty,NumPerMsr,WhsCode,LineStatus,BaseType,BaseEntry,BaseLine,TargetType,TrgetEntry,NoInvtryMv,U_Entregado FROM DLN1 WHERE DocEntry=6669 ORDER BY LineNum;
+
+Resultado: 2 filas; tiempo total 10 ms.
+
+--- SELECT 19. SAP: facturasEntrega6669 ---
+
+SELECT h.DocEntry,h.DocNum,h.DocStatus,h.CANCELED,h.DocDate,h.DocTime,h.CreateDate,h.CreateTS,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity FROM OINV h JOIN INV1 l ON l.DocEntry=h.DocEntry WHERE l.BaseType=15 AND l.BaseEntry=6669;
+
+Resultado: 0 filas; tiempo total 21 ms.
+
+--- SELECT 20. SAP: movimiento6669 ---
+
+SELECT TransNum,TransType,CreatedBy,BASE_REF,DocLineNum,ItemCode,Dscription,Warehouse,InQty,OutQty,DocDate,DocTime,CreateDate,TransValue,TransSeq FROM OINM WHERE TransType=15 AND CreatedBy=6669 ORDER BY DocLineNum,TransSeq;
+
+Resultado: 2 filas; tiempo total 178 ms.
+
+--- SELECT 21. SAP: valoracion6669 ---
+
+SELECT TransSeq,TransType,CreatedBy,BASE_REF,DocLineNum,ItemCode,LocCode,InQty,OutQty,DocDate,CreateDate FROM OIVL WHERE TransType=15 AND CreatedBy=6669 ORDER BY DocLineNum,TransSeq;
+
+Resultado: 2 filas; tiempo total 13 ms.
+
+--- SELECT 22. SAP: reversion6669 ---
+
+SELECT 'ORDN' tabla,h.DocEntry,h.DocNum,h.CANCELED,h.DocStatus,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,l.WhsCode FROM ORDN h JOIN RDN1 l ON l.DocEntry=h.DocEntry WHERE l.BaseType=15 AND l.BaseEntry=6669 UNION ALL SELECT 'ORIN',h.DocEntry,h.DocNum,h.CANCELED,h.DocStatus,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,l.WhsCode FROM ORIN h JOIN RIN1 l ON l.DocEntry=h.DocEntry WHERE l.BaseType=15 AND l.BaseEntry=6669;
+
+Resultado: 0 filas; tiempo total 53 ms.
+
+--- SELECT 23. SAP: referencesAcotadas ---
+
+SELECT 'OQUT' tabla,DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2,U_SO1_01FOLIORETAIL1 FROM OQUT WHERE DocDate>=@desde AND DocDate<@hasta AND (NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio) OR U_SO1_01FOLIORETAIL1=@folio) UNION ALL SELECT 'ODLN',DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2,U_SO1_01FOLIORETAIL1 FROM ODLN WHERE DocDate>=@desde AND DocDate<@hasta AND (NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio) OR U_SO1_01FOLIORETAIL1=@folio) UNION ALL SELECT 'OINV',DocEntry,DocNum,ObjType,DocStatus,CANCELED,NumAtCard,Ref1,Ref2,U_SO1_01FOLIORETAIL1 FROM OINV WHERE DocDate>=@desde AND DocDate<@hasta AND (NumAtCard IN (@numTexto,@folio) OR Ref1 IN (@numTexto,@folio) OR Ref2 IN (@numTexto,@folio) OR U_SO1_01FOLIORETAIL1=@folio);
+
+Resultado: 0 filas; tiempo total 263 ms.
+
+--- SELECT 24. SAP: patronesEntregas_historico ---
+
+SELECT h.CANCELED,h.DocStatus,l.BaseType,COUNT_BIG(*) lineas,COUNT(DISTINCT h.DocEntry) documentos FROM ODLN h JOIN DLN1 l ON l.DocEntry=h.DocEntry WHERE h.DocDate>=@desde AND h.DocDate<@hasta GROUP BY h.CANCELED,h.DocStatus,l.BaseType ORDER BY h.CANCELED,h.DocStatus,l.BaseType;
+
+Resultado: 5 filas; tiempo total 1171 ms.
+
+--- SELECT 25. SAP: cotizacionEntrega_historico ---
+
+SELECT DISTINCT TOP (6) q.DocEntry cotizacionEntry,q.DocNum cotizacionNum,d.DocEntry entregaEntry,d.DocNum entregaNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,s.SlpName vendedor,(SELECT COUNT(DISTINCT r.DocEntry) FROM RDR1 r WHERE r.BaseType=23 AND r.BaseEntry=q.DocEntry) pedidosRelacionados,(SELECT COUNT(DISTINCT i.DocEntry) FROM INV1 i JOIN OINV ih ON ih.DocEntry=i.DocEntry WHERE i.BaseType=15 AND i.BaseEntry=d.DocEntry AND ih.CANCELED='N') facturasVigentes FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry JOIN OQUT q ON l.BaseType=23 AND l.BaseEntry=q.DocEntry LEFT JOIN OSLP s ON s.SlpCode=d.SlpCode WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta ORDER BY d.DocEntry DESC;
+
+Resultado: 5 filas; tiempo total 246 ms.
+
+--- SELECT 26. SAP: entregaSinBase_historico ---
+
+SELECT TOP (2) d.DocEntry,d.DocNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.CardCode,d.SlpCode,COUNT(*) lineas FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta AND NOT EXISTS (SELECT 1 FROM DLN1 b WHERE b.DocEntry=d.DocEntry AND b.BaseType<>-1) GROUP BY d.DocEntry,d.DocNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.CardCode,d.SlpCode ORDER BY d.DocEntry DESC;
+
+Resultado: 2 filas; tiempo total 104 ms.
+
+--- SELECT 27. SAP: entregaCancelada_historico ---
+
+SELECT TOP (6) d.DocEntry,d.DocNum,d.DocStatus,d.CANCELED,d.DocDate,d.DocTime,d.CreateDate,d.CreateTS,d.CardCode,d.Comments FROM ODLN d WHERE d.CANCELED<>'N' AND d.DocDate>=@desde AND d.DocDate<@hasta ORDER BY d.DocEntry DESC;
+
+Resultado: 0 filas; tiempo total 43 ms.
+
+--- SELECT 28. SAP: cadenaCompleta_historico ---
+
+SELECT DISTINCT TOP (2) q.DocEntry cotizacionEntry,q.DocNum cotizacionNum,r.DocEntry pedidoEntry,r.DocNum pedidoNum,d.DocEntry entregaEntry,d.DocNum entregaNum,i.DocEntry facturaEntry,i.DocNum facturaNum FROM ODLN d JOIN DLN1 dl ON dl.DocEntry=d.DocEntry JOIN ORDR r ON dl.BaseType=17 AND dl.BaseEntry=r.DocEntry JOIN RDR1 rl ON rl.DocEntry=r.DocEntry AND rl.LineNum=dl.BaseLine JOIN OQUT q ON rl.BaseType=23 AND rl.BaseEntry=q.DocEntry JOIN INV1 il ON il.BaseType=15 AND il.BaseEntry=d.DocEntry AND il.BaseLine=dl.LineNum JOIN OINV i ON i.DocEntry=il.DocEntry AND i.CANCELED='N' WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta ORDER BY d.DocEntry DESC;
+
+Resultado: 2 filas; tiempo total 2444 ms.
+
+--- SELECT 29. SAP: parciales ---
+
+SELECT TOP (5) d.DocEntry entregaEntry,d.DocNum entregaNum,d.DocStatus,d.DocDate,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity cantidadEntrega,l.InvQty unidadesInventarioEntrega,r.Quantity cantidadPedido,r.OpenQty pendientePedido,r.InvQty unidadesInventarioPedido,q.Quantity cantidadCotizacion,q.OpenQty pendienteCotizacion,q.InvQty unidadesInventarioCotizacion FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry LEFT JOIN RDR1 r ON l.BaseType=17 AND l.BaseEntry=r.DocEntry AND l.BaseLine=r.LineNum LEFT JOIN QUT1 q ON l.BaseType=23 AND l.BaseEntry=q.DocEntry AND l.BaseLine=q.LineNum WHERE d.CANCELED='N' AND d.DocDate>=@desde AND d.DocDate<@hasta AND l.InvQty<COALESCE(r.InvQty,q.InvQty) ORDER BY d.DocEntry DESC;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 30. SAP: multiples ---
+
+SELECT TOP (5) l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,COUNT(DISTINCT l.DocEntry) numeroEntregas,SUM(l.Quantity) cantidadEntregada,SUM(l.InvQty) inventarioEntregado,MIN(h.DocDate) primeraFecha,MAX(h.DocDate) ultimaFecha FROM DLN1 l JOIN ODLN h ON h.DocEntry=l.DocEntry WHERE h.CANCELED='N' AND h.DocDate>=@desde AND h.DocDate<@hasta AND l.BaseType IN (17,23) GROUP BY l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode HAVING COUNT(DISTINCT l.DocEntry)>1 ORDER BY MAX(h.DocEntry) DESC;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 31. SAP: indices ---
+
+SELECT o.name tabla,i.name indice,i.type_desc,i.is_unique,i.has_filter,i.filter_definition,ic.key_ordinal,ic.is_included_column,c.name campo FROM sys.objects o JOIN sys.indexes i ON i.object_id=o.object_id JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE o.name IN ('OQUT','ORDR','ODLN','OINV','QUT1','RDR1','DLN1','INV1','OIVL') AND i.index_id>0 AND (i.is_primary_key=1 OR i.name LIKE '%BASE%' OR i.name LIKE '%DOC%' OR i.name LIKE '%DATE%' OR c.name IN ('BaseType','BaseEntry','BaseLine','CreatedBy','TransType','DocLineNum','TransSeq')) ORDER BY o.name,i.index_id,ic.key_ordinal,ic.index_column_id;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 32. SAP: udfValores ---
+
+SELECT f.TableID,f.AliasID,f.Descr,v.FldValue,v.Descr valorDescripcion FROM CUFD f LEFT JOIN UFD1 v ON v.TableID=f.TableID AND v.FieldID=f.FieldID WHERE f.TableID IN ('QUT1','RDR1','DLN1','INV1','@SO1_01VENTA') AND f.AliasID IN ('Entregado','SO1_VERIFICADO','SO1_STATUS','SO1_TIPO','SO1_FACTURA') ORDER BY f.TableID,f.FieldID,v.IndexID;
+
+Resultado: 48 filas; tiempo total 7978 ms.
+
+--- SELECT 33. SAP: existenciasCaso ---
+
+SELECT p.ItemCode,p.WhsCode,p.TransSeq,m.InQty,m.OutQty,(SELECT SUM(v.InQty-v.OutQty) FROM OIVL v WHERE v.ItemCode=p.ItemCode AND v.LocCode=p.WhsCode AND v.TransSeq<p.TransSeq) saldoContableAntes,(SELECT SUM(v.InQty-v.OutQty) FROM OIVL v WHERE v.ItemCode=p.ItemCode AND v.LocCode=p.WhsCode AND v.TransSeq<=p.TransSeq) saldoContableDespues,w.OnHand existenciaActual FROM (SELECT 'YAM-MODX7' ItemCode,'TSPS01' WhsCode,2983881 TransSeq UNION ALL SELECT 'YAM-PA150','BSPS03',2983882) p JOIN OIVL m ON m.TransSeq=p.TransSeq LEFT JOIN OITW w ON w.ItemCode=p.ItemCode AND w.WhsCode=p.WhsCode;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 34. SAP: movimientoPedido961461 ---
+
+SELECT TransType,CreatedBy,DocLineNum,ItemCode,Warehouse,InQty,OutQty,DocDate,DocTime FROM OINM WHERE CreatedBy=@pedido AND TransType=17;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 35. SAP: otrasRelacionesCotizacion ---
+
+SELECT 'RDR1' tabla,l.DocEntry,h.DocNum,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,h.CANCELED FROM RDR1 l JOIN ORDR h ON h.DocEntry=l.DocEntry WHERE l.BaseType=23 AND l.BaseEntry=160052 UNION ALL SELECT 'INV1',l.DocEntry,h.DocNum,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,h.CANCELED FROM INV1 l JOIN OINV h ON h.DocEntry=l.DocEntry WHERE l.BaseType=23 AND l.BaseEntry=160052;
+
+Resultado: 0 filas; tiempo total 12816 ms.
+
+--- SELECT 36. SAP: fechaServidor ---
+
+SELECT DB_NAME() baseDatos,GETDATE() fechaServidor,SYSDATETIMEOFFSET() fechaServidorZona;
+
+Resultado: 1 filas; tiempo total 453 ms.
+
+--- SELECT 37. SAP: parcialesAcotadas ---
+
+SELECT TOP (5) d.DocEntry entregaEntry,d.DocNum entregaNum,d.DocStatus,d.DocDate,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.InvQty inventarioEntrega,r.InvQty inventarioPedido,r.OpenInvQty pendientePedido,q.InvQty inventarioCotizacion,q.OpenInvQty pendienteCotizacion FROM (SELECT TOP (500) DocEntry,DocNum,DocStatus,DocDate FROM ODLN WHERE CANCELED='N' ORDER BY DocEntry DESC) d JOIN DLN1 l ON l.DocEntry=d.DocEntry LEFT JOIN RDR1 r ON l.BaseType=17 AND l.BaseEntry=r.DocEntry AND l.BaseLine=r.LineNum LEFT JOIN QUT1 q ON l.BaseType=23 AND l.BaseEntry=q.DocEntry AND l.BaseLine=q.LineNum WHERE l.InvQty<COALESCE(r.InvQty,q.InvQty) ORDER BY d.DocEntry DESC;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 38. SAP: multiplesAcotadas ---
+
+SELECT TOP (5) l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,COUNT(DISTINCT l.DocEntry) numeroEntregas,SUM(l.InvQty) inventarioEntregado,MIN(l.DocEntry) entregaEntryMin,MAX(l.DocEntry) entregaEntryMax FROM DLN1 l WHERE l.DocEntry IN (SELECT TOP (1000) DocEntry FROM ODLN WHERE CANCELED='N' ORDER BY DocEntry DESC) AND l.BaseType IN (17,23) GROUP BY l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode HAVING COUNT(DISTINCT l.DocEntry)>1 ORDER BY MAX(l.DocEntry) DESC;
+
+Resultado: 0 filas; tiempo total 9843 ms.
+
+--- SELECT 39. SAP: indicesAcotados ---
+
+SELECT OBJECT_NAME(i.object_id) tabla,i.name indice,i.type_desc,i.is_unique,ic.key_ordinal,c.name campo FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE i.object_id IN (OBJECT_ID('dbo.ODLN'),OBJECT_ID('dbo.DLN1'),OBJECT_ID('dbo.INV1'),OBJECT_ID('dbo.OIVL')) AND ic.key_ordinal>0 ORDER BY tabla,i.index_id,ic.key_ordinal;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 40. SAP: muestrasInventario ---
+
+SELECT h.DocEntry,h.DocNum,h.DocStatus,h.CANCELED,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity,l.InvQty,l.WhsCode,l.TargetType,l.TrgetEntry,l.U_Entregado,m.TransType,m.CreatedBy,m.DocLineNum,m.InQty,m.OutQty,m.TransSeq FROM ODLN h JOIN DLN1 l ON l.DocEntry=h.DocEntry LEFT JOIN OIVL m ON m.TransType=15 AND m.CreatedBy=h.DocEntry AND m.DocLineNum=l.LineNum AND m.ItemCode=l.ItemCode AND m.LocCode=l.WhsCode WHERE h.DocEntry IN (6432,4198,1164,4432,6618) ORDER BY h.DocEntry,l.LineNum,m.TransSeq;
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 41. SAP: facturasMuestras ---
+
+SELECT h.DocEntry,h.DocNum,h.DocStatus,h.CANCELED,h.DocDate,h.DocTime,h.CreateDate,h.CreateTS,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.Quantity FROM INV1 l JOIN OINV h ON h.DocEntry=l.DocEntry WHERE l.BaseType=15 AND l.BaseEntry IN (6432,4198,1164,4432,6618) ORDER BY l.BaseEntry,l.BaseLine;
+
+Resultado: 5 filas; tiempo total 8508 ms.
+
+--- SELECT 42. SAP: reversosMuestras ---
+
+SELECT 'ORDN' tabla,h.DocEntry,h.DocNum,h.CANCELED,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.InvQty FROM RDN1 l JOIN ORDN h ON h.DocEntry=l.DocEntry WHERE l.BaseType=15 AND l.BaseEntry IN (6432,4198,1164,4432,6669) UNION ALL SELECT 'ORIN',h.DocEntry,h.DocNum,h.CANCELED,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.InvQty FROM RIN1 l JOIN ORIN h ON h.DocEntry=l.DocEntry WHERE l.BaseType=15 AND l.BaseEntry IN (6432,4198,1164,4432,6669);
+
+Resultado: ERROR: Timeout: Request failed to complete in 15000ms.
+
+--- SELECT 43. SAP: existenciaActual ---
+
+SELECT ItemCode,WhsCode,OnHand FROM OITW WHERE (ItemCode='YAM-MODX7' AND WhsCode='TSPS01') OR (ItemCode='YAM-PA150' AND WhsCode='BSPS03');
+
+Resultado: 2 filas; tiempo total 130 ms.
+
+--- SELECT 44. SAP: inventarioTresAntecedentes ---
+
+SELECT TransSeq,TransType,CreatedBy,BASE_REF,DocLineNum,ItemCode,LocCode,InQty,OutQty,DocDate FROM OIVL WHERE TransType=15 AND CreatedBy IN (6432,4198,1164,4432) ORDER BY CreatedBy,DocLineNum,TransSeq;
+
+Resultado: ERROR: Failed to connect to 192.168.10.140:1433 in 5000ms.
+
+--- SELECT 45. SAP: cantidadesEntregasRecientes ---
+
+SELECT d.DocEntry entregaEntry,d.DocNum entregaNum,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.InvQty inventarioEntrega,r.InvQty inventarioOrigen,r.OpenInvQty pendienteOrigen FROM ODLN d JOIN DLN1 l ON l.DocEntry=d.DocEntry LEFT JOIN RDR1 r ON l.BaseType=17 AND l.BaseEntry=r.DocEntry AND l.BaseLine=r.LineNum WHERE d.DocEntry IN (6667,6668) ORDER BY d.DocEntry,l.LineNum;
+
+Resultado: 8 filas; tiempo total 18956 ms.
+
+--- SELECT 46. SAP: inventarioTresAntecedentes_reintento ---
+
+SELECT TransSeq,TransType,CreatedBy,BASE_REF,DocLineNum,ItemCode,LocCode,InQty,OutQty,DocDate FROM OIVL WHERE TransType=15 AND CreatedBy IN (6432,4198,1164,4432) ORDER BY CreatedBy,DocLineNum,TransSeq;
+
+Resultado: 14 filas; tiempo total 2592 ms.
+
+--- SELECT 47. SAP: parcialPedidoAcotadaFinal ---
+
+SELECT TOP (3) h.DocEntry entregaEntry,h.DocNum entregaNum,l.LineNum,l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,l.InvQty unidadesEntrega,r.InvQty unidadesOrigen,r.OpenInvQty pendienteOrigen FROM DLN1 l JOIN RDR1 r ON l.BaseType=17 AND r.DocEntry=l.BaseEntry AND r.LineNum=l.BaseLine JOIN ODLN h ON h.DocEntry=l.DocEntry WHERE l.DocEntry BETWEEN 6000 AND 6669 AND h.CANCELED='N' AND l.InvQty<r.InvQty ORDER BY l.DocEntry DESC;
+
+Resultado: 0 filas; tiempo total 4326 ms.
+
+--- SELECT 48. SAP: multiplesHistoricoFinal ---
+
+SELECT TOP (3) l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode,COUNT(DISTINCT l.DocEntry) entregas,SUM(l.InvQty) inventarioEntregado,MIN(l.DocEntry) primeraEntry,MAX(l.DocEntry) ultimaEntry FROM DLN1 l JOIN ODLN h ON h.DocEntry=l.DocEntry WHERE l.BaseType IN (17,23) AND h.CANCELED='N' GROUP BY l.BaseType,l.BaseEntry,l.BaseLine,l.ItemCode HAVING COUNT(DISTINCT l.DocEntry)>1 ORDER BY MAX(l.DocEntry) DESC;
+
+Resultado: 0 filas; tiempo total 3947 ms.
+
+--- SELECT 49. SAP: indicesDeliveryFinal ---
+
+SELECT i.name indice,i.type_desc,i.is_unique,ic.key_ordinal,c.name campo FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE i.object_id=OBJECT_ID('dbo.DLN1') AND ic.key_ordinal>0 ORDER BY i.index_id,ic.key_ordinal;
+
+Resultado: ERROR: Timeout: Request failed to complete in 8000ms.
+
+--- SELECT 50. R1: R1Caso ---
+
+SELECT v.Code,v.Name,v.U_SO1_DOCUMENTOSBO,v.U_SO1_TIPO,v.U_SO1_VERIFICADO,v.U_SO1_STATUS,v.U_SO1_SINCRONIZADO,v.U_SO1_FECHA,v.U_SO1_HORA,v.U_SO1_VENDEDOR,s.SlpName,v.U_SO1_SUCURSAL FROM [@SO1_01VENTA] v LEFT JOIN OSLP s ON s.SlpCode=v.U_SO1_VENDEDOR WHERE v.Name=@folio OR v.U_SO1_DOCUMENTOSBO=@numero;
+
+Resultado: 1 filas; tiempo total 79 ms.
+
+--- SELECT 51. R1: R1Lineas ---
+
+SELECT d.U_SO1_FOLIO,d.U_SO1_NUMPARTIDA,d.U_SO1_NUMEROARTICULO,d.U_SO1_DESCRIPCION,d.U_SO1_CANTIDAD,d.U_SO1_ALMACEN FROM [@SO1_01VENTADETALLE] d WHERE d.U_SO1_FOLIO=@folio ORDER BY d.U_SO1_NUMPARTIDA;
+
+Resultado: 2 filas; tiempo total 19 ms.
+
+--- SELECT 52. R1: R1Udf ---
+
+SELECT f.TableID,f.FieldID,f.AliasID,f.Descr,v.FldValue,v.Descr valorDescripcion FROM CUFD f LEFT JOIN UFD1 v ON v.TableID=f.TableID AND v.FieldID=f.FieldID WHERE f.TableID='@SO1_01VENTA' AND f.AliasID IN ('SO1_VERIFICADO','SO1_STATUS','SO1_TIPO','SO1_DOCUMENTOSBO','SO1_SINCRONIZADO') ORDER BY f.FieldID,v.IndexID;
+
+Resultado: 0 filas; tiempo total 23 ms.
+
+--- SELECT 53. R1: R1CamposEntrega ---
+
+SELECT c.name campo,t.name tipo FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID('dbo.[@SO1_01VENTA]') AND (c.name LIKE '%ENTREG%' OR c.name LIKE '%VALID%' OR c.name LIKE '%FACT%' OR c.name LIKE '%FECHA%' OR c.name LIKE '%HORA%' OR c.name LIKE '%VERIFIC%');
+
+Resultado: 21 filas; tiempo total 48 ms.
+
+--- SELECT 54. R1: R1CotizacionYEntrega ---
+
+SELECT v.Name,v.U_SO1_DOCUMENTOSBO,v.U_SO1_TIPO,v.U_SO1_VERIFICADO,v.U_SO1_STATUS,v.U_SO1_FACTURA,v.U_SO1_FECHA,v.U_SO1_HORA,v.U_SO1_FECHAENTREGA,v.U_SO1_HORAENTREGA,v.U_SO1_FECHACIERREDOC,v.U_SO1_VENDEDOR FROM [@SO1_01VENTA] v WHERE v.Name IN (@folio,@cotizacion);
+
+Resultado: 2 filas; tiempo total 44 ms.
+
+--- SELECT 55. R1: R1EjemplosValidados ---
+
+SELECT TOP (3) Name,U_SO1_DOCUMENTOSBO,U_SO1_TIPO,U_SO1_VERIFICADO,U_SO1_STATUS,U_SO1_FACTURA,U_SO1_FECHA,U_SO1_HORA,U_SO1_FECHAENTREGA,U_SO1_HORAENTREGA FROM [@SO1_01VENTA] WHERE U_SO1_TIPO='PE' AND U_SO1_VERIFICADO='Y' AND U_SO1_FECHA>=@desde AND U_SO1_FECHA<@hasta ORDER BY U_SO1_FECHA DESC,U_SO1_HORA DESC;
+
+Resultado: 3 filas; tiempo total 16 ms.
+
+--- SELECT 56. R1: R1RelacionOrigenCampos ---
+
+SELECT c.name campo FROM sys.columns c WHERE c.object_id=OBJECT_ID('dbo.[@SO1_01VENTA]') AND (c.name LIKE '%BASE%' OR c.name LIKE '%ORIG%' OR c.name LIKE '%REF%' OR c.name LIKE '%PEDIDO%' OR c.name LIKE '%COTIZ%') ORDER BY c.column_id;
+
+Resultado: 7 filas.
+
+--- SELECT 57. R1: R1RelacionOrigenValores ---
+
+SELECT Name,U_SO1_DOCUMENTOSBO,U_SO1_TIPO,U_SO1_PEDIDO,U_SO1_REFERENCIA,U_SO1_ORIGENDOCUMENT,U_SO1_COMPONENORIGEN FROM [@SO1_01VENTA] WHERE Name IN (@folio,@cotizacion);
+
+Resultado: 2 filas.
+
+--- SELECT 58. PedidosBodega (solo lectura): asignacionesCaso ---
+
+SELECT idOrigen,identificadorDetalle,usuarioAsignado,nombreAsignado,creadoEn,actualizadoEn FROM dbo.AsignacionArticuloPedido WHERE idOrigen IN (@r1,@pedidoSap,@entregaSap);
+
+Resultado: 1 filas; tiempo total 36 ms.
+
+--- SELECT 59. PedidosBodega (solo lectura): despachosCaso ---
+
+SELECT idOrigen,origenPedido,folioPedido,sapDocEntry,numeroPedido,estadoLocal,despachadoEn,validadoDetectadoEn FROM dbo.PedidoDespachado WHERE idOrigen IN (@r1,@pedidoSap,@entregaSap) OR numeroPedido=@numero;
+
+Resultado: 1 filas; tiempo total 25 ms.
+
+======================================================================
+ANEXO B. RESULTADOS DE LECTURA
+======================================================================
+
+Se conservan valores relevantes en formato JSON legible. NULL no equivale a
+cero ni a falso. Filas vacías de una consulta completada se distinguen de error.
+Los valores económicos de TransValue se omiten: la evidencia requerida es la
+cantidad, identidad y dirección del movimiento, no su importe.
+Las fechas ISO de documentos sin zona deben interpretarse como se explicó en
+la sección 7; las auditorías propias pueden utilizar UTC y no son DocTime SAP.
+
+
+FUENTE: SAP
+
+Esquema filtrado: 325 campos verificados.
+DLN1: DocEntry (int), LineNum (int), TargetType (int), TrgetEntry (int), BaseType (int), BaseEntry (int), BaseLine (int), LineStatus (char), ItemCode (nvarchar), Dscription (nvarchar), Quantity (numeric), OpenQty (numeric), WhsCode (nvarchar), SlpCode (int), DocDate (datetime), InvntSttus (char), ObjType (nvarchar), NumPerMsr (numeric), LocCode (int), NoInvtryMv (char), InvQty (numeric), OpenInvQty (numeric), U_Entregado (smallint)
+INV1: DocEntry (int), LineNum (int), TargetType (int), TrgetEntry (int), BaseType (int), BaseEntry (int), BaseLine (int), LineStatus (char), ItemCode (nvarchar), Dscription (nvarchar), Quantity (numeric), OpenQty (numeric), WhsCode (nvarchar), SlpCode (int), DocDate (datetime), InvntSttus (char), ObjType (nvarchar), NumPerMsr (numeric), LocCode (int), NoInvtryMv (char), InvQty (numeric), OpenInvQty (numeric), U_Entregado (smallint)
+ODLN: DocEntry (int), DocNum (int), DocType (char), CANCELED (char), DocStatus (char), InvntSttus (char), ObjType (nvarchar), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), NumAtCard (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), TransId (int), DocTime (smallint), SlpCode (int), UpdateDate (datetime), CreateDate (datetime), UserSign (smallint), UserSign2 (smallint), CreateTS (int), UpdateTS (int), BaseType (int), BaseEntry (int)
+OINM: TransNum (int), TransType (int), CreatedBy (int), BASE_REF (nvarchar), DocLineNum (int), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), DocTime (smallint), ItemCode (nvarchar), Dscription (nvarchar), InQty (numeric), OutQty (numeric), Warehouse (nvarchar), SlpCode (int), UserSign (smallint), OpenQty (numeric), CreateDate (datetime), BaseLine (int), TransValue (numeric), TransSeq (int)
+OINV: DocEntry (int), DocNum (int), DocType (char), CANCELED (char), DocStatus (char), InvntSttus (char), ObjType (nvarchar), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), NumAtCard (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), TransId (int), DocTime (smallint), SlpCode (int), UpdateDate (datetime), CreateDate (datetime), UserSign (smallint), UserSign2 (smallint), CreateTS (int), UpdateTS (int), BaseType (int), BaseEntry (int)
+OIVL: TransType (int), CreatedBy (int), BASE_REF (nvarchar), DocLineNum (int), DocDate (datetime), ItemCode (nvarchar), InQty (numeric), OutQty (numeric), CreateDate (datetime), TransSeq (int), LocCode (nvarchar), UserSign (smallint), OpenQty (numeric)
+OQUT: DocEntry (int), DocNum (int), DocType (char), CANCELED (char), DocStatus (char), InvntSttus (char), ObjType (nvarchar), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), NumAtCard (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), TransId (int), DocTime (smallint), SlpCode (int), UpdateDate (datetime), CreateDate (datetime), UserSign (smallint), UserSign2 (smallint), CreateTS (int), UpdateTS (int), BaseType (int), BaseEntry (int)
+ORDN: DocEntry (int), DocNum (int), DocType (char), CANCELED (char), DocStatus (char), InvntSttus (char), ObjType (nvarchar), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), NumAtCard (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), TransId (int), DocTime (smallint), SlpCode (int), UpdateDate (datetime), CreateDate (datetime), UserSign (smallint), UserSign2 (smallint), CreateTS (int), UpdateTS (int), BaseType (int), BaseEntry (int)
+ORDR: DocEntry (int), DocNum (int), DocType (char), CANCELED (char), DocStatus (char), InvntSttus (char), ObjType (nvarchar), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), NumAtCard (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), TransId (int), DocTime (smallint), SlpCode (int), UpdateDate (datetime), CreateDate (datetime), UserSign (smallint), UserSign2 (smallint), CreateTS (int), UpdateTS (int), BaseType (int), BaseEntry (int)
+ORIN: DocEntry (int), DocNum (int), DocType (char), CANCELED (char), DocStatus (char), InvntSttus (char), ObjType (nvarchar), DocDate (datetime), CardCode (nvarchar), CardName (nvarchar), NumAtCard (nvarchar), Ref1 (nvarchar), Ref2 (nvarchar), Comments (nvarchar), TransId (int), DocTime (smallint), SlpCode (int), UpdateDate (datetime), CreateDate (datetime), UserSign (smallint), UserSign2 (smallint), CreateTS (int), UpdateTS (int), BaseType (int), BaseEntry (int)
+QUT1: DocEntry (int), LineNum (int), TargetType (int), TrgetEntry (int), BaseType (int), BaseEntry (int), BaseLine (int), LineStatus (char), ItemCode (nvarchar), Dscription (nvarchar), Quantity (numeric), OpenQty (numeric), WhsCode (nvarchar), SlpCode (int), DocDate (datetime), InvntSttus (char), ObjType (nvarchar), NumPerMsr (numeric), LocCode (int), NoInvtryMv (char), InvQty (numeric), OpenInvQty (numeric), U_Entregado (smallint)
+RDN1: DocEntry (int), LineNum (int), TargetType (int), TrgetEntry (int), BaseType (int), BaseEntry (int), BaseLine (int), LineStatus (char), ItemCode (nvarchar), Dscription (nvarchar), Quantity (numeric), OpenQty (numeric), WhsCode (nvarchar), SlpCode (int), DocDate (datetime), InvntSttus (char), ObjType (nvarchar), NumPerMsr (numeric), LocCode (int), NoInvtryMv (char), InvQty (numeric), OpenInvQty (numeric), U_Entregado (smallint)
+RDR1: DocEntry (int), LineNum (int), TargetType (int), TrgetEntry (int), BaseType (int), BaseEntry (int), BaseLine (int), LineStatus (char), ItemCode (nvarchar), Dscription (nvarchar), Quantity (numeric), OpenQty (numeric), WhsCode (nvarchar), SlpCode (int), DocDate (datetime), InvntSttus (char), ObjType (nvarchar), NumPerMsr (numeric), LocCode (int), NoInvtryMv (char), InvQty (numeric), OpenInvQty (numeric), U_Entregado (smallint)
+RIN1: DocEntry (int), LineNum (int), TargetType (int), TrgetEntry (int), BaseType (int), BaseEntry (int), BaseLine (int), LineStatus (char), ItemCode (nvarchar), Dscription (nvarchar), Quantity (numeric), OpenQty (numeric), WhsCode (nvarchar), SlpCode (int), DocDate (datetime), InvntSttus (char), ObjType (nvarchar), NumPerMsr (numeric), LocCode (int), NoInvtryMv (char), InvQty (numeric), OpenInvQty (numeric), U_Entregado (smallint)
+
+documento
+{
+  "nombre": "documento",
+  "ms": 397,
+  "filas": [
+    {
+      "tabla": "ORDR",
+      "DocEntry": 961461,
+      "DocNum": 101475685,
+      "ObjType": "17",
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "CardCode": "9999",
+      "CardName": "ABEL EDGARDO CEDILLO",
+      "SlpCode": 8,
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 1204,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "UpdateDate": "2026-09-14T00:00:00.000Z",
+      "UserSign": 1,
+      "UserSign2": 1,
+      "NumAtCard": "SPSS03PE390619",
+      "Ref1": "101475685",
+      "Ref2": null
+    }
+  ]
+}
+
+cabeceraCaso
+{
+  "nombre": "cabeceraCaso",
+  "ms": 80,
+  "filas": [
+    {
+      "DocEntry": 961461,
+      "DocNum": 101475685,
+      "ObjType": "17",
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "InvntSttus": "O",
+      "CardCode": "9999",
+      "CardName": "ABEL EDGARDO CEDILLO",
+      "GroupCode": 108,
+      "GroupName": "Cliente Contado",
+      "SlpCode": 8,
+      "SlpName": "SPS Hector Alvi Cedillo",
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 1204,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "CreateTS": 120457,
+      "UpdateDate": "2026-09-14T00:00:00.000Z",
+      "UpdateTS": 120457,
+      "UserSign": 1,
+      "usuarioCreacion": "manager",
+      "nombreUsuarioCreacion": "manager",
+      "UserSign2": 1,
+      "usuarioActualizacion": "manager",
+      "NumAtCard": "SPSS03PE390619",
+      "Ref1": "101475685",
+      "Ref2": null,
+      "Comments": "Basado en operación de Retail One SPSS04CO60265 . Basado en operación de Retail One SPSS03PE390619. Basado en pedido de Retail One SPSS03PE390619",
+      "U_SO1_01RETAILONE": "Y"
+    }
+  ]
+}
+
+lineasCaso
+{
+  "nombre": "lineasCaso",
+  "ms": 18,
+  "filas": [
+    {
+      "DocEntry": 961461,
+      "LineNum": 0,
+      "ItemCode": "YAM-MODX7",
+      "Dscription": "SINTETIZADOR 76 TECLAS CON USB SIN ADAPTADOR DE CORRIENTE",
+      "Quantity": 1,
+      "OpenQty": 1,
+      "InvQty": 1,
+      "OpenInvQty": 1,
+      "NumPerMsr": 1,
+      "WhsCode": "TSPS01",
+      "WhsName": "Tienda Principal",
+      "LineStatus": "O",
+      "BaseType": -1,
+      "BaseEntry": null,
+      "BaseLine": null,
+      "TargetType": -1,
+      "TrgetEntry": null,
+      "NoInvtryMv": "N",
+      "U_Entregado": null
+    },
+    {
+      "DocEntry": 961461,
+      "LineNum": 1,
+      "ItemCode": "YAM-PA150",
+      "Dscription": "ADAPTADOR DE CORRIENTE 12V 1.5A",
+      "Quantity": 1,
+      "OpenQty": 1,
+      "InvQty": 1,
+      "OpenInvQty": 1,
+      "NumPerMsr": 1,
+      "WhsCode": "BSPS03",
+      "WhsName": "Circuitos y Repuestos",
+      "LineStatus": "O",
+      "BaseType": -1,
+      "BaseEntry": null,
+      "BaseLine": null,
+      "TargetType": -1,
+      "TrgetEntry": null,
+      "NoInvtryMv": "N",
+      "U_Entregado": null
+    }
+  ]
+}
+
+basesCaso
+{
+  "nombre": "basesCaso",
+  "ms": 28,
+  "filas": []
+}
+
+destinosCaso
+{
+  "nombre": "destinosCaso",
+  "ms": 37,
+  "filas": []
+}
+
+referencias
+{
+  "nombre": "referencias",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+udfEntrega
+{
+  "nombre": "udfEntrega",
+  "ms": 56,
+  "filas": [
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 23,
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 30,
+      "AliasID": "SO1_FECHAENTREGA",
+      "Descr": "Fecha de entrega",
+      "TypeID": "D",
+      "EditType": null
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 33,
+      "AliasID": "SO1_DOCUMENTOSBO",
+      "Descr": "Número de documento de SBO",
+      "TypeID": "N",
+      "EditType": null
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 37,
+      "AliasID": "SO1_VERIFICADO",
+      "Descr": "Verificado",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 104,
+      "AliasID": "SO1_HORAENTREGA",
+      "Descr": "Hora de entrega",
+      "TypeID": "N",
+      "EditType": null
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 120,
+      "AliasID": "SO1_ENTREGAPROVE",
+      "Descr": "Entrega proveedor",
+      "TypeID": "A",
+      "EditType": " "
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "FieldID": 137,
+      "AliasID": "SO1_MODALIDENTREGA",
+      "Descr": "Modalidad de entrega",
+      "TypeID": "A",
+      "EditType": " "
+    },
+    {
+      "TableID": "DLN1",
+      "FieldID": 0,
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "TypeID": "N",
+      "EditType": null
+    },
+    {
+      "TableID": "INV1",
+      "FieldID": 0,
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "TypeID": "N",
+      "EditType": null
+    },
+    {
+      "TableID": "ODLN",
+      "FieldID": 36,
+      "AliasID": "SO1_01RETAILONE",
+      "Descr": "Creado por Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "ODLN",
+      "FieldID": 37,
+      "AliasID": "SO1_01FOLIORETAIL1",
+      "Descr": "Folio de Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "OINV",
+      "FieldID": 36,
+      "AliasID": "SO1_01RETAILONE",
+      "Descr": "Creado por Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "OINV",
+      "FieldID": 37,
+      "AliasID": "SO1_01FOLIORETAIL1",
+      "Descr": "Folio de Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "OQUT",
+      "FieldID": 36,
+      "AliasID": "SO1_01RETAILONE",
+      "Descr": "Creado por Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "OQUT",
+      "FieldID": 37,
+      "AliasID": "SO1_01FOLIORETAIL1",
+      "Descr": "Folio de Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "ORDR",
+      "FieldID": 36,
+      "AliasID": "SO1_01RETAILONE",
+      "Descr": "Creado por Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "ORDR",
+      "FieldID": 37,
+      "AliasID": "SO1_01FOLIORETAIL1",
+      "Descr": "Folio de Retail One",
+      "TypeID": "A",
+      "EditType": null
+    },
+    {
+      "TableID": "QUT1",
+      "FieldID": 0,
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "TypeID": "N",
+      "EditType": null
+    },
+    {
+      "TableID": "RDR1",
+      "FieldID": 0,
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "TypeID": "N",
+      "EditType": null
+    }
+  ]
+}
+
+patronesEntregas
+{
+  "nombre": "patronesEntregas",
+  "ms": 150,
+  "filas": [
+    {
+      "CANCELED": "N",
+      "DocStatus": "O",
+      "BaseType": 17,
+      "lineas": "8",
+      "documentos": 2
+    },
+    {
+      "CANCELED": "N",
+      "DocStatus": "O",
+      "BaseType": 23,
+      "lineas": "2",
+      "documentos": 1
+    }
+  ]
+}
+
+cotizacionEntrega
+{
+  "nombre": "cotizacionEntrega",
+  "ms": 166,
+  "filas": [
+    {
+      "cotizacionEntry": 160052,
+      "cotizacionNum": 100206148,
+      "entregaEntry": 6669,
+      "entregaNum": 40968,
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 902,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "CreateTS": 90201,
+      "vendedor": "SPS Hector Alvi Cedillo",
+      "pedidosRelacionados": 0,
+      "facturasVigentes": 0
+    }
+  ]
+}
+
+entregaSinBase
+{
+  "nombre": "entregaSinBase",
+  "ms": 72,
+  "filas": []
+}
+
+entregaCancelada
+{
+  "nombre": "entregaCancelada",
+  "ms": 28,
+  "filas": []
+}
+
+pedidoEntregaSinFactura
+{
+  "nombre": "pedidoEntregaSinFactura",
+  "ms": 145,
+  "filas": [
+    {
+      "pedidoEntry": 957059,
+      "pedidoNum": 101474074,
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "DocDate": "2026-09-04T00:00:00.000Z",
+      "DocTime": 1706,
+      "BaseType": 17,
+      "BaseEntry": 957059
+    },
+    {
+      "pedidoEntry": 956425,
+      "pedidoNum": 101473857,
+      "entregaEntry": 6667,
+      "entregaNum": 40966,
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "DocDate": "2026-09-03T00:00:00.000Z",
+      "DocTime": 918,
+      "BaseType": 17,
+      "BaseEntry": 956425
+    }
+  ]
+}
+
+cadenaCompleta
+{
+  "nombre": "cadenaCompleta",
+  "ms": 85,
+  "filas": []
+}
+
+cotizacion160052
+{
+  "nombre": "cotizacion160052",
+  "ms": 61,
+  "filas": [
+    {
+      "DocEntry": 160052,
+      "DocNum": 100206148,
+      "ObjType": "23",
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "InvntSttus": "C",
+      "CardCode": "9999",
+      "CardName": "ABEL EDGARDO CEDILLO",
+      "SlpCode": 8,
+      "SlpName": "SPS Hector Alvi Cedillo",
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 845,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "CreateTS": 84505,
+      "UpdateDate": "2026-09-14T00:00:00.000Z",
+      "UpdateTS": 85238,
+      "UserSign": 1,
+      "usuarioCreacion": "manager",
+      "UserSign2": 55,
+      "NumAtCard": "SPSS04CO60265",
+      "Ref1": "100206148",
+      "Ref2": null,
+      "Comments": "Basado en operación de Retail One SPSS04CO60265",
+      "U_SO1_01RETAILONE": "Y",
+      "U_SO1_01FOLIORETAIL1": "SPSS04CO60265"
+    }
+  ]
+}
+
+lineasCotizacion160052
+{
+  "nombre": "lineasCotizacion160052",
+  "ms": 23,
+  "filas": [
+    {
+      "DocEntry": 160052,
+      "LineNum": 2,
+      "ItemCode": "YAM-MODX7",
+      "Dscription": "SINTETIZADOR 76 TECLAS CON USB SIN ADAPTADOR DE CORRIENTE",
+      "Quantity": 1,
+      "OpenQty": 0,
+      "InvQty": 1,
+      "OpenInvQty": 0,
+      "WhsCode": "TSPS01",
+      "LineStatus": "C",
+      "BaseType": -1,
+      "BaseEntry": null,
+      "BaseLine": null,
+      "TargetType": 15,
+      "TrgetEntry": 6669,
+      "U_Entregado": null
+    },
+    {
+      "DocEntry": 160052,
+      "LineNum": 3,
+      "ItemCode": "YAM-PA150",
+      "Dscription": "ADAPTADOR DE CORRIENTE 12V 1.5A",
+      "Quantity": 1,
+      "OpenQty": 0,
+      "InvQty": 1,
+      "OpenInvQty": 0,
+      "WhsCode": "BSPS03",
+      "LineStatus": "C",
+      "BaseType": -1,
+      "BaseEntry": null,
+      "BaseLine": null,
+      "TargetType": 15,
+      "TrgetEntry": 6669,
+      "U_Entregado": null
+    }
+  ]
+}
+
+entrega6669
+{
+  "nombre": "entrega6669",
+  "ms": 19,
+  "filas": [
+    {
+      "DocEntry": 6669,
+      "DocNum": 40968,
+      "ObjType": "15",
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "InvntSttus": "O",
+      "DocType": "I",
+      "CardCode": "9999",
+      "CardName": "ABEL EDGARDO CEDILLO",
+      "SlpCode": 8,
+      "SlpName": "SPS Hector Alvi Cedillo",
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 902,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "CreateTS": 90201,
+      "UpdateDate": "2026-09-14T00:00:00.000Z",
+      "UpdateTS": 90202,
+      "UserSign": 55,
+      "usuarioCreacion": "PIERROT",
+      "UserSign2": 55,
+      "NumAtCard": "SPSS04CO60265",
+      "Ref1": "40968",
+      "Ref2": null,
+      "Comments": "Basado en operación de Retail One SPSS04CO60265 Basado en Ofertas de ventas 100206148.",
+      "TransId": 2169255,
+      "U_SO1_01RETAILONE": "N",
+      "U_SO1_01FOLIORETAIL1": "SPSS04CO60265"
+    }
+  ]
+}
+
+lineasEntrega6669
+{
+  "nombre": "lineasEntrega6669",
+  "ms": 10,
+  "filas": [
+    {
+      "DocEntry": 6669,
+      "LineNum": 0,
+      "ItemCode": "YAM-MODX7",
+      "Dscription": "SINTETIZADOR 76 TECLAS CON USB SIN ADAPTADOR DE CORRIENTE",
+      "Quantity": 1,
+      "OpenQty": 1,
+      "InvQty": 1,
+      "OpenInvQty": 1,
+      "NumPerMsr": 1,
+      "WhsCode": "TSPS01",
+      "LineStatus": "O",
+      "BaseType": 23,
+      "BaseEntry": 160052,
+      "BaseLine": 2,
+      "TargetType": -1,
+      "TrgetEntry": null,
+      "NoInvtryMv": "N",
+      "U_Entregado": null
+    },
+    {
+      "DocEntry": 6669,
+      "LineNum": 1,
+      "ItemCode": "YAM-PA150",
+      "Dscription": "ADAPTADOR DE CORRIENTE 12V 1.5A",
+      "Quantity": 1,
+      "OpenQty": 1,
+      "InvQty": 1,
+      "OpenInvQty": 1,
+      "NumPerMsr": 1,
+      "WhsCode": "BSPS03",
+      "LineStatus": "O",
+      "BaseType": 23,
+      "BaseEntry": 160052,
+      "BaseLine": 3,
+      "TargetType": -1,
+      "TrgetEntry": null,
+      "NoInvtryMv": "N",
+      "U_Entregado": null
+    }
+  ]
+}
+
+facturasEntrega6669
+{
+  "nombre": "facturasEntrega6669",
+  "ms": 21,
+  "filas": []
+}
+
+movimiento6669
+{
+  "nombre": "movimiento6669",
+  "ms": 178,
+  "filas": [
+    {
+      "TransNum": 2983881,
+      "TransType": 15,
+      "CreatedBy": 6669,
+      "BASE_REF": "40968",
+      "DocLineNum": 0,
+      "ItemCode": "YAM-MODX7",
+      "Dscription": "SINTETIZADOR 76 TECLAS CON USB SIN ADAPTADOR DE CORRIENTE",
+      "Warehouse": "TSPS01",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 902,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "TransSeq": 2983881
+    },
+    {
+      "TransNum": 2983882,
+      "TransType": 15,
+      "CreatedBy": 6669,
+      "BASE_REF": "40968",
+      "DocLineNum": 1,
+      "ItemCode": "YAM-PA150",
+      "Dscription": "ADAPTADOR DE CORRIENTE 12V 1.5A",
+      "Warehouse": "BSPS03",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 902,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "TransSeq": 2983882
+    }
+  ]
+}
+
+valoracion6669
+{
+  "nombre": "valoracion6669",
+  "ms": 13,
+  "filas": [
+    {
+      "TransSeq": 2983881,
+      "TransType": 15,
+      "CreatedBy": 6669,
+      "BASE_REF": "40968",
+      "DocLineNum": 0,
+      "ItemCode": "YAM-MODX7",
+      "LocCode": "TSPS01",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "CreateDate": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2983882,
+      "TransType": 15,
+      "CreatedBy": 6669,
+      "BASE_REF": "40968",
+      "DocLineNum": 1,
+      "ItemCode": "YAM-PA150",
+      "LocCode": "BSPS03",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "CreateDate": "2026-09-14T00:00:00.000Z"
+    }
+  ]
+}
+
+reversion6669
+{
+  "nombre": "reversion6669",
+  "ms": 53,
+  "filas": []
+}
+
+referencesAcotadas
+{
+  "nombre": "referencesAcotadas",
+  "ms": 263,
+  "filas": []
+}
+
+patronesEntregas_historico
+{
+  "nombre": "patronesEntregas_historico",
+  "ms": 1171,
+  "filas": [
+    {
+      "CANCELED": "N",
+      "DocStatus": "C",
+      "BaseType": -1,
+      "lineas": "39",
+      "documentos": 28
+    },
+    {
+      "CANCELED": "N",
+      "DocStatus": "C",
+      "BaseType": 17,
+      "lineas": "15084",
+      "documentos": 6631
+    },
+    {
+      "CANCELED": "N",
+      "DocStatus": "C",
+      "BaseType": 23,
+      "lineas": "14",
+      "documentos": 4
+    },
+    {
+      "CANCELED": "N",
+      "DocStatus": "O",
+      "BaseType": 17,
+      "lineas": "14",
+      "documentos": 5
+    },
+    {
+      "CANCELED": "N",
+      "DocStatus": "O",
+      "BaseType": 23,
+      "lineas": "2",
+      "documentos": 1
+    }
+  ]
+}
+
+cotizacionEntrega_historico
+{
+  "nombre": "cotizacionEntrega_historico",
+  "ms": 246,
+  "filas": [
+    {
+      "cotizacionEntry": 160052,
+      "cotizacionNum": 100206148,
+      "entregaEntry": 6669,
+      "entregaNum": 40968,
+      "DocStatus": "O",
+      "CANCELED": "N",
+      "DocDate": "2026-09-14T00:00:00.000Z",
+      "DocTime": 902,
+      "CreateDate": "2026-09-14T00:00:00.000Z",
+      "CreateTS": 90201,
+      "vendedor": "SPS Hector Alvi Cedillo",
+      "pedidosRelacionados": 0,
+      "facturasVigentes": 0
+    },
+    {
+      "cotizacionEntry": 148910,
+      "cotizacionNum": 100201496,
+      "entregaEntry": 6435,
+      "entregaNum": 40920,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-03-20T00:00:00.000Z",
+      "DocTime": 925,
+      "CreateDate": "2026-03-20T00:00:00.000Z",
+      "CreateTS": 92520,
+      "vendedor": "SPS Maynor Yojany Rivera Orellana",
+      "pedidosRelacionados": 1,
+      "facturasVigentes": 0
+    },
+    {
+      "cotizacionEntry": 148567,
+      "cotizacionNum": 100201353,
+      "entregaEntry": 6432,
+      "entregaNum": 40917,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-03-14T00:00:00.000Z",
+      "DocTime": 1054,
+      "CreateDate": "2026-03-14T00:00:00.000Z",
+      "CreateTS": 105423,
+      "vendedor": "SPS Marvin Gabriel Menjivar Navarrete",
+      "pedidosRelacionados": 0,
+      "facturasVigentes": 0
+    },
+    {
+      "cotizacionEntry": 108680,
+      "cotizacionNum": 100185279,
+      "entregaEntry": 4198,
+      "entregaNum": 100155080,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2024-07-31T00:00:00.000Z",
+      "DocTime": 818,
+      "CreateDate": "2024-07-31T00:00:00.000Z",
+      "CreateTS": 81844,
+      "vendedor": "CIR Katherine Yadira Regalado Hernandez//NO TRABAJA",
+      "pedidosRelacionados": 0,
+      "facturasVigentes": 0
+    },
+    {
+      "cotizacionEntry": 21387,
+      "cotizacionNum": 100147486,
+      "entregaEntry": 1164,
+      "entregaNum": 36339,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2020-03-03T00:00:00.000Z",
+      "DocTime": 1626,
+      "CreateDate": "2020-03-03T00:00:00.000Z",
+      "CreateTS": 162625,
+      "vendedor": "TBM Jose Hernan Lopez Valle",
+      "pedidosRelacionados": 0,
+      "facturasVigentes": 0
+    }
+  ]
+}
+
+entregaSinBase_historico
+{
+  "nombre": "entregaSinBase_historico",
+  "ms": 104,
+  "filas": [
+    {
+      "DocEntry": 4432,
+      "DocNum": 200016780,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2024-08-26T00:00:00.000Z",
+      "DocTime": 1209,
+      "CreateDate": "2024-08-26T00:00:00.000Z",
+      "CreateTS": 120936,
+      "CardCode": "T9999",
+      "SlpCode": 248,
+      "lineas": 1
+    },
+    {
+      "DocEntry": 4421,
+      "DocNum": 200016779,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2024-08-22T00:00:00.000Z",
+      "DocTime": 1119,
+      "CreateDate": "2024-08-22T00:00:00.000Z",
+      "CreateTS": 111949,
+      "CardCode": "T9999",
+      "SlpCode": 248,
+      "lineas": 1
+    }
+  ]
+}
+
+entregaCancelada_historico
+{
+  "nombre": "entregaCancelada_historico",
+  "ms": 43,
+  "filas": []
+}
+
+cadenaCompleta_historico
+{
+  "nombre": "cadenaCompleta_historico",
+  "ms": 2444,
+  "filas": [
+    {
+      "cotizacionEntry": 152732,
+      "cotizacionNum": 100203121,
+      "pedidoEntry": 919780,
+      "pedidoNum": 101459807,
+      "entregaEntry": 6618,
+      "entregaNum": 100155642,
+      "facturaEntry": 881777,
+      "facturaNum": 201646148
+    },
+    {
+      "cotizacionEntry": 152716,
+      "cotizacionNum": 100203115,
+      "pedidoEntry": 919724,
+      "pedidoNum": 101459783,
+      "entregaEntry": 6598,
+      "entregaNum": 100155622,
+      "facturaEntry": 881721,
+      "facturaNum": 201646136
+    }
+  ]
+}
+
+parciales
+{
+  "nombre": "parciales",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+multiples
+{
+  "nombre": "multiples",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+indices
+{
+  "nombre": "indices",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+udfValores
+{
+  "nombre": "udfValores",
+  "ms": 7978,
+  "filas": [
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_FACTURA",
+      "Descr": "Factura",
+      "FldValue": "N",
+      "valorDescripcion": "No"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_FACTURA",
+      "Descr": "Factura",
+      "FldValue": "Y",
+      "valorDescripcion": "Sí"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "MO",
+      "valorDescripcion": "Mostrador"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "CA",
+      "valorDescripcion": "Caja"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "CO",
+      "valorDescripcion": "Cotización"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "CR",
+      "valorDescripcion": "Crédito"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "PE",
+      "valorDescripcion": "Pedido"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "CC",
+      "valorDescripcion": "Cobranza de crédito"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "AN",
+      "valorDescripcion": "Anticipo"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "NC",
+      "valorDescripcion": "Nota de crédito"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "CS",
+      "valorDescripcion": "Crédito y consignación"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "ED",
+      "valorDescripcion": "Entrega directa"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "FA",
+      "valorDescripcion": "Factura anticipo"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "AA",
+      "valorDescripcion": "Aplicación de anticipo"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "DD",
+      "valorDescripcion": "Documento de descuento"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "NR",
+      "valorDescripcion": "Nota crédito certi regalo"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BA",
+      "valorDescripcion": "Borrador nota contado"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BC",
+      "valorDescripcion": "Borrador cotización"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BD",
+      "valorDescripcion": "Borrador venta domicilio"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BE",
+      "valorDescripcion": "Borrador entrega directa"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BF",
+      "valorDescripcion": "Borrador factura anticipo"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BM",
+      "valorDescripcion": "Borrador nota mostrador"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BN",
+      "valorDescripcion": "Borr nota crédito directa"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BP",
+      "valorDescripcion": "Borrador pedido"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "BR",
+      "valorDescripcion": "Borrador nota crédito"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "EN",
+      "valorDescripcion": "Entrega factura reserva"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "OA",
+      "valorDescripcion": "Operación anulada"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "MC",
+      "valorDescripcion": "Merma por comanda"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "CM",
+      "valorDescripcion": "Comanda"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "DO",
+      "valorDescripcion": "Nota mostrador domicilio"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "RF",
+      "valorDescripcion": "Refacturación"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "DA",
+      "valorDescripcion": "Domicilio avanzado"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_TIPO",
+      "Descr": "Tipo",
+      "FldValue": "NP",
+      "valorDescripcion": "Nota crédito cobro puntos"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "A",
+      "valorDescripcion": "Abierto"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "C",
+      "valorDescripcion": "Cerrado"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "P",
+      "valorDescripcion": "EnProceso"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "E",
+      "valorDescripcion": "Empacado"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "L",
+      "valorDescripcion": "Listo"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "V",
+      "valorDescripcion": "Enviado"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "N",
+      "valorDescripcion": "Cancelada"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "S",
+      "valorDescripcion": "Suspendida"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_STATUS",
+      "Descr": "Status",
+      "FldValue": "R",
+      "valorDescripcion": "Recibida"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_VERIFICADO",
+      "Descr": "Verificado",
+      "FldValue": "N",
+      "valorDescripcion": "No"
+    },
+    {
+      "TableID": "@SO1_01VENTA",
+      "AliasID": "SO1_VERIFICADO",
+      "Descr": "Verificado",
+      "FldValue": "Y",
+      "valorDescripcion": "Sí"
+    },
+    {
+      "TableID": "DLN1",
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "FldValue": null,
+      "valorDescripcion": null
+    },
+    {
+      "TableID": "INV1",
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "FldValue": null,
+      "valorDescripcion": null
+    },
+    {
+      "TableID": "QUT1",
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "FldValue": null,
+      "valorDescripcion": null
+    },
+    {
+      "TableID": "RDR1",
+      "AliasID": "Entregado",
+      "Descr": "Entregado",
+      "FldValue": null,
+      "valorDescripcion": null
+    }
+  ]
+}
+
+existenciasCaso
+{
+  "nombre": "existenciasCaso",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+movimientoPedido961461
+{
+  "nombre": "movimientoPedido961461",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+otrasRelacionesCotizacion
+{
+  "nombre": "otrasRelacionesCotizacion",
+  "ms": 12816,
+  "filas": []
+}
+
+fechaServidor
+{
+  "nombre": "fechaServidor",
+  "ms": 453,
+  "filas": [
+    {
+      "baseDatos": "PAJARO_AZUL",
+      "fechaServidor": "2026-09-16T09:13:22.360Z",
+      "fechaServidorZona": "2026-09-16T15:13:22.361Z"
+    }
+  ]
+}
+
+parcialesAcotadas
+{
+  "nombre": "parcialesAcotadas",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+multiplesAcotadas
+{
+  "nombre": "multiplesAcotadas",
+  "ms": 9843,
+  "filas": []
+}
+
+indicesAcotados
+{
+  "nombre": "indicesAcotados",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+muestrasInventario
+{
+  "nombre": "muestrasInventario",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+facturasMuestras
+{
+  "nombre": "facturasMuestras",
+  "ms": 8508,
+  "filas": [
+    {
+      "DocEntry": 881777,
+      "DocNum": 201646148,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-05-27T00:00:00.000Z",
+      "DocTime": 1640,
+      "CreateDate": "2026-05-27T00:00:00.000Z",
+      "CreateTS": 164019,
+      "LineNum": 0,
+      "BaseType": 15,
+      "BaseEntry": 6618,
+      "BaseLine": 0,
+      "ItemCode": "ESM-EBMP-1455SP-RD",
+      "Quantity": 7
+    },
+    {
+      "DocEntry": 881777,
+      "DocNum": 201646148,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-05-27T00:00:00.000Z",
+      "DocTime": 1640,
+      "CreateDate": "2026-05-27T00:00:00.000Z",
+      "CreateTS": 164019,
+      "LineNum": 1,
+      "BaseType": 15,
+      "BaseEntry": 6618,
+      "BaseLine": 1,
+      "ItemCode": "ESM-EBMBJ-1207-BL",
+      "Quantity": 7
+    },
+    {
+      "DocEntry": 881777,
+      "DocNum": 201646148,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-05-27T00:00:00.000Z",
+      "DocTime": 1640,
+      "CreateDate": "2026-05-27T00:00:00.000Z",
+      "CreateTS": 164019,
+      "LineNum": 2,
+      "BaseType": 15,
+      "BaseEntry": 6618,
+      "BaseLine": 2,
+      "ItemCode": "MIRAGE-MSC-14-RD",
+      "Quantity": 5
+    },
+    {
+      "DocEntry": 881777,
+      "DocNum": 201646148,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-05-27T00:00:00.000Z",
+      "DocTime": 1640,
+      "CreateDate": "2026-05-27T00:00:00.000Z",
+      "CreateTS": 164019,
+      "LineNum": 3,
+      "BaseType": 15,
+      "BaseEntry": 6618,
+      "BaseLine": 3,
+      "ItemCode": "ESM-EBQA-04-RD",
+      "Quantity": 3
+    },
+    {
+      "DocEntry": 881777,
+      "DocNum": 201646148,
+      "DocStatus": "C",
+      "CANCELED": "N",
+      "DocDate": "2026-05-27T00:00:00.000Z",
+      "DocTime": 1640,
+      "CreateDate": "2026-05-27T00:00:00.000Z",
+      "CreateTS": 164019,
+      "LineNum": 4,
+      "BaseType": 15,
+      "BaseEntry": 6618,
+      "BaseLine": 4,
+      "ItemCode": "MIRAGE-MBC-201020-BL",
+      "Quantity": 4
+    }
+  ]
+}
+
+reversosMuestras
+{
+  "nombre": "reversosMuestras",
+  "error": "Timeout: Request failed to complete in 15000ms"
+}
+
+existenciaActual
+{
+  "nombre": "existenciaActual",
+  "ms": 130,
+  "filas": [
+    {
+      "ItemCode": "YAM-MODX7",
+      "WhsCode": "TSPS01",
+      "OnHand": 0
+    },
+    {
+      "ItemCode": "YAM-PA150",
+      "WhsCode": "BSPS03",
+      "OnHand": 457
+    }
+  ]
+}
+
+inventarioTresAntecedentes
+{
+  "nombre": "inventarioTresAntecedentes",
+  "error": "Failed to connect to 192.168.10.140:1433 in 5000ms"
+}
+
+cantidadesEntregasRecientes
+{
+  "nombre": "cantidadesEntregasRecientes",
+  "ms": 18956,
+  "filas": [
+    {
+      "entregaEntry": 6667,
+      "entregaNum": 40966,
+      "LineNum": 0,
+      "BaseType": 17,
+      "BaseEntry": 956425,
+      "BaseLine": 0,
+      "ItemCode": "ALI-A506-SL",
+      "inventarioEntrega": 15,
+      "inventarioOrigen": 15,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6667,
+      "entregaNum": 40966,
+      "LineNum": 1,
+      "BaseType": 17,
+      "BaseEntry": 956425,
+      "BaseLine": 1,
+      "ItemCode": "ALI-A506-SL2",
+      "inventarioEntrega": 10,
+      "inventarioOrigen": 10,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "LineNum": 0,
+      "BaseType": 17,
+      "BaseEntry": 957059,
+      "BaseLine": 0,
+      "ItemCode": "ALI-A705",
+      "inventarioEntrega": 5,
+      "inventarioOrigen": 5,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "LineNum": 1,
+      "BaseType": 17,
+      "BaseEntry": 957059,
+      "BaseLine": 1,
+      "ItemCode": "ALI-AC105BK",
+      "inventarioEntrega": 5,
+      "inventarioOrigen": 5,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "LineNum": 2,
+      "BaseType": 17,
+      "BaseEntry": 957059,
+      "BaseLine": 2,
+      "ItemCode": "ALI-A506-SL3",
+      "inventarioEntrega": 50,
+      "inventarioOrigen": 50,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "LineNum": 3,
+      "BaseType": 17,
+      "BaseEntry": 957059,
+      "BaseLine": 3,
+      "ItemCode": "ALI-A506-SL2",
+      "inventarioEntrega": 50,
+      "inventarioOrigen": 50,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "LineNum": 4,
+      "BaseType": 17,
+      "BaseEntry": 957059,
+      "BaseLine": 4,
+      "ItemCode": "ALI-A506-SL1",
+      "inventarioEntrega": 30,
+      "inventarioOrigen": 30,
+      "pendienteOrigen": 0
+    },
+    {
+      "entregaEntry": 6668,
+      "entregaNum": 40967,
+      "LineNum": 5,
+      "BaseType": 17,
+      "BaseEntry": 957059,
+      "BaseLine": 5,
+      "ItemCode": "ESM-157106-33",
+      "inventarioEntrega": 6,
+      "inventarioOrigen": 6,
+      "pendienteOrigen": 0
+    }
+  ]
+}
+
+inventarioTresAntecedentes_reintento
+{
+  "nombre": "inventarioTresAntecedentes_reintento",
+  "ms": 2592,
+  "filas": [
+    {
+      "TransSeq": 475584,
+      "TransType": 15,
+      "CreatedBy": 1164,
+      "BASE_REF": "36339",
+      "DocLineNum": 0,
+      "ItemCode": "CRC-209",
+      "LocCode": "BSPS03",
+      "InQty": 0,
+      "OutQty": 57,
+      "DocDate": "2020-03-03T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 475585,
+      "TransType": 15,
+      "CreatedBy": 1164,
+      "BASE_REF": "36339",
+      "DocLineNum": 1,
+      "ItemCode": "CRC-208",
+      "LocCode": "BSPS03",
+      "InQty": 0,
+      "OutQty": 20,
+      "DocDate": "2020-03-03T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 475586,
+      "TransType": 15,
+      "CreatedBy": 1164,
+      "BASE_REF": "36339",
+      "DocLineNum": 2,
+      "ItemCode": "CRC-208",
+      "LocCode": "TSPS01",
+      "InQty": 0,
+      "OutQty": 16,
+      "DocDate": "2020-03-03T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 475587,
+      "TransType": 15,
+      "CreatedBy": 1164,
+      "BASE_REF": "36339",
+      "DocLineNum": 3,
+      "ItemCode": "AD-1223",
+      "LocCode": "BSPS03",
+      "InQty": 0,
+      "OutQty": 57,
+      "DocDate": "2020-03-03T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 475588,
+      "TransType": 15,
+      "CreatedBy": 1164,
+      "BASE_REF": "36339",
+      "DocLineNum": 4,
+      "ItemCode": "CABLE 14ROL 1K",
+      "LocCode": "BSPS02",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2020-03-03T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 475589,
+      "TransType": 15,
+      "CreatedBy": 1164,
+      "BASE_REF": "36339",
+      "DocLineNum": 5,
+      "ItemCode": "ET-11",
+      "LocCode": "BSPS03",
+      "InQty": 0,
+      "OutQty": 5,
+      "DocDate": "2020-03-03T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2128042,
+      "TransType": 15,
+      "CreatedBy": 4198,
+      "BASE_REF": "100155080",
+      "DocLineNum": 0,
+      "ItemCode": "IRF3205",
+      "LocCode": "BSPS03",
+      "InQty": 0,
+      "OutQty": 2,
+      "DocDate": "2024-07-31T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2128043,
+      "TransType": 15,
+      "CreatedBy": 4198,
+      "BASE_REF": "100155080",
+      "DocLineNum": 1,
+      "ItemCode": "220X1/4W",
+      "LocCode": "TSPS01",
+      "InQty": 0,
+      "OutQty": 3,
+      "DocDate": "2024-07-31T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2160488,
+      "TransType": 15,
+      "CreatedBy": 4432,
+      "BASE_REF": "200016780",
+      "DocLineNum": 0,
+      "ItemCode": "ALI-AWR-100N",
+      "LocCode": "TSPS01",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2024-08-26T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2779370,
+      "TransType": 15,
+      "CreatedBy": 6432,
+      "BASE_REF": "40917",
+      "DocLineNum": 0,
+      "ItemCode": "BEHR-XE-QX1832USB",
+      "LocCode": "BSPS01",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-03-14T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2779371,
+      "TransType": 15,
+      "CreatedBy": 6432,
+      "BASE_REF": "40917",
+      "DocLineNum": 1,
+      "ItemCode": "TOR-T15",
+      "LocCode": "BSPS04",
+      "InQty": 0,
+      "OutQty": 2,
+      "DocDate": "2026-03-14T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2779372,
+      "TransType": 15,
+      "CreatedBy": 6432,
+      "BASE_REF": "40917",
+      "DocLineNum": 2,
+      "ItemCode": "HER-SS200BB",
+      "LocCode": "BSPS04",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-03-14T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2779373,
+      "TransType": 15,
+      "CreatedBy": 6432,
+      "BASE_REF": "40917",
+      "DocLineNum": 3,
+      "ItemCode": "P53-Y-007-15",
+      "LocCode": "BSPS02",
+      "InQty": 0,
+      "OutQty": 1,
+      "DocDate": "2026-03-14T00:00:00.000Z"
+    },
+    {
+      "TransSeq": 2779374,
+      "TransType": 15,
+      "CreatedBy": 6432,
+      "BASE_REF": "40917",
+      "DocLineNum": 4,
+      "ItemCode": "P53-PNXX-001-30",
+      "LocCode": "BSPS02",
+      "InQty": 0,
+      "OutQty": 2,
+      "DocDate": "2026-03-14T00:00:00.000Z"
+    }
+  ]
+}
+
+parcialPedidoAcotadaFinal
+{
+  "nombre": "parcialPedidoAcotadaFinal",
+  "ms": 4326,
+  "filas": []
+}
+
+multiplesHistoricoFinal
+{
+  "nombre": "multiplesHistoricoFinal",
+  "ms": 3947,
+  "filas": []
+}
+
+indicesDeliveryFinal
+{
+  "nombre": "indicesDeliveryFinal",
+  "error": "Timeout: Request failed to complete in 8000ms"
+}
+
+FUENTE: R1
+
+R1Caso
+{
+  "nombre": "R1Caso",
+  "ms": 79,
+  "filas": [
+    {
+      "Code": null,
+      "Name": "SPSS03PE390619",
+      "U_SO1_DOCUMENTOSBO": 101475685,
+      "U_SO1_TIPO": "PE",
+      "U_SO1_VERIFICADO": "N",
+      "U_SO1_STATUS": "A",
+      "U_SO1_SINCRONIZADO": "N",
+      "U_SO1_FECHA": "2026-09-14T00:00:00.000Z",
+      "U_SO1_HORA": 855,
+      "U_SO1_VENDEDOR": 8,
+      "SlpName": "SPS Hector Alvi Cedillo",
+      "U_SO1_SUCURSAL": "SPS"
+    }
+  ]
+}
+
+R1Lineas
+{
+  "nombre": "R1Lineas",
+  "ms": 19,
+  "filas": [
+    {
+      "U_SO1_FOLIO": "SPSS03PE390619",
+      "U_SO1_NUMPARTIDA": 1,
+      "U_SO1_NUMEROARTICULO": "YAM-MODX7",
+      "U_SO1_DESCRIPCION": "SINTETIZADOR 76 TECLAS CON USB SIN ADAPTADOR DE CORRIENTE",
+      "U_SO1_CANTIDAD": 1,
+      "U_SO1_ALMACEN": "TSPS01"
+    },
+    {
+      "U_SO1_FOLIO": "SPSS03PE390619",
+      "U_SO1_NUMPARTIDA": 2,
+      "U_SO1_NUMEROARTICULO": "YAM-PA150",
+      "U_SO1_DESCRIPCION": "ADAPTADOR DE CORRIENTE 12V 1.5A",
+      "U_SO1_CANTIDAD": 1,
+      "U_SO1_ALMACEN": "BSPS03"
+    }
+  ]
+}
+
+R1Udf
+{
+  "nombre": "R1Udf",
+  "ms": 23,
+  "filas": []
+}
+
+R1CamposEntrega
+{
+  "nombre": "R1CamposEntrega",
+  "ms": 48,
+  "filas": [
+    {
+      "campo": "U_SO1_FECHASOLCANCEL",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_FACTURA",
+      "tipo": "nvarchar"
+    },
+    {
+      "campo": "U_SO1_FECHAENTREGA",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_FECHAVENC",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_VERIFICADO",
+      "tipo": "char"
+    },
+    {
+      "campo": "U_SO1_HORACADENA",
+      "tipo": "nvarchar"
+    },
+    {
+      "campo": "U_SO1_FECHA",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_HORA",
+      "tipo": "smallint"
+    },
+    {
+      "campo": "U_SO1_HORAINICIO",
+      "tipo": "int"
+    },
+    {
+      "campo": "U_SO1_HORAFIN",
+      "tipo": "int"
+    },
+    {
+      "campo": "U_SO1_HORAACTUALIZA",
+      "tipo": "smallint"
+    },
+    {
+      "campo": "U_SO1_HORAENTREGA",
+      "tipo": "int"
+    },
+    {
+      "campo": "U_SO1_HORAENTCADENA",
+      "tipo": "nvarchar"
+    },
+    {
+      "campo": "U_SO1_FECHACIERREDOC",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_ENTREGAPROVE",
+      "tipo": "char"
+    },
+    {
+      "campo": "U_SO1_HORAENHASTACAD",
+      "tipo": "nvarchar"
+    },
+    {
+      "campo": "U_SO1_HORAENHASTA",
+      "tipo": "smallint"
+    },
+    {
+      "campo": "U_SO1_FECHAACTESTALT",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_FECHAACTDATENV",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_FECHAVENCIRESG",
+      "tipo": "datetime"
+    },
+    {
+      "campo": "U_SO1_MODALIDENTREGA",
+      "tipo": "nvarchar"
+    }
+  ]
+}
+
+R1CotizacionYEntrega
+{
+  "nombre": "R1CotizacionYEntrega",
+  "ms": 44,
+  "filas": [
+    {
+      "Name": "SPSS03PE390619",
+      "U_SO1_DOCUMENTOSBO": 101475685,
+      "U_SO1_TIPO": "PE",
+      "U_SO1_VERIFICADO": "N",
+      "U_SO1_STATUS": "A",
+      "U_SO1_FACTURA": "Y",
+      "U_SO1_FECHA": "2026-09-14T00:00:00.000Z",
+      "U_SO1_HORA": 855,
+      "U_SO1_FECHAENTREGA": "2026-09-14T00:00:00.000Z",
+      "U_SO1_HORAENTREGA": null,
+      "U_SO1_FECHACIERREDOC": null,
+      "U_SO1_VENDEDOR": 8
+    },
+    {
+      "Name": "SPSS04CO60265",
+      "U_SO1_DOCUMENTOSBO": 100206148,
+      "U_SO1_TIPO": "CO",
+      "U_SO1_VERIFICADO": "N",
+      "U_SO1_STATUS": "C",
+      "U_SO1_FACTURA": "N",
+      "U_SO1_FECHA": "2026-09-14T00:00:00.000Z",
+      "U_SO1_HORA": 843,
+      "U_SO1_FECHAENTREGA": null,
+      "U_SO1_HORAENTREGA": null,
+      "U_SO1_FECHACIERREDOC": null,
+      "U_SO1_VENDEDOR": 8
+    }
+  ]
+}
+
+R1EjemplosValidados
+{
+  "nombre": "R1EjemplosValidados",
+  "ms": 16,
+  "filas": [
+    {
+      "Name": "SPSS09PE388894",
+      "U_SO1_DOCUMENTOSBO": 101475796,
+      "U_SO1_TIPO": "PE",
+      "U_SO1_VERIFICADO": "Y",
+      "U_SO1_STATUS": "C",
+      "U_SO1_FACTURA": "Y",
+      "U_SO1_FECHA": "2026-09-16T00:00:00.000Z",
+      "U_SO1_HORA": 856,
+      "U_SO1_FECHAENTREGA": "2026-09-16T00:00:00.000Z",
+      "U_SO1_HORAENTREGA": null
+    },
+    {
+      "Name": "SPSS09PE388893",
+      "U_SO1_DOCUMENTOSBO": 101475795,
+      "U_SO1_TIPO": "PE",
+      "U_SO1_VERIFICADO": "Y",
+      "U_SO1_STATUS": "C",
+      "U_SO1_FACTURA": "Y",
+      "U_SO1_FECHA": "2026-09-16T00:00:00.000Z",
+      "U_SO1_HORA": 854,
+      "U_SO1_FECHAENTREGA": "2026-09-16T00:00:00.000Z",
+      "U_SO1_HORAENTREGA": null
+    },
+    {
+      "Name": "SPSS06PE388720",
+      "U_SO1_DOCUMENTOSBO": 101475794,
+      "U_SO1_TIPO": "PE",
+      "U_SO1_VERIFICADO": "Y",
+      "U_SO1_STATUS": "C",
+      "U_SO1_FACTURA": "Y",
+      "U_SO1_FECHA": "2026-09-16T00:00:00.000Z",
+      "U_SO1_HORA": 848,
+      "U_SO1_FECHAENTREGA": "2026-09-16T00:00:00.000Z",
+      "U_SO1_HORAENTREGA": null
+    }
+  ]
+}
+
+R1RelacionOrigenCampos
+{
+  "nombre": "R1RelacionOrigenCampos",
+  "filas": [
+    {
+      "campo": "U_SO1_PEDIDO"
+    },
+    {
+      "campo": "U_SO1_REFERENCIA"
+    },
+    {
+      "campo": "U_SO1_ESCANTBASEPROM"
+    },
+    {
+      "campo": "U_SO1_FOLIOREFACONSO"
+    },
+    {
+      "campo": "U_SO1_CONFIRMAPEDIDO"
+    },
+    {
+      "campo": "U_SO1_ORIGENDOCUMENT"
+    },
+    {
+      "campo": "U_SO1_COMPONENORIGEN"
+    }
+  ]
+}
+
+R1RelacionOrigenValores
+{
+  "nombre": "R1RelacionOrigenValores",
+  "filas": [
+    {
+      "Name": "SPSS03PE390619",
+      "U_SO1_DOCUMENTOSBO": 101475685,
+      "U_SO1_TIPO": "PE",
+      "U_SO1_PEDIDO": "N",
+      "U_SO1_REFERENCIA": "",
+      "U_SO1_ORIGENDOCUMENT": null,
+      "U_SO1_COMPONENORIGEN": "01"
+    },
+    {
+      "Name": "SPSS04CO60265",
+      "U_SO1_DOCUMENTOSBO": 100206148,
+      "U_SO1_TIPO": "CO",
+      "U_SO1_PEDIDO": "N",
+      "U_SO1_REFERENCIA": "",
+      "U_SO1_ORIGENDOCUMENT": null,
+      "U_SO1_COMPONENORIGEN": "01"
+    }
+  ]
+}
+
+FUENTE: PedidosBodega (solo lectura)
+
+asignacionesCaso
+{
+  "nombre": "asignacionesCaso",
+  "ms": 36,
+  "filas": [
+    {
+      "idOrigen": "R1:TSPS01:SPSS03PE390619",
+      "identificadorDetalle": "2",
+      "usuarioAsignado": "acalix",
+      "nombreAsignado": "Ana Calix",
+      "creadoEn": "2026-09-14T14:56:34.356Z",
+      "actualizadoEn": "2026-09-14T14:56:34.356Z"
+    }
+  ]
+}
+
+despachosCaso
+{
+  "nombre": "despachosCaso",
+  "ms": 25,
+  "filas": [
+    {
+      "idOrigen": "R1:TSPS01:SPSS03PE390619",
+      "origenPedido": "R1",
+      "folioPedido": "SPSS03PE390619",
+      "sapDocEntry": null,
+      "numeroPedido": "SPSS03PE390619",
+      "estadoLocal": "DESPACHADO",
+      "despachadoEn": "2026-09-14T14:56:37.248Z",
+      "validadoDetectadoEn": null
+    }
+  ]
+}
+
+FIN DEL INFORME.
+

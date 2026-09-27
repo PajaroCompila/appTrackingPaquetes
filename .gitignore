@@ -9,3 +9,6 @@ appPedidosBodega.rar
 tablasR1.xlsx
 ~$*
 **/test-results/
+
+# Perfiles temporales de LibreOffice
+documentacion/.lo_profile*/

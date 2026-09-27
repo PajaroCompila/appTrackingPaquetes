@@ -87,13 +87,7 @@
     </div>
   </form>
 
-  @if (informacionIncompleta()) {
-    <p class="aviso-fuente" role="status">Una fuente no respondió. Los datos pueden estar incompletos.</p>
-  }
-
-  @if (actualizando()) { <p class="estado-actualizacion" role="status">Actualizando…</p> }
-  @if (avisoActualizacion()) { <p class="aviso-actualizacion" role="status">{{ avisoActualizacion() }}</p> }
-  @if (!actualizando() && ultimaActualizacion()) {
+  @if (ultimaActualizacion()) {
     <p class="estado-actualizacion">Última actualización: {{ ultimaActualizacion() | date:'hh:mm:ss a' }}</p>
   }
 

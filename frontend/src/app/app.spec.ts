@@ -27,6 +27,14 @@ describe('App', () => {
     }).compileComponents();
   });
 
+  it('muestra solo el enlace dashboard para DASHBOARDS', () => {
+    usuario.update(s => s ? { ...s, codigoRol: 'DASHBOARDS' } : s);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
+    expect(enlaces.map(e => e.getAttribute('href'))).toEqual(['/dashboard']);
+  });
+
   it('muestra la identidad de la aplicación', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -41,15 +49,17 @@ describe('App', () => {
     fixture.detectChanges();
     const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
 
-    expect(enlaces).toHaveLength(3);
+    expect(enlaces).toHaveLength(4);
     expect(enlaces.map((enlace) => enlace.getAttribute('aria-label'))).toEqual([
       'Pedidos pendientes',
       'Pedidos despachados',
+      'Pedidos devueltos',
       'Historial',
     ]);
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
       '/pedidos',
       '/pedidos-despachados',
+      '/pedidos-devueltos',
       '/historial-validados',
     ]);
     expect(fixture.nativeElement.querySelector('a[href="/dashboard"]')).toBeNull();
