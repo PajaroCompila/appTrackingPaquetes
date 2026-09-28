@@ -37,7 +37,8 @@ describe('historial de pedidos CANCEL', () => {
     await crear();
     expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:'',fechaHasta:'',codigosAlmacen:[]}));
     expect(fixture.nativeElement.textContent).toContain('101471323');
-    expect(fixture.nativeElement.textContent).toContain('CANCEL');
+    expect(fixture.nativeElement.textContent).toContain('CANCELADO');
+    expect(fixture.nativeElement.textContent).not.toContain('CANCEL</span>');
     expect(fixture.nativeElement.textContent).not.toContain('Confirmar');
     expect(fixture.nativeElement.textContent).not.toContain('Progreso');
   });

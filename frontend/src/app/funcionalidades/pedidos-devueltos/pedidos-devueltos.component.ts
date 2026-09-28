@@ -60,20 +60,19 @@ export class PedidosDevueltosComponent implements OnInit {
 
   public readonly configuracionDetalle: ConfiguracionDetallePedido = {
     contexto: 'Pedidos devueltos', titulo: 'Detalle del pedido cancelado',
-    descripcion: 'Historial de cancelaciones SAP', etiquetaEstado: 'CANCEL', etiquetaFecha: 'Fecha del pedido', severidadEstado: 'peligro',
+    descripcion: 'Pedido cancelado en SAP', etiquetaEstado: 'CANCELADO', etiquetaFecha: 'Fecha del pedido', severidadEstado: 'peligro',
     etiquetaRetorno: 'Regresar a pedidos devueltos', tituloInformacion: 'Datos del pedido',
     etiquetaArticulos: 'Artículos del pedido', permitirImpresion: false,
-    aviso: 'Cancelación confirmada en SAP. Este registro no acredita una recepción física de mercadería.',
   };
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     const p = this.detalle();
     return p ? { idOrigen:p.idOrigen,numeroPedido:p.numeroPedido,tipoDocumento:'Pedido SAP',
       vendedor:p.nombreVendedor ?? null,fechaPedido:p.fechaHoraPedido ?? null,bodega:this.bodegas(p),
-      datosOperativos:[{etiqueta:'Estado SAP',valor:'CANCEL',icono:'pi pi-ban'},
+      datosOperativos:[{etiqueta:'Estado',valor:'CANCELADO',icono:'pi pi-ban'},
         {etiqueta:'Referencia R1',valor:p.folioPedido || 'No disponible',icono:'pi pi-file'}],
       articulos:p.lineas.map(l=>({clave:l.identificadorDetalle,identificadorDetalle:l.identificadorDetalle,
         codigo:l.codigoArticulo,descripcion:l.descripcion,cantidad:l.cantidad,codigoAlmacen:l.codigoAlmacen,
-        nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:'CANCEL'})),
+        nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:'CANCELADO'})),
     } : null;
   });
   public regresar(): void { void this.enrutador.navigateByUrl(this.retorno()); }
@@ -159,6 +158,7 @@ export class PedidosDevueltosComponent implements OnInit {
   }
   public nombreAlmacen(codigo:string):string {return this.almacenes().find(a=>a.codigoAlmacen===codigo)?.nombreAlmacen || codigo;}
   public bodegas(p:PedidoDevuelto):string {return [...new Set(p.lineas.flatMap(l=>l.codigoAlmacen?[l.codigoAlmacen]:[]))].join(', ') || '—';}
+  public estadoVisible(estado:string | null | undefined):string {return estado === 'CANCEL' ? 'CANCELADO' : estado || '—';}
   public progreso(p:PedidoDevuelto):string {return `${p.lineasRecibidas ?? p.lineas.filter(l=>l.estado==='DEVUELTO').length} / ${p.totalLineas ?? p.lineas.length}`;}
   public fecha(v:string|null|undefined):string {return formatearFechaHoraHonduras(v);}
   public clave(p:PedidoDevuelto,l:LineaDevolucion):string {return `${p.idClave}\u0000${l.identificadorDetalle}`;}

@@ -9,7 +9,7 @@
       <div>
         <p class="sobrelinea">Pedidos</p>
         <h1 id="titulo-pedidos-devueltos">Pedidos devueltos</h1>
-        <p>Historial de pedidos cancelados en SAP. Solo estado CANCEL.</p>
+        <p>Pedidos cancelados en SAP.</p>
       </div>
     </div>
 
@@ -108,7 +108,7 @@
               <td data-label="Bodegas">{{ bodegas(pedido) }}</td>
               <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
               <td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td>
-              <td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estado }}</span></td>
+              <td data-label="Estado"><span class="etiqueta-estado">{{ estadoVisible(pedido.estado) }}</span></td>
               <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]" [queryParams]="parametrosRetorno()">Ver detalle</a></td>
             </tr>
           }
@@ -130,7 +130,7 @@
                 <td data-label="Bodega destino">{{ linea.codigoAlmacen || '—' }}</td>
                 <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
                 <td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td>
-                <td data-label="Estado"><span class="etiqueta-estado">{{ linea.estado }}</span></td>
+                <td data-label="Estado"><span class="etiqueta-estado">{{ estadoVisible(linea.estado) }}</span></td>
                 <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]" [queryParams]="parametrosRetorno()">Ver detalle</a></td>
               </tr>
             }
