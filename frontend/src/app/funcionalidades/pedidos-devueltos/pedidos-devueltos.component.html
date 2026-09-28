@@ -79,10 +79,10 @@
   }
 
   <div class="pestanas-historial" role="tablist" aria-label="Forma de ver devoluciones">
-    <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
-      [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
     <button type="button" role="tab" id="pestana-articulos" [attr.aria-selected]="vista() === 'articulos'"
       [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+    <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
+      [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
   </div>
 
   @if (mensaje()) {<p class="mensaje-devolucion" role="status">{{ mensaje() }}</p>}
