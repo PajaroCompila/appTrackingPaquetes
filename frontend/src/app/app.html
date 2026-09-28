@@ -3,7 +3,7 @@
     <aside class="barra-lateral" aria-label="Navegación principal">
       <img class="marca-icono" src="/imagenes/isotipo-pajaro-azul.png" alt="Pájaro Azul" />
       <nav class="navegacion-principal" appCerrarTooltipNavegacion>
-        @if (usuario()?.codigoRol === 'ADMINISTRADOR' || usuario()?.codigoRol === 'DASHBOARDS') {
+        @if (usuario()?.codigoRol === 'ADMINISTRADOR' || usuario()?.codigoRol === 'DASHBOARDS' || usuario()?.codigoRol === 'CONSULTA') {
           <a routerLink="/dashboard" routerLinkActive="activo" aria-label="Dashboard"><i class="pi pi-chart-bar" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Dashboard</span></a>
         }
         <a routerLink="/pedidos" routerLinkActive="activo" aria-label="Pedidos pendientes"><i class="pi pi-list-check" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos pendientes</span></a>

@@ -26,6 +26,12 @@ describe('administradorGuard', () => {
     expect(restringidas.map(r => r.path)).toEqual(['configuracion/usuarios']);
   });
 
+  it('CONSULTA puede abrir dashboard pero no administrar usuarios', () => {
+    usuario.set({usuarioId:'2',nombreUsuario:'consulta',nombreVisible:'Consulta',codigoRol:'CONSULTA',codigoAlmacen:null,debeCambiarContrasena:false});
+    expect(TestBed.runInInjectionContext(() => dashboardGuard())).toBe(true);
+    expect(TestBed.runInInjectionContext(() => administradorGuard())).not.toBe(true);
+  });
+
   it('permite ingresar al administrador', () => {
     usuario.set({ usuarioId: '1', nombreUsuario: 'admin', nombreVisible: 'Administrador',
       codigoRol: 'ADMINISTRADOR', codigoAlmacen: null, debeCambiarContrasena: false });

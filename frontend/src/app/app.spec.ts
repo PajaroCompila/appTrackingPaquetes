@@ -77,12 +77,12 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('a[href="/configuracion/usuarios"]')).toBeNull();
   });
 
-  it('oculta Dashboard y Configuración a un usuario de consulta', () => {
+  it('muestra Dashboard y oculta Usuarios para CONSULTA', () => {
     usuario.update((sesion) => sesion ? { ...sesion, codigoRol: 'CONSULTA' } : sesion);
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('a[href="/dashboard"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/dashboard"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/configuracion/usuarios"]')).toBeNull();
   });
 
