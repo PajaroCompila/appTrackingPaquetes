@@ -35,6 +35,17 @@ describe('App', () => {
     window.localStorage.removeItem('pedidos-bodega:sonido-notificaciones');
   });
 
+  it('DASHBOARDS ve todas las ventanas del menu excepto usuarios', () => {
+    usuario.update(u => u ? {...u, codigoRol: 'DASHBOARDS'} : u);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
+    expect(enlaces.map(e => e.getAttribute('href'))).toEqual([
+      '/dashboard', '/pedidos', '/pedidos-despachados', '/pedidos-devueltos', '/historial-validados']);
+    expect(fixture.nativeElement.querySelector('app-consulta-inventario-articulo-host')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.acciones-notificaciones')).not.toBeNull();
+  });
+
   it('muestra la identidad de la aplicación', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

@@ -44,15 +44,16 @@ export function requerirContrasenaActualizada(
   siguiente();
 }
 
-// Acceso de solo lectura para el rol DASHBOARDS.
+// El rol DASHBOARDS puede consultar todos los modulos excepto usuarios.
 export function requerirAccesoModulo(
   solicitud: Request, _respuesta: Response, siguiente: NextFunction,
 ): void {
   if (solicitud.user?.codigoRol === 'DASHBOARDS') {
     const autenticacion = solicitud.baseUrl === '/api/autenticacion';
-    const dashboard = solicitud.baseUrl === '/api/dashboard' && solicitud.method === 'GET';
-    if (!autenticacion && !dashboard) {
-      siguiente(new ErrorAplicacion(403, 'PERMISO_REQUERIDO', 'Esta cuenta solo puede consultar dashboards.'));
+    const consulta = ['GET', 'HEAD'].includes(solicitud.method)
+      && !/^\/api\/usuarios(?:\/|$)/i.test(solicitud.baseUrl);
+    if (!autenticacion && !consulta) {
+      siguiente(new ErrorAplicacion(403, 'PERMISO_REQUERIDO', 'No tienes permiso para realizar esta accion.'));
       return;
     }
   }

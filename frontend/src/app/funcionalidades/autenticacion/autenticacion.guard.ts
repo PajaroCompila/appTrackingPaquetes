@@ -17,14 +17,6 @@ export const administradorGuard=()=>{const s=inject(AutenticacionService),r=inje
   const validar=()=>s.usuario()?.codigoRol==='ADMINISTRADOR'?true:r.createUrlTree(['/pedidos']);
   return s.usuario()?validar():s.consultarSesion().pipe(map(validar),catchError(()=>of(r.createUrlTree(['/login']))));};
 
-export const accesoOperativoGuard = () => {
-  const s = inject(AutenticacionService), r = inject(Router);
-  const validar = () => s.usuario()?.codigoRol === 'DASHBOARDS'
-    ? r.createUrlTree(['/dashboard']) : true;
-  return s.usuario() ? validar() : s.consultarSesion().pipe(
-    map(validar), catchError(() => of(r.createUrlTree(['/login']))));
-};
-
 export const dashboardGuard = () => {
   const s = inject(AutenticacionService), r = inject(Router);
   const validar = () => ['ADMINISTRADOR', 'DASHBOARDS'].includes(s.usuario()?.codigoRol ?? '')

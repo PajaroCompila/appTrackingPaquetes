@@ -18,6 +18,14 @@ describe('administradorGuard', () => {
     });
   });
 
+  it('DASHBOARDS accede a las ventanas y no a configuracion de usuarios', () => {
+    usuario.set({usuarioId:'1',nombreUsuario:'mkt1',nombreVisible:'Marketing',codigoRol:'DASHBOARDS',codigoAlmacen:null,debeCambiarContrasena:false});
+    expect(TestBed.runInInjectionContext(() => dashboardGuard())).toBe(true);
+    expect(TestBed.runInInjectionContext(() => administradorGuard())).not.toBe(true);
+    const restringidas = routes.filter(r => r.canActivate?.includes(administradorGuard));
+    expect(restringidas.map(r => r.path)).toEqual(['configuracion/usuarios']);
+  });
+
   it('permite ingresar al administrador', () => {
     usuario.set({ usuarioId: '1', nombreUsuario: 'admin', nombreVisible: 'Administrador',
       codigoRol: 'ADMINISTRADOR', codigoAlmacen: null, debeCambiarContrasena: false });

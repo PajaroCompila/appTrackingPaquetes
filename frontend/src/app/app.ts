@@ -1,4 +1,4 @@
-import { Component, computed, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
 import { CerrarTooltipNavegacionDirective } from './compartido/interaccion/cerrar-tooltip-navegacion.directive';
 import { NavigationEnd, NavigationStart, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -30,7 +30,6 @@ export class App {
   public readonly esLogin = signal(this.router.url.startsWith('/login'));
   public readonly panelNotificacionesAbierto = signal(false);
   public readonly usuario = this.autenticacion.usuario;
-  public readonly soloDashboards = computed(() => this.usuario()?.codigoRol === 'DASHBOARDS');
   private readonly notificacionesGlobales = inject(PedidosNotificacionesGlobalesService);
 
   public constructor() {

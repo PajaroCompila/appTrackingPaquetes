@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { accesoOperativoGuard, dashboardGuard, administradorGuard, autenticacionGuard, sesionGuard } from './funcionalidades/autenticacion/autenticacion.guard';
+import { dashboardGuard, administradorGuard, autenticacionGuard, sesionGuard } from './funcionalidades/autenticacion/autenticacion.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'pedidos' },
@@ -11,7 +11,7 @@ export const routes: Routes = [
     import('./funcionalidades/dashboard/ventas-vendedor.component').then(({ VentasVendedorComponent }) => VentasVendedorComponent) },
   {
     path: 'pedidos',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () =>
       import('./funcionalidades/pedidos/lista-pedidos.component').then(
         ({ ListaPedidosComponent }) => ListaPedidosComponent,
@@ -19,16 +19,16 @@ export const routes: Routes = [
   },
   {
     path: 'pedidos-despachados',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () =>
       import('./funcionalidades/pedidos-despachados/pedidos-despachados.component').then(
         ({ PedidosDespachadosComponent }) => PedidosDespachadosComponent,
       ),
   },
-  { path: 'pedidos-despachados/:idOrigen', canActivate: [autenticacionGuard, accesoOperativoGuard], loadComponent: () => import('./funcionalidades/pedidos-despachados/pedidos-despachados.component').then(({PedidosDespachadosComponent})=>PedidosDespachadosComponent) },
+  { path: 'pedidos-despachados/:idOrigen', canActivate: [autenticacionGuard], loadComponent: () => import('./funcionalidades/pedidos-despachados/pedidos-despachados.component').then(({PedidosDespachadosComponent})=>PedidosDespachadosComponent) },
   {
     path: 'historial-validados',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () =>
       import('./funcionalidades/historial/historial.component').then(
         ({ HistorialComponent }) => HistorialComponent,
@@ -36,7 +36,7 @@ export const routes: Routes = [
   },
   {
     path: 'pedidos-devueltos',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () =>
       import('./funcionalidades/pedidos-devueltos/pedidos-devueltos.component').then(
         ({ PedidosDevueltosComponent }) => PedidosDevueltosComponent,
@@ -44,37 +44,37 @@ export const routes: Routes = [
   },
   {
     path: 'pedidos-devueltos/:idOrigen',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () => import('./funcionalidades/pedidos-devueltos/pedidos-devueltos.component')
       .then(({ PedidosDevueltosComponent }) => PedidosDevueltosComponent),
   },
   {
     path: 'historial-validados/:idOrigen',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () => import('./funcionalidades/historial/historial.component')
       .then(({ HistorialComponent }) => HistorialComponent),
   },
   {
-    path: 'pedidos/facturados-pendientes', canActivate: [autenticacionGuard, accesoOperativoGuard],
+    path: 'pedidos/facturados-pendientes', canActivate: [autenticacionGuard],
     loadComponent: () => import('./funcionalidades/facturados-pendientes/facturados-pendientes.component')
       .then(({ FacturadosPendientesComponent }) => FacturadosPendientesComponent),
   },
   {
-    path: 'pedidos/facturados-pendientes/:idOrigen', canActivate: [autenticacionGuard, accesoOperativoGuard],
+    path: 'pedidos/facturados-pendientes/:idOrigen', canActivate: [autenticacionGuard],
     loadComponent: () => import('./funcionalidades/facturados-pendientes/facturados-pendientes.component')
       .then(({ FacturadosPendientesComponent }) => FacturadosPendientesComponent),
   },
   {
     path: 'pedidos/:folioPedido',
-    canActivate: [autenticacionGuard, accesoOperativoGuard],
+    canActivate: [autenticacionGuard],
     loadComponent: () =>
       import('./funcionalidades/pedidos/detalle-pedido.component').then(
         ({ DetallePedidoComponent }) => DetallePedidoComponent,
       ),
   },
-  { path: 'configuracion/usuarios', canActivate: [autenticacionGuard, accesoOperativoGuard, administradorGuard],
+  { path: 'configuracion/usuarios', canActivate: [autenticacionGuard, administradorGuard],
     loadComponent: () => import('./funcionalidades/usuarios/usuarios.component').then(({UsuariosComponent})=>UsuariosComponent) },
-  { path: 'prueba-microinteracciones', canActivate: [autenticacionGuard, accesoOperativoGuard, administradorGuard],
+  { path: 'prueba-microinteracciones', canActivate: [autenticacionGuard, dashboardGuard],
     loadComponent: () => import('./funcionalidades/pruebas/microinteracciones-prueba.component')
       .then(({ MicrointeraccionesPruebaComponent }) => MicrointeraccionesPruebaComponent) },
   { path: '**', redirectTo: 'pedidos' },

@@ -39,13 +39,13 @@ describe('requerirRoles', () => {
 });
 
 describe('acceso del rol DASHBOARDS', () => {
-  it.each(['/api/usuarios', '/api/pedidos', '/api/almacenes', '/api/articulos', '/api/historial-validados', '/api/pedidos-despachados'])(
+  it.each(['/api/usuarios', '/api/usuarios/roles'])(
     'bloquea %s para DASHBOARDS', (baseUrl) => {
       const siguiente = vi.fn();
       requerirAccesoModulo({ user: { ...identidad, nombreUsuario: 'cualquier_usuario', codigoRol: 'DASHBOARDS' }, baseUrl, method: 'GET' } as Request, {} as Response, siguiente);
       expect(siguiente.mock.calls[0]?.[0]).toMatchObject({ estadoHttp: 403 });
     });
-  it.each(['/api/dashboard', '/api/autenticacion'])('permite %s', (baseUrl) => {
+  it.each(['/api/dashboard', '/api/autenticacion', '/api/pedidos', '/api/almacenes', '/api/articulos', '/api/historial-validados', '/api/pedidos-despachados', '/api/pedidos-devueltos'])('permite %s', (baseUrl) => {
     const siguiente = vi.fn();
     requerirAccesoModulo({ user: { ...identidad, nombreUsuario: 'otro_usuario', codigoRol: 'DASHBOARDS' }, baseUrl, method: 'GET' } as Request, {} as Response, siguiente);
     expect(siguiente).toHaveBeenCalledWith();
