@@ -5,6 +5,7 @@ export interface ConfiguracionDetallePedido {
   titulo: string;
   descripcion: string;
   etiquetaEstado: string;
+  etiquetaFecha?: string;
   severidadEstado: SeveridadDetalle;
   etiquetaRetorno: string;
   tituloInformacion: string;

@@ -1,0 +1,27 @@
+{
+  "validadoEn": "2026-09-28T17:13:05.861Z",
+  "fuente": "ORDR.CANCELED=Y",
+  "canceladosSap": 510,
+  "historialLocal": 510,
+  "duplicados": 0,
+  "casos": [
+    {
+      "fecha": "2026-09-02",
+      "pedidos": [
+        "101471323"
+      ],
+      "articulos": 1
+    },
+    {
+      "fecha": "2026-09-10",
+      "pedidos": [
+        "700059230",
+        "700059235"
+      ],
+      "articulos": 2
+    }
+  ],
+  "noCanceladoExcluido": "300532740",
+  "persistenciaSinSap": true,
+  "fechaFiltro": "Fecha del pedido SAP; no se infiere fecha de cancelacion"
+}

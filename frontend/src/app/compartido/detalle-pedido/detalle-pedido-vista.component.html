@@ -71,7 +71,7 @@
       </article>
       <article class="tarjeta-resumen">
         <span class="icono-resumen"><i class="pi pi-calendar" aria-hidden="true"></i></span>
-        <div><span>{{ detalle.tipoDocumento ? 'Fecha de entrega' : 'Fecha del pedido' }}</span><strong>{{ fecha(detalle.fechaPedido) }}</strong></div>
+        <div><span>{{ configuracion.etiquetaFecha ?? (detalle.tipoDocumento ? 'Fecha de entrega' : 'Fecha del pedido') }}</span><strong>{{ fecha(detalle.fechaPedido) }}</strong></div>
       </article>
       <article class="tarjeta-resumen">
         <span class="icono-resumen"><i class="pi pi-box" aria-hidden="true"></i></span>

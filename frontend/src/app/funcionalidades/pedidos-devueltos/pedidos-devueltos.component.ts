@@ -1,12 +1,14 @@
+import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
+import type { ConfiguracionDetallePedido, PedidoDetalleVisual } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, Subject, catchError, combineLatest, finalize, map, switchMap } from 'rxjs';
-import { esFechaCalendarioValida, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
+import { esFechaCalendarioValida } from '../../compartido/estado-filtros-sesion';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
@@ -18,7 +20,7 @@ import { PedidosDevueltosService, type RespuestaPedidosDevueltos } from './pedid
 
 @Component({
   selector: 'app-pedidos-devueltos',
-  imports: [CommonModule, FormsModule, RouterLink, PaginacionComponent, SelectorAlmacenesDirective, CodigoArticuloInventarioDirective],
+  imports: [DetallePedidoVistaComponent, CommonModule, FormsModule, RouterLink, PaginacionComponent, SelectorAlmacenesDirective, CodigoArticuloInventarioDirective],
   templateUrl: './pedidos-devueltos.component.html',
   styleUrls: ['../pedidos/lista-pedidos.component.css', './pedidos-devueltos.component.css'],
 })
@@ -52,12 +54,42 @@ export class PedidosDevueltosComponent implements OnInit {
   public readonly idOrigen = signal<string | null>(null);
   public readonly vista = signal<'pedido' | 'articulos'>('pedido');
   public readonly filtros = {
-    numeroPedido: '', fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
+    numeroPedido: '', fechaDesde: '', fechaHasta: '',
     codigosAlmacen: [] as string[], estado: 'todos' as FiltrosPedidosDevueltos['estado'], cantidadPorPagina: 25,
   };
 
+  public readonly configuracionDetalle: ConfiguracionDetallePedido = {
+    contexto: 'Pedidos devueltos', titulo: 'Detalle del pedido cancelado',
+    descripcion: 'Historial de cancelaciones SAP', etiquetaEstado: 'CANCEL', etiquetaFecha: 'Fecha del pedido', severidadEstado: 'peligro',
+    etiquetaRetorno: 'Regresar a pedidos devueltos', tituloInformacion: 'Datos del pedido',
+    etiquetaArticulos: 'Artículos del pedido', permitirImpresion: false,
+    aviso: 'Cancelación confirmada en SAP. Este registro no acredita una recepción física de mercadería.',
+  };
+  public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
+    const p = this.detalle();
+    return p ? { idOrigen:p.idOrigen,numeroPedido:p.numeroPedido,tipoDocumento:'Pedido SAP',
+      vendedor:p.nombreVendedor ?? null,fechaPedido:p.fechaHoraPedido ?? null,bodega:this.bodegas(p),
+      datosOperativos:[{etiqueta:'Estado SAP',valor:'CANCEL',icono:'pi pi-ban'},
+        {etiqueta:'Referencia R1',valor:p.folioPedido || 'No disponible',icono:'pi pi-file'}],
+      articulos:p.lineas.map(l=>({clave:l.identificadorDetalle,identificadorDetalle:l.identificadorDetalle,
+        codigo:l.codigoArticulo,descripcion:l.descripcion,cantidad:l.cantidad,codigoAlmacen:l.codigoAlmacen,
+        nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:'CANCEL'})),
+    } : null;
+  });
+  public regresar(): void { void this.enrutador.navigateByUrl(this.retorno()); }
+  public parametrosRetorno(): {retorno:string} {
+    const params = new URLSearchParams({numeroPedido:this.filtros.numeroPedido,fechaDesde:this.filtros.fechaDesde,
+      fechaHasta:this.filtros.fechaHasta,vista:this.vista(),pagina:String(this.pagina())});
+    this.filtros.codigosAlmacen.forEach(c=>params.append('codigoAlmacen',c));
+    return {retorno:'/pedidos-devueltos?'+params.toString()};
+  }
+
   public ngOnInit(): void {
     this.cargarAlmacenes();
+    const refresco = setInterval(() => {
+      if (this.aplicados && !this.actualizando()) this.consultar.next();
+    }, 60_000);
+    this.destruirRef.onDestroy(() => clearInterval(refresco));
     this.consultar.pipe(
       switchMap(() => {
         this.actualizando.set(true);
@@ -90,11 +122,10 @@ export class PedidosDevueltosComponent implements OnInit {
       .subscribe(([parametros,q]) => {
         this.versionRuta += 1;
         this.idOrigen.set(parametros.get('idOrigen'));
-        const g=this.filtrosGlobales.obtener();
         this.filtros.numeroPedido=q.get('numeroPedido') ?? '';
-        this.filtros.fechaDesde=esFechaCalendarioValida(q.get('fechaDesde'))?q.get('fechaDesde')!:g.fechaDesde;
-        this.filtros.fechaHasta=esFechaCalendarioValida(q.get('fechaHasta'))?q.get('fechaHasta')!:g.fechaHasta;
-        this.filtros.codigosAlmacen=q.has('codigoAlmacen')?q.getAll('codigoAlmacen'):[...g.codigosAlmacen];
+        this.filtros.fechaDesde=esFechaCalendarioValida(q.get('fechaDesde'))?q.get('fechaDesde')!:'';
+        this.filtros.fechaHasta=esFechaCalendarioValida(q.get('fechaHasta'))?q.get('fechaHasta')!:'';
+        this.filtros.codigosAlmacen=q.has('codigoAlmacen')?q.getAll('codigoAlmacen'):[];
         const estado=q.get('estado');
         this.filtros.estado=estado==='pendiente'||estado==='parcial'||estado==='devuelto'?estado:'todos';
         const cantidad=Number(q.get('cantidadPorPagina'));
@@ -111,8 +142,7 @@ export class PedidosDevueltosComponent implements OnInit {
 
   public buscar(): void { this.guardarGlobales(); this.actualizarRuta(1); }
   public limpiarFiltros(): void {
-    const fecha=obtenerFechaLocalActual();
-    Object.assign(this.filtros,{numeroPedido:'',fechaDesde:fecha,fechaHasta:fecha,codigosAlmacen:[],estado:'todos'});
+    Object.assign(this.filtros,{numeroPedido:'',fechaDesde:'',fechaHasta:'',codigosAlmacen:[],estado:'todos'});
     this.buscar();
   }
   public cambiarVista(vista:'pedido'|'articulos'):void {if(this.vista()!==vista){this.vista.set(vista);this.actualizarRuta(1);}}
@@ -134,7 +164,7 @@ export class PedidosDevueltosComponent implements OnInit {
   public clave(p:PedidoDevuelto,l:LineaDevolucion):string {return `${p.idClave}\u0000${l.identificadorDetalle}`;}
   public puedeConfirmar(l:LineaDevolucion):boolean {
     const u=this.autenticacion.usuario();
-    if(!u||!l.codigoAlmacen||l.estado==='DEVUELTO')return false;
+    if(!u||!l.codigoAlmacen||l.estado==='CANCEL'||l.estado==='DEVUELTO')return false;
     if(u.codigoRol==='ADMINISTRADOR')return true;
     if(u.codigoRol!=='OPERADOR_BODEGA')return false;
     return (u.codigosAlmacenVisibles ?? []).some(c=>c.toUpperCase()===l.codigoAlmacen!.toUpperCase());
@@ -167,7 +197,7 @@ export class PedidosDevueltosComponent implements OnInit {
   @HostListener('window:focus')
   public refrescarAlVolver():void {if(this.aplicados&&!this.confirmando())this.consultar.next();}
   private guardarGlobales():void {
-    this.filtrosGlobales.actualizar({fechaDesde:this.filtros.fechaDesde,fechaHasta:this.filtros.fechaHasta,codigosAlmacen:this.filtros.codigosAlmacen});
+    this.filtrosGlobales.actualizar({codigosAlmacen:this.filtros.codigosAlmacen});
   }
   private actualizarRuta(pagina:number):void {
     this.aplicados={...this.filtros,codigosAlmacen:[...this.filtros.codigosAlmacen],pagina,vista:this.vista()};

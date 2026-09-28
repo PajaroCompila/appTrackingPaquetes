@@ -4,6 +4,7 @@
   "description": "API de Pedidos Bodega",
   "main": "dist/servidor.js",
   "scripts": {
+    "db:sync:cancelaciones": "tsx scripts/sincronizarCancelacionesSap.ts",
     "db:provision": "tsx scripts/aprovisionarBaseDatos.ts",
     "db:migrate:auth": "tsx scripts/migrarAutenticacion.ts",
     "db:migrate:despachos": "tsx scripts/migrarPedidosDespachados.ts",

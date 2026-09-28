@@ -1,58 +1,29 @@
 <section class="pagina vista-pedidos vista-devueltos" aria-labelledby="titulo-pedidos-devueltos">
   @if (idOrigen()) {
-    <a class="boton boton-secundario regresar-devueltos" [routerLink]="retorno()"><i class="pi pi-arrow-left" aria-hidden="true"></i> Regresar a pedidos devueltos</a>
-    @if (detalle(); as pedido) {
-      <div class="panel encabezado-pagina">
-        <div><p class="sobrelinea">Pedido devuelto</p><h1 id="titulo-pedidos-devueltos">Pedido #{{ pedido.numeroPedido }}</h1><p>{{ pedido.nombreVendedor || '—' }}</p></div>
-        <span class="etiqueta-estado">{{ pedido.estado }}</span>
-      </div>
-      <div class="panel datos-devolucion">
-        <div><small>Origen</small><strong>{{ pedido.origenPedido || '—' }}</strong></div>
-        <div><small>Vendedor responsable</small><strong>{{ pedido.nombreVendedor || '—' }}</strong></div>
-        <div><small>Fecha despacho original</small><strong>{{ fecha(pedido.fechaDespacho) }}</strong></div>
-        <div><small>Fecha cancelación</small><strong>{{ fecha(pedido.fechaCancelacion) }}</strong></div>
-        <div><small>Motivo técnico</small><strong>{{ pedido.motivo || '—' }}</strong></div>
-        <div><small>Cancelado por</small><strong>{{ pedido.canceladoPor || 'No disponible' }}</strong></div>
-        <div><small>Progreso</small><strong>{{ progreso(pedido) }}</strong></div>
-        @if (pedido.fechaDevolucionCompleta) {<div><small>Devolución completa</small><strong>{{ fecha(pedido.fechaDevolucionCompleta) }}</strong></div>}
-      </div>
-      <div class="acciones-devolucion">
-        <button class="boton boton-primario" type="button" (click)="confirmarDevolucion()" [disabled]="seleccion().size === 0 || confirmando() || actualizando()">Confirmar devolución ({{ seleccion().size }})</button>
-      </div>
-      <div class="panel tabla-contenedor tabla-detalle-devueltos"><table>
-        <thead><tr><th class="columna-seleccion"><span class="solo-lectores">Seleccionar</span></th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Estado</th><th>Recibido por</th><th>Fecha/hora recepción</th></tr></thead>
-        <tbody>@for (linea of pedido.lineas; track linea.identificadorDetalle) {
-          <tr><td class="columna-seleccion"><input class="seleccion-linea" type="checkbox" [attr.aria-label]="'Seleccionar ' + linea.codigoArticulo" [checked]="estaSeleccionada(pedido, linea)" [disabled]="!puedeConfirmar(linea) || confirmando()" (change)="alternarLinea(pedido, linea)" /></td>
-            <td class="codigo-articulo" [appCodigoArticuloInventario]="linea.codigoArticulo" [codigoAlmacenInventario]="linea.codigoAlmacen"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
-            <td><span class="texto-dos-lineas" [title]="linea.descripcion || ''">{{ linea.descripcion || '—' }}</span></td><td>{{ linea.cantidad }}</td><td>{{ linea.codigoAlmacen }}</td>
-            <td><span class="etiqueta-estado">{{ linea.estado }}</span></td><td>{{ linea.recibidoPor || '—' }}</td><td>{{ fecha(linea.recibidoEn) }}</td>
-          </tr>
-        }</tbody>
-      </table></div>
-    } @else if (cargando()) {<div class="panel estado-interfaz" role="status">Cargando pedido…</div>}
-    @if (error()) {<p class="texto-error" role="alert">{{ error() }}</p>}
-    @if (mensaje()) {<p class="mensaje-devolucion" role="status">{{ mensaje() }}</p>}
+    <app-detalle-pedido-vista [configuracion]="configuracionDetalle" [pedido]="detalleVisual()"
+      [cargando]="cargando()" [error]="error() ? {titulo:'No se pudo cargar el pedido',detalle:error()!} : null"
+      (regresar)="regresar()" (reintentar)="reintentar()" />
   } @else {
   <div class="bloque-superior-operativo">
     <div class="encabezado-pagina">
       <div>
         <p class="sobrelinea">Pedidos</p>
         <h1 id="titulo-pedidos-devueltos">Pedidos devueltos</h1>
-        <p>Controlá los productos que deben regresar físicamente a sus bodegas.</p>
+        <p>Historial de pedidos cancelados en SAP. Solo estado CANCEL.</p>
       </div>
     </div>
 
     <form class="panel filtros" (ngSubmit)="buscar()">
       <div class="campo">
         <label for="numeroPedidoDevuelto">Número de pedido</label>
-        <input id="numeroPedidoDevuelto" name="numeroPedido" inputmode="numeric" maxlength="20" [(ngModel)]="filtros.numeroPedido" />
+        <input id="numeroPedidoDevuelto" name="numeroPedido" maxlength="100" [(ngModel)]="filtros.numeroPedido" />
       </div>
       <div class="campo">
-        <label for="fechaDesdeDevuelto">Fecha desde</label>
+        <label for="fechaDesdeDevuelto">Fecha del pedido desde</label>
         <input id="fechaDesdeDevuelto" name="fechaDesde" type="date" [(ngModel)]="filtros.fechaDesde" />
       </div>
       <div class="campo">
-        <label for="fechaHastaDevuelto">Fecha hasta</label>
+        <label for="fechaHastaDevuelto">Fecha del pedido hasta</label>
         <input id="fechaHastaDevuelto" name="fechaHasta" type="date" [(ngModel)]="filtros.fechaHasta" />
       </div>
       <div class="campo campo-amplio campo-almacenes">
@@ -114,11 +85,6 @@
       [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
   </div>
 
-  @if (vista() === 'articulos') {
-    <div class="acciones-devolucion">
-      <button class="boton boton-primario" type="button" (click)="confirmarDevolucion()" [disabled]="seleccion().size === 0 || confirmando() || actualizando()">Confirmar devolución ({{ seleccion().size }})</button>
-    </div>
-  }
   @if (mensaje()) {<p class="mensaje-devolucion" role="status">{{ mensaje() }}</p>}
 
   @if (cargando()) {
@@ -133,7 +99,7 @@
   } @else if (vista() === 'pedido') {
     <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
       <table class="tabla-pedido-devuelto">
-        <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Vendedor responsable</th><th>Fecha cancelación</th><th>Progreso devolución</th><th>Estado</th><th>Ver detalle</th></tr></thead>
+        <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Ver detalle</th></tr></thead>
         <tbody>
           @for (pedido of devoluciones(); track pedido.idClave) {
             <tr>
@@ -141,10 +107,9 @@
               <td data-label="Artículos">{{ pedido.totalLineas ?? pedido.lineas.length }}</td>
               <td data-label="Bodegas">{{ bodegas(pedido) }}</td>
               <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
-              <td data-label="Fecha cancelación">{{ fecha(pedido.fechaCancelacion) }}</td>
-              <td data-label="Progreso devolución">{{ progreso(pedido) }}</td>
+              <td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td>
               <td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estado }}</span></td>
-              <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]">Ver detalle</a></td>
+              <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]" [queryParams]="parametrosRetorno()">Ver detalle</a></td>
             </tr>
           }
         </tbody>
@@ -153,22 +118,20 @@
   } @else {
     <div class="panel tabla-contenedor tabla-articulos-devueltos" role="tabpanel" aria-labelledby="pestana-articulos">
       <table>
-        <thead><tr><th class="columna-seleccion"><span class="solo-lectores">Seleccionar</span></th><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Vendedor responsable</th><th>Fecha cancelación</th><th>Estado</th><th>Recibido por</th><th>Ver detalle</th></tr></thead>
+        <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Ver detalle</th></tr></thead>
         <tbody>
           @for (pedido of devoluciones(); track pedido.idClave) {
             @for (linea of pedido.lineas; track linea.identificadorDetalle) {
               <tr>
-                <td class="columna-seleccion"><input class="seleccion-linea" type="checkbox" [attr.aria-label]="'Seleccionar ' + linea.codigoArticulo + ' del pedido ' + pedido.numeroPedido" [checked]="estaSeleccionada(pedido, linea)" [disabled]="!puedeConfirmar(linea) || confirmando()" (change)="alternarLinea(pedido, linea)" /></td>
                 <td data-label="Pedido"><strong>{{ pedido.numeroPedido }}</strong></td>
                 <td class="codigo-articulo" data-label="Código" [appCodigoArticuloInventario]="linea.codigoArticulo" [codigoAlmacenInventario]="linea.codigoAlmacen"><strong>{{ linea.codigoArticulo || '—' }}</strong></td>
                 <td data-label="Descripción"><span class="texto-dos-lineas">{{ linea.descripcion || '—' }}</span></td>
                 <td data-label="Cantidad">{{ linea.cantidad }}</td>
                 <td data-label="Bodega destino">{{ linea.codigoAlmacen || '—' }}</td>
                 <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
-                <td data-label="Fecha cancelación">{{ fecha(pedido.fechaCancelacion) }}</td>
+                <td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td>
                 <td data-label="Estado"><span class="etiqueta-estado">{{ linea.estado }}</span></td>
-                <td data-label="Recibido por">{{ linea.recibidoPor || '—' }}</td>
-                <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]">Ver detalle</a></td>
+                <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]" [queryParams]="parametrosRetorno()">Ver detalle</a></td>
               </tr>
             }
           }

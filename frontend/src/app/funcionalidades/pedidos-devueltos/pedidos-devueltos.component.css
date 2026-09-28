@@ -73,18 +73,8 @@
 .pestanas-historial button:focus-visible { outline: 2px solid var(--azul-500); outline-offset: 2px; }
 
 .tabla-contenedor { overflow-x: auto; }
-.tabla-articulos-devueltos table { min-width: 1380px; table-layout: fixed; }
-.tabla-articulos-devueltos th:nth-child(1) { width: 3%; }
-.tabla-articulos-devueltos th:nth-child(2) { width: 7%; }
-.tabla-articulos-devueltos th:nth-child(3) { width: 13%; }
-.tabla-articulos-devueltos th:nth-child(4) { width: 18%; }
-.tabla-articulos-devueltos th:nth-child(5) { width: 5%; }
-.tabla-articulos-devueltos th:nth-child(6) { width: 7%; }
-.tabla-articulos-devueltos th:nth-child(7) { width: 12%; }
-.tabla-articulos-devueltos th:nth-child(8) { width: 9%; }
-.tabla-articulos-devueltos th:nth-child(9) { width: 11%; }
-.tabla-articulos-devueltos th:nth-child(10) { width: 8%; }
-.tabla-articulos-devueltos th:nth-child(11) { width: 7%; }
+.tabla-articulos-devueltos table { min-width: 1100px; table-layout: auto; }
+.tabla-articulos-devueltos th:nth-child(3) { min-width: 240px; }
 .vista-devueltos th, .vista-devueltos td { text-align: center; overflow-wrap: anywhere; }
 :host .vista-devueltos .tabla-contenedor th { white-space: normal; overflow-wrap: normal; line-height: 1.25; }
 .vista-devueltos .codigo-articulo { overflow-wrap: normal; }
@@ -113,3 +103,8 @@
   .tabla-articulos-devueltos table { min-width: 0; table-layout: auto; }
   :host .vista-devueltos .tabla-contenedor table { min-width: 0; table-layout: auto; }
 }
+
+@media (min-width: 681px) {
+  .vista-devueltos .tabla-contenedor table { min-width: 1000px; }
+}
+.vista-devueltos .etiqueta-estado { color: #a12d2d; background: #fcecec; }

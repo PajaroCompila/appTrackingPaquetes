@@ -1,9 +1,10 @@
+import { cancelacionesSap } from './cancelacionSapHistorial.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
-import { PedidoDevueltoRepositorio, type FiltrosDevolucion, type SeleccionDevolucion } from './pedidoDevueltoRepositorio.js';
+import { type FiltrosDevolucion, type SeleccionDevolucion } from './pedidoDevueltoRepositorio.js';
 import type { PedidoDevuelto } from './pedidoDevueltoServicio.js';
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 
@@ -26,7 +27,7 @@ export interface RepositorioDevolucionRutas {
   obtener(id: string): Promise<PedidoDevuelto|null>;
   confirmar(s: SeleccionDevolucion[],u: IdentidadAutenticada): Promise<void>;
 }
-export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = new PedidoDevueltoRepositorio()): Router {
+export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = cancelacionesSap): Router {
   const rutas = Router();
   rutas.get('/',async(req,res,next) => {
     try {
@@ -35,7 +36,7 @@ export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = new 
       const codigosAlmacen = restringirCodigosAlmacen(req.user,codigoAlmacen).map(c => c.toUpperCase());
       const r = await repo.listar({...f,codigosAlmacen});
       const datos = r.datos.map(p => ({...p,lineas:p.lineas.filter(l => puedeVerAlmacen(req.user,l.codigoAlmacen)
-        && (!codigosAlmacen.length || codigosAlmacen.includes(l.codigoAlmacen?.toUpperCase() ?? '')))})).filter(p => p.lineas.length>0);
+        && (!codigosAlmacen.length || codigosAlmacen.includes(l.codigoAlmacen?.toUpperCase() ?? '')))})).filter(p => p.lineas.length>0 || (codigosAlmacen.length===0 && p.totalLineas===0));
       res.json({datos,paginacion:{pagina:f.pagina,cantidadPorPagina:f.cantidadPorPagina,totalRegistros:r.total,
         cantidadDevuelta:f.vista==='pedido'?datos.length:datos.reduce((n,p)=>n+p.lineas.length,0),hayMas:f.pagina*f.cantidadPorPagina<r.total}});
     } catch(e) {next(errorDatos(e));}
@@ -54,7 +55,7 @@ export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = new 
       const pedido = await repo.obtener(id);
       if (!pedido) throw new ErrorAplicacion(404,'DEVOLUCION_NO_ENCONTRADA','No se encontró la devolución.');
       const lineas = pedido.lineas.filter(l => puedeVerAlmacen(req.user,l.codigoAlmacen));
-      if (!lineas.length) throw new ErrorAplicacion(403,'PERMISO_DEVOLUCION','No tenés permiso para ver esta devolución.');
+      if (!lineas.length && !(pedido.totalLineas===0 && restringirCodigosAlmacen(req.user,[]).length===0)) throw new ErrorAplicacion(403,'PERMISO_DEVOLUCION','No tenés permiso para ver esta devolución.');
       res.json({datos:{...pedido,lineas}});
     } catch(e) {next(errorDatos(e));}
   });

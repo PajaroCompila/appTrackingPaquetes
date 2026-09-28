@@ -2,7 +2,7 @@ import { HistorialServicio } from './historialServicio.js';
 import { configuracion } from '../../configuracion/configuracion.js';
 import { EntregaSapSincronizador } from './entregaSapSincronizador.js';
 import { ConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
-import { PedidoDevueltoSincronizador } from '../pedidosDevueltos/pedidoDevueltoSincronizador.js';
+import { cancelacionesSap, type CancelacionSapHistorial } from '../pedidosDevueltos/cancelacionSapHistorial.js';
 import { ControlOperativoSincronizador } from '../facturadosPendientes/controlOperativoSincronizador.js';
 
 let temporizador: NodeJS.Timeout | undefined;
@@ -10,7 +10,7 @@ let activo = false;
 let ejecutando = false;
 let servicio: HistorialServicio | undefined;
 let servicioEntregas: EntregaSapSincronizador | undefined;
-let servicioDevoluciones: PedidoDevueltoSincronizador | undefined;
+let servicioDevoluciones: CancelacionSapHistorial | undefined;
 let servicioControlOperativo: ControlOperativoSincronizador | undefined;
 
 function programarSiguiente(): void {
@@ -49,7 +49,7 @@ export function iniciarSincronizadorHistorial(): void {
   if (activo) return;
   servicio = new HistorialServicio();
   servicioEntregas = new EntregaSapSincronizador(undefined, undefined, new ConciliacionEntregaPedido());
-  servicioDevoluciones = new PedidoDevueltoSincronizador();
+  servicioDevoluciones = cancelacionesSap;
   servicioControlOperativo = new ControlOperativoSincronizador();
   activo = true;
   void ejecutar();
