@@ -71,10 +71,7 @@ export class InventarioComponent implements OnInit, AfterViewInit {
   public buscar(): void {
     const termino = this.terminoBusqueda.trim();
     if (termino.length < 2) return;
-    const activos = this.resultados();
-    const seleccionado = activos[this.indiceActivo()]
-      ?? activos.find(({ codigoArticulo }) => codigoArticulo.toLocaleLowerCase() === termino.toLocaleLowerCase())
-      ?? (activos.length === 1 ? activos[0] : undefined);
+    const seleccionado = this.resultados()[this.indiceActivo()];
     if (seleccionado) {
       this.seleccionar(seleccionado);
       return;

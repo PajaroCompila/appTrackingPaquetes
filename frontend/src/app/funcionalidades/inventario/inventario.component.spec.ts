@@ -51,6 +51,25 @@ describe('InventarioComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Sintetizador 76 teclas');
   });
 
+  it('trata esm como coincidencia y no abre inventario hasta seleccionar un resultado', async () => {
+    buscarArticulosInventario.mockReturnValueOnce(of({ datos: [
+      { codigoArticulo: 'ESM-MS123', descripcion: 'Stand para micrófono' },
+      { codigoArticulo: 'RP-ESM-PASTI-UHF113', descripcion: 'Pastilla para micrófono' },
+    ] }));
+    fixture.componentInstance.terminoBusqueda = 'esm';
+    fixture.componentInstance.buscar();
+    await vi.advanceTimersByTimeAsync(250);
+    fixture.detectChanges();
+
+    expect(buscarArticulosInventario).toHaveBeenCalledWith('esm');
+    expect(abrir).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('ESM-MS123');
+    expect(fixture.nativeElement.textContent).toContain('RP-ESM-PASTI-UHF113');
+
+    (fixture.nativeElement.querySelector('.resultado-articulo') as HTMLButtonElement).click();
+    expect(abrir).toHaveBeenCalledWith('ESM-MS123', undefined);
+  });
+
   it('abre el modal compartido al seleccionar una coincidencia', async () => {
     fixture.componentInstance.terminoBusqueda = 'yam';
     fixture.componentInstance.alCambiarTermino('yam');
