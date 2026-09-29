@@ -91,6 +91,14 @@ describe('Facturados pendientes: vista operativa aislada',()=> {
     const boton=[...fixture.nativeElement.querySelectorAll('button')].find((b:HTMLButtonElement)=>b.textContent?.trim()==='Confirmar entrega');
     expect(boton.disabled).toBe(false);boton.click();expect(servicio.confirmar).toHaveBeenCalledWith(linea);
   });
+  it('DASHBOARDS abre el detalle sin accion para confirmar',()=> {
+    usuario.set({nombreUsuario:'visor',codigoRol:'DASHBOARDS'});
+    ruta.next(convertToParamMap({idOrigen:pedido.idOrigen}));fixture.detectChanges();
+    const botones=[...fixture.nativeElement.querySelectorAll('button')] as HTMLButtonElement[];
+    expect(botones.some(b=>b.textContent?.trim()==='Confirmar entrega')).toBe(false);
+    fixture.componentInstance.confirmar(linea);
+    expect(servicio.confirmar).not.toHaveBeenCalled();
+  });
   it('al confirmar última línea navega a la cola sin tocar Historial ni Pendientes',()=> {
     ruta.next(convertToParamMap({idOrigen:pedido.idOrigen}));
     servicio.obtener.mockReturnValue(throwError(()=>({status:404})));

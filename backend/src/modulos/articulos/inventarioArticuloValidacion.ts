@@ -7,6 +7,6 @@ const codigoSeguro = (maximo: number, permiteEspacios = false) =>
 
 export const esquemaCodigoArticulo = codigoSeguro(100, true);
 export const esquemaConsultaInventario = z.object({
-  codigoAlmacen: codigoSeguro(16),
+  codigoAlmacen: codigoSeguro(16).optional(),
 }).strict();
 

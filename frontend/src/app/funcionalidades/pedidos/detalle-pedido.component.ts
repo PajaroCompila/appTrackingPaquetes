@@ -14,6 +14,7 @@ import { PedidosService } from './pedidos.service';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import { claveArticuloAsignado, type AsignacionArticulo } from '../../compartido/asignaciones/asignacion.interface';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
 import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 
 @Component({
@@ -51,7 +52,7 @@ export class DetallePedidoComponent implements OnInit {
     const rol = this.autenticacion.usuario()?.codigoRol;
     return rol === 'ADMINISTRADOR' || rol === 'OPERADOR_BODEGA';
   });
-  public readonly configuracionDetalle: ConfiguracionDetallePedido = {
+  public readonly configuracionDetalle = computed<ConfiguracionDetallePedido>(() => ({
     contexto: 'Pedido pendiente',
     titulo: 'Detalle del pedido pendiente',
     descripcion: 'Datos del pedido y sus artículos pendientes.',
@@ -60,8 +61,13 @@ export class DetallePedidoComponent implements OnInit {
     etiquetaRetorno: 'Regresar a pedidos pendientes',
     tituloInformacion: 'Información del pedido',
     etiquetaArticulos: 'Artículos del pedido',
-    herramientasImpresionPendiente: true,
-  };
+    herramientasImpresionPendiente: obtenerPermisosRol(
+      this.autenticacion.usuario()?.codigoRol,
+    ).registrarImpresiones,
+    permitirImpresion: obtenerPermisosRol(
+      this.autenticacion.usuario()?.codigoRol,
+    ).registrarImpresiones,
+  }));
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     const detalle = this.detalle();
     if (!detalle) return null;

@@ -12,6 +12,7 @@ import { AlmacenesService } from './almacenes.service';
 import type { PedidoResumen } from './pedido.interface';
 import { ListaPedidosComponent } from './lista-pedidos.component';
 import { PedidosService } from './pedidos.service';
+import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
 
 describe('ListaPedidos: selección masiva visible por sección', () => {
   let fixture: ComponentFixture<ListaPedidosComponent>;
@@ -22,6 +23,9 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
   const registrarImpresiones = vi.fn();
   const estadosAsignacion = new Map<string, AsignacionArticulo>();
   const asignaciones = { consultar: vi.fn(), obtenerUsuarios: vi.fn(), guardar: vi.fn(), reasignar: vi.fn() };
+  const usuario = signal<UsuarioSesion>({ usuarioId: '1', nombreUsuario: 'sistemas',
+    nombreVisible: 'Sistemas', codigoRol: 'ADMINISTRADOR', codigoAlmacen: null,
+    debeCambiarContrasena: false });
 
   const asignacion = (
     idOrigen: string,
@@ -50,6 +54,7 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     sessionStorage.clear();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-21T14:00:00Z'));
+    usuario.set({ ...usuario(), codigoRol: 'ADMINISTRADOR' });
     for (const nombre of ['showModal', 'close'] as const) {
       if (!HTMLDialogElement.prototype[nombre]) Object.defineProperty(HTMLDialogElement.prototype, nombre, {
         configurable: true, value(this: HTMLDialogElement) { this.open = nombre === 'showModal'; },
@@ -100,10 +105,7 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
         { provide: AsignacionesService, useValue: asignaciones },
         { provide: ImpresionesService, useValue: { registrar: registrarImpresiones } },
         { provide: PedidosNotificacionesService, useValue: { procesarRespuesta: vi.fn() } },
-        { provide: AutenticacionService, useValue: { usuario: signal({
-          usuarioId: '1', nombreUsuario: 'sistemas', nombreVisible: 'Sistemas',
-          codigoRol: 'ADMINISTRADOR', codigoAlmacen: null, debeCambiarContrasena: false,
-        }) } },
+        { provide: AutenticacionService, useValue: { usuario } },
         { provide: ActivatedRoute, useValue: {
           queryParamMap: of(convertToParamMap({})), snapshot: { queryParamMap: convertToParamMap({}) },
         } },
@@ -129,7 +131,24 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
       const acciones = [...seccion.querySelectorAll('.columna-accion-masiva button')]
         .map((boton) => boton.textContent?.trim());
       expect(acciones).toEqual(['TRANSFERIR TODO', 'IMPRIMIR TODO']);
+      expect(seccion.querySelector('.acciones-impresion-grupo .boton-imprimir-seleccionados'))
+        .not.toBeNull();
     });
+  });
+
+  it('DASHBOARDS ve ambos grupos sin asignar, transferir ni imprimir', () => {
+    usuario.set({ ...usuario(), codigoRol: 'DASHBOARDS', nombreUsuario: 'visor' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelector('.boton-asignar')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.columna-transferir')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.columna-imprimir')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.acciones-impresion-grupo')).toBeNull();
+    componente.transferir();
+    componente.imprimirSeleccionados('normales');
+    expect(despacharLineas).not.toHaveBeenCalled();
+    expect(registrarImpresiones).not.toHaveBeenCalled();
   });
 
   it('selecciona y desmarca transferencia solo en la sección pulsada', () => {
@@ -160,8 +179,12 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     fixture.detectChanges();
     expect(componente.lineasSeleccionadasImpresion().size).toBe(1);
     expect(componente.lineasSeleccionadasTransferencia().size).toBe(2);
-    expect(fixture.nativeElement.querySelector('.boton-imprimir-seleccionados').textContent)
+    expect(fixture.nativeElement.querySelector('#titulo-normales')?.parentElement
+      .querySelector('.boton-imprimir-seleccionados').textContent)
       .toContain('(1)');
+    expect(fixture.nativeElement.querySelector('#titulo-especiales')?.parentElement
+      .querySelector('.boton-imprimir-seleccionados').textContent)
+      .toContain('(0)');
   });
 
   it('reconcilia ambas selecciones al refrescar y elimina únicamente la línea desaparecida', async () => {
@@ -195,7 +218,8 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
     estadosAsignacion.set('R1:NORMAL:1\u00001', asignacion('R1:NORMAL:1', '1', 'gcruz', 'Gregorio Cruz'));
     estadosAsignacion.set('R1:NORMAL:1\u00002', asignacion('R1:NORMAL:1', '2', 'mperez', 'Marcos Perez'));
     componente.seleccionarTodasImpresiones('normales');
-    componente.imprimirSeleccionados();
+    componente.seleccionarTodasImpresiones('especiales');
+    componente.imprimirSeleccionados('normales');
     await vi.advanceTimersByTimeAsync(0);
     expect(componente.articulosImpresion().map(({ vendedor, asignadoA }) => ({ vendedor, asignadoA })))
       .toEqual([
@@ -210,7 +234,8 @@ describe('ListaPedidos: selección masiva visible por sección', () => {
       { idOrigen: 'R1:NORMAL:1', identificadorDetalle: '1', codigoArticulo: 'ART-1' },
       { idOrigen: 'R1:NORMAL:1', identificadorDetalle: '2', codigoArticulo: 'ART-2' },
     ]);
-    expect(componente.lineasSeleccionadasImpresion().size).toBe(0);
+    expect(componente.lineasSeleccionadasImpresion().size).toBe(1);
+    expect(componente.cantidadSeleccionadaImpresion('especiales')).toBe(1);
     imprimir.mockRestore();
   });
 

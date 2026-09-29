@@ -1,17 +1,27 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { DetallePedidoComponent } from './detalle-pedido.component';
 import { PedidosService } from './pedidos.service';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
+import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
+import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 
 describe('DetallePedidoComponent', () => {
+  const usuario = signal<UsuarioSesion>({ usuarioId: '1', nombreUsuario: 'operador',
+    nombreVisible: 'Operador', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+    debeCambiarContrasena: false });
   let fixture: ComponentFixture<DetallePedidoComponent>;
   let pedidosService: { obtenerDetallePedido: ReturnType<typeof vi.fn> };
   let enrutador: {
     navigateByUrl: ReturnType<typeof vi.fn>;
     parseUrl: ReturnType<typeof vi.fn>;
   };
+
+  beforeEach(() => usuario.set({ ...usuario(), codigoRol: 'OPERADOR_BODEGA' }));
 
   async function configurar(respuesta: unknown, retorno = '/pedidos?pagina=2'): Promise<void> {
     pedidosService = { obtenerDetallePedido: vi.fn().mockReturnValue(respuesta) };
@@ -31,6 +41,12 @@ describe('DetallePedidoComponent', () => {
       imports: [DetallePedidoComponent],
       providers: [
         { provide: PedidosService, useValue: pedidosService },
+        { provide: AutenticacionService, useValue: { usuario } },
+        { provide: AsignacionesService, useValue: {
+          consultar: () => of({ datos: [] }), obtenerUsuarios: () => of({ datos: [],
+            puedeAsignar: false, puedeAsignarTodos: false, puedeReasignar: false }),
+        } },
+        { provide: ImpresionesService, useValue: { consultar: () => of({ datos: [] }), registrar: vi.fn() } },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -45,6 +61,23 @@ describe('DetallePedidoComponent', () => {
     }).compileComponents();
     fixture = TestBed.createComponent(DetallePedidoComponent);
   }
+
+  it('DASHBOARDS abre el detalle pendiente sin transferir ni imprimir', async () => {
+    usuario.set({ ...usuario(), codigoRol: 'DASHBOARDS' });
+    await configurar(of({ datos: {
+      cabecera: { idOrigen: 'R1:TSPS01:F1', folioPedido: 'F1', numeroPedido: '101',
+        nombreVendedor: 'Vendedor', codigosAlmacen: ['TSPS01'], nombresBodega: 'Principal',
+        fechaHoraPedido: '2026-09-29T08:00:00', codigoEstadoVenta: 'A' },
+      partidas: [{ numeroPartida: '1', codigoArticulo: 'A1', descripcionArticulo: 'Articulo',
+        cantidadSolicitada: 1, codigoAlmacen: 'TSPS01', nombreAlmacen: 'Principal',
+        codigoEstadoEntrega: 'A' }],
+    } }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('TRANSFERIR TODO');
+    expect(fixture.nativeElement.textContent).not.toContain('IMPRIMIR TODO');
+    expect(fixture.nativeElement.textContent).not.toContain('Imprimir seleccionados');
+  });
 
   it('renderiza partidas, conserva null y regresa al listado previo', async () => {
     await configurar(of({

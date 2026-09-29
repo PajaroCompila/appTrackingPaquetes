@@ -50,9 +50,12 @@ export function requerirAccesoModulo(
 ): void {
   if (solicitud.user?.codigoRol === 'DASHBOARDS') {
     const autenticacion = solicitud.baseUrl === '/api/autenticacion';
+    const consultaConCuerpo = solicitud.method === 'POST'
+      && ((solicitud.baseUrl === '/api/pedidos/asignaciones' && solicitud.path === '/consultar')
+        || (solicitud.baseUrl === '/api/impresiones' && solicitud.path === '/consultar'));
     const consulta = ['GET', 'HEAD'].includes(solicitud.method)
       && !/^\/api\/usuarios(?:\/|$)/i.test(solicitud.baseUrl);
-    if (!autenticacion && !consulta) {
+    if (!autenticacion && !consulta && !consultaConCuerpo) {
       siguiente(new ErrorAplicacion(403, 'PERMISO_REQUERIDO', 'No tienes permiso para realizar esta accion.'));
       return;
     }

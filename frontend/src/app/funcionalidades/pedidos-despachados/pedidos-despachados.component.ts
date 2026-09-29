@@ -27,6 +27,8 @@ import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/con
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
 import { ImpresionPedidoPosService } from '../pedidos/impresion-pedido-pos.service';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -84,6 +86,7 @@ export class PedidosDespachadosComponent implements OnInit {
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly inyector = inject(Injector);
   private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
+  private readonly autenticacion = inject(AutenticacionService);
   private readonly actualizarAhora = new Subject<boolean>();
   private haCargado = false;
   private consultaEnCurso = false;
@@ -130,12 +133,15 @@ export class PedidosDespachadosComponent implements OnInit {
       etiquetaRetorno: 'Regresar a pedidos despachados',
       tituloInformacion: 'Información de entrega',
       etiquetaArticulos: 'Artículos despachados del pedido',
-      permitirImpresion: true,
+      permitirImpresion: !this.modoSoloConsulta(),
       aviso: pedido?.esParcial === true
         ? 'Despacho parcial: este pedido todavía conserva líneas pendientes.'
         : null,
     };
   });
+  public modoSoloConsulta(): boolean {
+    return obtenerPermisosRol(this.autenticacion.usuario()?.codigoRol).soloConsultaOperativa;
+  }
   public readonly errorDetalle = computed<ErrorDetalleVisual | null>(() =>
     this.error() && this.idOrigen()
       ? { titulo: 'No pudimos cargar el pedido', detalle: 'Probá de nuevo.' }
@@ -350,9 +356,18 @@ export class PedidosDespachadosComponent implements OnInit {
     this.lineasSeleccionadasImpresion.set(seleccion);
   }
 
-  public imprimirSeleccionados(): void {
-    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
-    const elegidos = this.lineasImpresionVisibles().filter(({ pedido, articulo }) =>
+  public cantidadSeleccionadaImpresion(grupo: GrupoDespachados['clave']): number {
+    const seleccionadas = this.lineasSeleccionadasImpresion();
+    return this.lineasImpresionGrupo(grupo).filter(({ pedido, articulo }) =>
+      articulo.identificadorDetalle?.trim()
+      && seleccionadas.has(this.claveImpresion(pedido, articulo))).length;
+  }
+
+  public imprimirSeleccionados(grupo: GrupoDespachados['clave'] | null = null): void {
+    if (this.modoSoloConsulta() || this.preparandoImpresion()
+      || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const visibles = grupo ? this.lineasImpresionGrupo(grupo) : this.lineasImpresionVisibles();
+    const elegidos = visibles.filter(({ pedido, articulo }) =>
       articulo.identificadorDetalle?.trim()
       && this.lineasSeleccionadasImpresion().has(this.claveImpresion(pedido, articulo)));
     if (elegidos.length === 0) return;
@@ -429,6 +444,13 @@ export class PedidosDespachadosComponent implements OnInit {
 
   private lineasImpresionVisibles(): { pedido: Despachado; articulo: Despachado['articulos'][number] }[] {
     return [...this.pedidos(), ...this.pedidosEspeciales()].flatMap((pedido) =>
+      pedido.articulos.map((articulo) => ({ pedido, articulo })));
+  }
+
+  private lineasImpresionGrupo(
+    grupo: GrupoDespachados['clave'],
+  ): { pedido: Despachado; articulo: Despachado['articulos'][number] }[] {
+    return this.pedidosGrupo(grupo).flatMap((pedido) =>
       pedido.articulos.map((articulo) => ({ pedido, articulo })));
   }
 

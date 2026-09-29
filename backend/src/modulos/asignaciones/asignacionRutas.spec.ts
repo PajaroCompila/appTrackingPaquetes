@@ -35,6 +35,8 @@ describe('asignaciones de artículos', () => {
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'BODEGATBM')).toBe(true);
     expect(puedeAsignarPedidos('OPERADOR_BODEGA', 'otro')).toBe(false);
     expect(puedeAsignarPedidos('CONSULTA', 'otro')).toBe(false);
+    expect(puedeAsignarPedidos('DASHBOARDS', 'GCRUZ')).toBe(false);
+    expect(puedeReasignarPedidos('DASHBOARDS', 'GCRUZ')).toBe(false);
   });
 
   it('mantiene el catálogo autorizado de siete técnicos', () => {
@@ -52,6 +54,9 @@ describe('asignaciones de artículos', () => {
     expect(usuariosAsignablesParaSesion({
       ...usuarioNormal, nombreUsuario: 'gcruz',
     })).toEqual(tecnicosAsignables);
+    expect(usuariosAsignablesParaSesion({
+      ...usuarioNormal, codigoRol: 'DASHBOARDS', nombreUsuario: 'gcruz',
+    })).toEqual([]);
   });
 
   it('limita ACALIX y JLARA a Jorge Lara y Ana Calix', () => {

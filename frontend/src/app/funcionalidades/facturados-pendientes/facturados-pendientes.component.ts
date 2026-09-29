@@ -9,6 +9,7 @@ import { PaginacionComponent } from '../../compartido/paginacion/paginacion.comp
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { esFechaCalendarioValida, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import type { Almacen } from '../pedidos/almacen.interface';
 import { FacturadosPendientesService } from './facturados-pendientes.service';
@@ -105,6 +106,9 @@ export class FacturadosPendientesComponent implements OnInit {
     const propio=u.nombreUsuario.toLowerCase();const asignado=linea.usuarioAsignado?.toLowerCase();
     return !asignado || u.codigoRol==='ADMINISTRADOR' || propio==='gcruz' || propio===asignado
       || (['acalix','jlara'].includes(propio) && ['acalix','jlara'].includes(asignado));
+  }
+  public modoSoloConsulta():boolean {
+    return obtenerPermisosRol(this.autenticacion.usuario()?.codigoRol).soloConsultaOperativa;
   }
   public confirmar(linea:LineaFacturadaPendiente):void {
     if (this.confirmando() || !this.puedeConfirmar(linea)) return;

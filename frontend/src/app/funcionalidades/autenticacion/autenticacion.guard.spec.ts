@@ -26,9 +26,10 @@ describe('administradorGuard', () => {
     expect(restringidas.map(r => r.path)).toEqual(['configuracion/usuarios']);
   });
 
-  it('CONSULTA puede abrir dashboard pero no administrar usuarios', () => {
+  it('CONSULTA no puede abrir dashboard ni administrar usuarios', () => {
     usuario.set({usuarioId:'2',nombreUsuario:'consulta',nombreVisible:'Consulta',codigoRol:'CONSULTA',codigoAlmacen:null,debeCambiarContrasena:false});
-    expect(TestBed.runInInjectionContext(() => dashboardGuard())).toBe(true);
+    const resultado = TestBed.runInInjectionContext(() => dashboardGuard()) as UrlTree;
+    expect(TestBed.inject(Router).serializeUrl(resultado)).toBe('/pedidos');
     expect(TestBed.runInInjectionContext(() => administradorGuard())).not.toBe(true);
   });
 

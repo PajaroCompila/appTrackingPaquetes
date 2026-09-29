@@ -50,6 +50,27 @@ describe('acceso del rol DASHBOARDS', () => {
     requerirAccesoModulo({ user: { ...identidad, nombreUsuario: 'otro_usuario', codigoRol: 'DASHBOARDS' }, baseUrl, method: 'GET' } as Request, {} as Response, siguiente);
     expect(siguiente).toHaveBeenCalledWith();
   });
+  it.each([
+    ['/api/pedidos/asignaciones', '/consultar'],
+    ['/api/impresiones', '/consultar'],
+  ])('permite la consulta POST sin escritura %s%s', (baseUrl, path) => {
+    const siguiente = vi.fn();
+    requerirAccesoModulo({ user: { ...identidad, codigoRol: 'DASHBOARDS' }, baseUrl, path,
+      method: 'POST' } as Request, {} as Response, siguiente);
+    expect(siguiente).toHaveBeenCalledWith();
+  });
+  it.each([
+    ['/api/pedidos/asignaciones', '/', 'PATCH'],
+    ['/api/pedidos/asignaciones', '/reasignar', 'PATCH'],
+    ['/api/pedidos-despachados', '/', 'POST'],
+    ['/api/pedidos-devueltos', '/confirmar', 'POST'],
+    ['/api/impresiones', '/registrar', 'POST'],
+  ])('bloquea la operacion mutable %s%s', (baseUrl, path, method) => {
+    const siguiente = vi.fn();
+    requerirAccesoModulo({ user: { ...identidad, codigoRol: 'DASHBOARDS' }, baseUrl, path,
+      method } as Request, {} as Response, siguiente);
+    expect(siguiente.mock.calls[0]?.[0]).toMatchObject({ estadoHttp: 403 });
+  });
 });
 
 it.each(['POST', 'PATCH', 'DELETE'])('DASHBOARDS no puede escribir con %s', method => {

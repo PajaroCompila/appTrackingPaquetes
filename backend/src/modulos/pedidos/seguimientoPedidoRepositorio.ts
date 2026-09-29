@@ -191,9 +191,11 @@ export class SeguimientoPedidoRepositorio {
 
   public async aplicarArticulos<T extends { idOrigen: string }>(articulos: T[]): Promise<void> {
     if (articulos.length === 0) return;
-    const estado = await this.cargar([...new Set(articulos.map(({ idOrigen }) => idOrigen))]);
+    const cabeceras = await this.cargarCabeceras(
+      [...new Set(articulos.map(({ idOrigen }) => idOrigen))],
+    );
     for (const articulo of articulos) {
-      const cabecera = estado.cabeceras.get(articulo.idOrigen);
+      const cabecera = cabeceras.get(articulo.idOrigen);
       if (!cabecera) continue;
       Object.assign(articulo, {
         fechaEntradaCola: cabecera.fechaEntradaCola.toISOString(),
@@ -202,6 +204,18 @@ export class SeguimientoPedidoRepositorio {
         modificadoPor: cabecera.modificadoPor,
       });
     }
+  }
+
+  private async cargarCabeceras(ids: string[]): Promise<Map<string, CabeceraSeguimiento>> {
+    const unicos = [...new Set(ids)];
+    if (unicos.length === 0) return new Map();
+    const parametros = unicos.map((_, indice) => `@id${indice}`);
+    const solicitud = obtenerPoolPedidosBodega().request();
+    unicos.forEach((id, indice) => solicitud.input(`id${indice}`, sql.NVarChar(150), id));
+    const resultado = await solicitud.query<CabeceraSeguimiento>(`SELECT idOrigen, fechaEntradaCola,
+      excluidoSla AS esEspecial, huellaActual, modificadoEn, modificadoPor
+      FROM dbo.SeguimientoPedido WHERE idOrigen IN (${parametros.join(',')});`);
+    return new Map(resultado.recordset.map((fila) => [fila.idOrigen, fila]));
   }
 
   private aplicarEstado(

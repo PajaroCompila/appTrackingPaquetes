@@ -85,25 +85,27 @@
     } @else if (error(); as mensaje) {
       <div class="estado-interfaz estado-error" role="alert"><h2>{{ mensaje.titulo }}</h2><p>{{ mensaje.detalle }}</p></div>
     } @else {
-      <div class="acciones-transferencia">
-        <button class="boton boton-secundario boton-imprimir-seleccionados" type="button"
-          [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
-          (click)="imprimirSeleccionados()">Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
-      </div>
       @for (grupo of grupos(); track grupo.clave) {
       <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-historial-' + grupo.clave">
+        @if (!modoSoloConsulta()) {
+        <div class="acciones-impresion-grupo">
+          <button class="boton boton-secundario boton-imprimir-seleccionados" type="button"
+            [disabled]="cantidadSeleccionadaImpresion(grupo.clave) === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+            (click)="imprimirSeleccionados(grupo.clave)">Imprimir seleccionados ({{ cantidadSeleccionadaImpresion(grupo.clave) }})</button>
+        </div>
+        }
       <h2 [id]="'titulo-historial-' + grupo.clave">{{ grupo.titulo }}</h2>
       @if ((vista() === 'pedido' && grupo.pedidos.length === 0)
         || (vista() === 'articulos' && grupo.articulos.length === 0)) {
         <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
       } @else if (vista() === 'pedido') {
       <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
-        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th><th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+        <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
           etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
           [bloqueado]="grupo.pedidos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
-          (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th></tr></thead>
+          (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th>}</tr></thead>
           <tbody>@for (pedido of grupo.pedidos; track pedido.idOrigen) {
-            <tr><td data-label="Pedido"><strong>{{ numeroDocumento(pedido) }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estadoHistorial || 'Facturado' }}</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalHistorial(pedido) }}</strong></td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td><td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+            <tr><td data-label="Pedido"><strong>{{ numeroDocumento(pedido) }}</strong></td><td data-label="Estado"><span class="etiqueta-estado">{{ pedido.estadoHistorial || 'Facturado' }}</span></td><td data-label="Artículos">{{ pedido.articulos.length }}</td><td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td><td data-label="Fecha del pedido">{{ fechaHora(pedido.fechaHoraPedido) }}</td><td data-label="Vendedor">{{ marcador(pedido.nombreVendedor) }}</td><td data-label="Usuario">{{ responsablesPedido(pedido) }}</td><td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalHistorial(pedido) }}</strong></td><td data-label="Modificado por">{{ modificadoPor(pedido) }}</td><td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>@if (!modoSoloConsulta()) {<td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
               <label class="selector-linea selector-impresion" title="Seleccionar pedido para imprimir">
                 <input type="checkbox" [checked]="pedidoSeleccionadoParaImpresion(pedido)"
                   [disabled]="preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
@@ -111,16 +113,16 @@
                   (change)="alternarPedidoImpresion(pedido, $any($event.target).checked)" />
                 <span aria-hidden="true">✓</span>
               </label>
-            </td></tr>
+            </td>}</tr>
           }</tbody>
         </table>
       </div>
       } @else {
       <div class="panel tabla-contenedor tabla-articulos" role="tabpanel" aria-labelledby="pestana-articulos">
-        <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Ver detalle</th><th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+        <table><thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Ver detalle</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
           etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
           [bloqueado]="grupo.articulos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
-          (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th></tr></thead>
+          (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th>}</tr></thead>
           <tbody>@for (articulo of grupo.articulos; track articulo.idOrigen + ':' + (articulo.identificadorDetalle ?? $index)) {
             <tr><td data-label="Pedido"><strong>{{ numeroDocumento(articulo) }}</strong></td>
               <td class="codigo-articulo dato-consultable" data-label="Código"
@@ -135,7 +137,7 @@
               <td data-label="Usuario"><span class="texto-dos-lineas">{{ marcador(articulo.usuarioAsignado ?? null) }}</span></td>
               <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalHistorial(articulo) }}</strong></td>
               <td class="accion-tabla"><a class="enlace-detalle" [routerLink]="['/historial-validados', articulo.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
-              <td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+              @if (!modoSoloConsulta()) {<td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
                 <label class="selector-linea selector-impresion" title="Seleccionar para imprimir">
                   <input type="checkbox" [disabled]="!articulo.identificadorDetalle || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
                     [checked]="estaSeleccionadoParaImpresion(articulo)"
@@ -143,7 +145,7 @@
                     (change)="alternarSeleccionImpresion(articulo, $any($event.target).checked)" />
                   <span aria-hidden="true">✓</span>
                 </label>
-              </td>
+              </td>}
             </tr>
           }</tbody>
         </table>
@@ -157,7 +159,7 @@
       }
     }
   }
-  @if (!idOrigen()) {
+  @if (!idOrigen() && !modoSoloConsulta()) {
     <app-vista-impresion-pedido [articulos]="articulosImpresion()" [fechaHora]="fechaHoraImpresion()" />
     <app-confirmacion-impresion [abierta]="confirmarImpresion()" [guardando]="guardandoImpresion()"
       [error]="errorRegistroImpresion()" (confirmar)="registrarImpresionConfirmada()"

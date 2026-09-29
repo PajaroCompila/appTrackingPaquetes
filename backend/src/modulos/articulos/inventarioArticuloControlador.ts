@@ -29,11 +29,12 @@ export class InventarioArticuloControlador {
 
     try {
       const consultaCompleta = puedeConsultarTodoElInventario(solicitud.user);
-      if (!consultaCompleta && !puedeVerAlmacen(solicitud.user!, consulta.data.codigoAlmacen)) {
+      const codigoAlmacen = consulta.data.codigoAlmacen;
+      if (codigoAlmacen && !consultaCompleta && !puedeVerAlmacen(solicitud.user!, codigoAlmacen)) {
         siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
         return;
       }
-      const inventario = await this.repositorio.obtener(articulo.data, consulta.data.codigoAlmacen);
+      const inventario = await this.repositorio.obtener(articulo.data, codigoAlmacen);
       if (!inventario) {
         siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
         return;
@@ -41,6 +42,16 @@ export class InventarioArticuloControlador {
       if (!consultaCompleta && Array.isArray(inventario.existencias)) {
         inventario.existencias = inventario.existencias.filter(({ codigoAlmacen }) =>
           puedeVerAlmacen(solicitud.user!, codigoAlmacen));
+        if (!codigoAlmacen) {
+          const primeraVisible = inventario.existencias[0];
+          if (!primeraVisible) {
+            siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
+            return;
+          }
+          inventario.codigoAlmacen = primeraVisible.codigoAlmacen;
+          inventario.nombreAlmacen = primeraVisible.nombreAlmacen;
+          inventario.existenciaFisica = primeraVisible.existenciaFisica;
+        }
       }
       respuesta.json(inventario);
     } catch (error) {

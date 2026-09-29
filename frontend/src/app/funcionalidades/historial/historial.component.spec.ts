@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
@@ -9,8 +10,55 @@ import { HistorialComponent } from './historial.component';
 import { HistorialService } from './historial.service';
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
 
 describe('HistorialComponent', () => {
+  const usuario = signal<UsuarioSesion>({ usuarioId: '1', nombreUsuario: 'operador',
+    nombreVisible: 'Operador', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
+    debeCambiarContrasena: false });
+
+  beforeEach(() => {
+    usuario.set({ ...usuario(), codigoRol: 'OPERADOR_BODEGA' });
+    TestBed.configureTestingModule({
+      providers: [{ provide: AutenticacionService, useValue: { usuario } }],
+    });
+  });
+
+  it('DASHBOARDS ve el historial sin controles de impresion', async () => {
+    usuario.set({ ...usuario(), codigoRol: 'DASHBOARDS' });
+    const buscarArticulos = vi.fn().mockReturnValue(of({
+      datos: [{ idOrigen: 'R1:H1', identificadorDetalle: '1', numeroPedido: '300',
+        codigoArticulo: 'A1', descripcion: 'Articulo', cantidad: 1, codigoAlmacen: 'BSPS01',
+        nombreAlmacen: 'Bodega', fechaHoraPedido: '2026-09-22T08:00:00-06:00',
+        nombreVendedor: 'Vendedor', esEspecial: false }],
+      paginacion: { pagina: 1, cantidadPorPagina: 25, cantidadDevuelta: 1,
+        totalRegistros: 1, hayMas: false },
+    }));
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { buscar: vi.fn(), buscarArticulos, obtener: vi.fn() } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: () => of({ datos: [] }) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true), navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.acciones-impresion-grupo')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.columna-imprimir')).toBeNull();
+    fixture.componentInstance.seleccionarTodasImpresiones('normales');
+    fixture.componentInstance.imprimirSeleccionados('normales');
+    expect(fixture.componentInstance.articulosImpresion()).toEqual([]);
+    fixture.destroy();
+  });
   it('imprime el detalle de historial con el mismo componente POS', async () => {
     vi.useFakeTimers();
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
@@ -168,21 +216,32 @@ describe('HistorialComponent', () => {
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     fixture.componentInstance.seleccionarTodasImpresiones('normales');
     fixture.componentInstance.seleccionarTodasImpresiones('especiales');
-    fixture.componentInstance.imprimirSeleccionados();
+    fixture.componentInstance.imprimirSeleccionados('especiales');
     await vi.advanceTimersByTimeAsync(0);
 
     const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]
       .map((titulo: HTMLElement) => titulo.textContent?.trim());
-    expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
+    expect(titulos).toEqual(['Pedidos Especiales', 'Pedidos Normales']);
+    const seccionEspeciales = fixture.nativeElement
+      .querySelector('#titulo-historial-especiales')?.parentElement as HTMLElement;
+    const seccionNormales = fixture.nativeElement
+      .querySelector('#titulo-historial-normales')?.parentElement as HTMLElement;
+    expect(seccionEspeciales.querySelector('.acciones-impresion-grupo')?.textContent)
+      .toContain('Imprimir seleccionados');
+    expect(seccionNormales.querySelector('.acciones-impresion-grupo')?.textContent)
+      .toContain('Imprimir seleccionados');
+    expect(fixture.componentInstance.cantidadSeleccionadaImpresion('especiales')).toBe(1);
+    expect(fixture.componentInstance.cantidadSeleccionadaImpresion('normales')).toBe(1);
     expect(fixture.nativeElement.textContent).toContain('IMPRIMIR TODO');
     expect(fixture.componentInstance.lineasSeleccionadasImpresion().size).toBe(2);
-    expect(fixture.componentInstance.articulosImpresion().map(({ asignadoA }) => asignadoA))
-      .toEqual(['Sin asignar', 'Sin asignar']);
+    expect(fixture.componentInstance.articulosImpresion()
+      .map(({ codigo, asignadoA }) => ({ codigo, asignadoA })))
+      .toEqual([{ codigo: 'ESPECIAL', asignadoA: 'Sin asignar' }]);
     expect(imprimir).toHaveBeenCalledOnce();
     expect(fixture.nativeElement.textContent).toContain('NORMAL');
     expect(fixture.nativeElement.textContent).toContain('ESPECIAL');
     (fixture.nativeElement.querySelector('.codigo-articulo') as HTMLElement).click();
-    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('NORMAL', 'BSPS01');
+    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('ESPECIAL', 'BSPS01');
     const tiempos = [...fixture.nativeElement.querySelectorAll('.tiempo-total-despacho')]
       .map((elemento: HTMLElement) => elemento.textContent?.trim());
     expect(tiempos).toEqual(['16:00', '16:00']);
@@ -196,6 +255,95 @@ describe('HistorialComponent', () => {
     }));
     fixture.destroy();
     imprimir.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('no mezcla filtros editados con el auto refresco y reinicia ambas páginas al buscar', async () => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    const buscarArticulos = vi.fn().mockReturnValue(of({
+      datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25,
+        cantidadDevuelta: 0, totalRegistros: 0, hayMas: false },
+    }));
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { buscar: vi.fn(), buscarArticulos,
+          obtener: vi.fn() } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: vi.fn()
+          .mockReturnValue(of({ datos: [] })) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true),
+          navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const componente = fixture.componentInstance;
+    componente.pagina.set(8);
+    componente.paginaEspeciales.set(6);
+    componente.alternarAlmacen('BSPS04', true);
+
+    (componente as unknown as { cargar(automatica: boolean): void }).cargar(true);
+    expect(buscarArticulos).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen: [], clasificacion: 'especial', pagina: 6,
+    }));
+
+    componente.buscar();
+    expect(componente.pagina()).toBe(1);
+    expect(componente.paginaEspeciales()).toBe(1);
+    expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({
+      codigosAlmacen: ['BSPS04'], clasificacion: 'normal', pagina: 1,
+    }));
+    expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({
+      codigosAlmacen: ['BSPS04'], clasificacion: 'especial', pagina: 1,
+    }));
+    fixture.destroy();
+    vi.useRealTimers();
+  });
+
+  it('no restaura número ni páginas antiguas cuando la URL no los contiene', async () => {
+    sessionStorage.clear();
+    sessionStorage.setItem('pedidosBodega.filtros.historial', JSON.stringify({
+      numeroPedido: '101476067', pagina: 9, paginaEspeciales: 7,
+      cantidadPorPagina: 25, vista: 'articulos',
+    }));
+    vi.useFakeTimers();
+    const buscarArticulos = vi.fn().mockReturnValue(of({
+      datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25,
+        cantidadDevuelta: 0, totalRegistros: 0, hayMas: false },
+    }));
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { buscar: vi.fn(), buscarArticulos,
+          obtener: vi.fn() } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: vi.fn()
+          .mockReturnValue(of({ datos: [] })) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true),
+          navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.filtros.numeroPedido).toBe('');
+    expect(fixture.componentInstance.pagina()).toBe(1);
+    expect(fixture.componentInstance.paginaEspeciales()).toBe(1);
+    expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({
+      numeroPedido: '', pagina: 1,
+    }));
+    fixture.destroy();
     vi.useRealTimers();
   });
 });

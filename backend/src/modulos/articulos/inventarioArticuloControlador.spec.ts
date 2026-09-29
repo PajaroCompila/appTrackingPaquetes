@@ -59,4 +59,28 @@ describe('acceso al inventario por almacén', () => {
     expect(respuesta.body.existencias.map(({ codigoAlmacen }: { codigoAlmacen: string }) =>
       codigoAlmacen)).toEqual(['TCIR01']);
   });
+
+  it('permite la consulta por código y limita la respuesta a las bodegas autorizadas', async () => {
+    const obtener = vi.fn().mockResolvedValue(structuredClone(inventarioCompleto));
+
+    const respuesta = await solicitud(aplicacionInventario('otro', obtener))
+      .get('/api/articulos/A1/inventario');
+
+    expect(respuesta.status).toBe(200);
+    expect(obtener).toHaveBeenCalledWith('A1', undefined);
+    expect(respuesta.body.codigoAlmacen).toBe('TCIR01');
+    expect(respuesta.body.existencias).toEqual([
+      { codigoAlmacen: 'TCIR01', nombreAlmacen: 'Circunvalación', existenciaFisica: 2 },
+    ]);
+  });
+
+  it('mantiene todas las bodegas en la consulta general autorizada para Tommy', async () => {
+    const obtener = vi.fn().mockResolvedValue(structuredClone(inventarioCompleto));
+
+    const respuesta = await solicitud(aplicacionInventario('tlopez', obtener))
+      .get('/api/articulos/A1/inventario');
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.existencias).toHaveLength(2);
+  });
 });

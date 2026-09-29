@@ -531,6 +531,7 @@ export class DetallePedidoVistaComponent implements OnChanges {
       this.estadosImpresion.set(new Map());
     }
     this.mensajeImpresion.set('');
+    if (this.configuracion.permitirImpresion === false) return;
     const pedido = this.pedido;
     if (!pedido) return;
     const idOrigenConsultado = pedido.idOrigen;

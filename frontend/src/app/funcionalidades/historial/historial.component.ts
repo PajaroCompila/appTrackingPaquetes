@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selector-almacenes.directive';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, forkJoin, of, type Observable } from 'rxjs';
+import { forkJoin, type Observable, type Subscription } from 'rxjs';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 import type {
   ConfiguracionDetallePedido,
@@ -27,6 +27,8 @@ import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/con
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import type { LineaRegistroImpresion } from '../../compartido/impresiones/impresion.interface';
 import { ImpresionPedidoPosService } from '../pedidos/impresion-pedido-pos.service';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
 
 const claveFiltrosHistorial = 'historial';
 const intervaloActualizacionHistorialMs = 15000;
@@ -60,17 +62,20 @@ export class HistorialComponent implements OnInit {
   private readonly filtrosGlobales = inject(FiltrosGlobalesService);
   private readonly inyector = inject(Injector);
   private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
+  private readonly autenticacion = inject(AutenticacionService);
   private temporizador?: ReturnType<typeof setInterval>;
   private temporizadorImpresion?: ReturnType<typeof setTimeout>;
+  private consultaListado?: Subscription;
+  private secuenciaConsulta = 0;
   private loteImpresion: LineaRegistroImpresion[] | null = null;
   private esperandoCierreImpresion = false;
   private haCargado = false;
-  private recargaManualPendiente = false;
   public readonly idOrigen = signal<string | null>(null);
   public filtros = {
     fechaDesde: obtenerFechaLocalActual(),
     fechaHasta: obtenerFechaLocalActual(), numeroPedido: '', codigosAlmacen: [] as string[], cantidadPorPagina: 25,
   };
+  private filtrosAplicados = { ...this.filtros, codigosAlmacen: [...this.filtros.codigosAlmacen] };
   public readonly almacenes = signal<Almacen[]>([]);
   public readonly registros = signal<HistorialValidado[]>([]);
   public readonly registrosEspeciales = signal<HistorialValidado[]>([]);
@@ -83,11 +88,11 @@ export class HistorialComponent implements OnInit {
   public readonly totalRegistros = signal(0);
   public readonly totalRegistrosEspeciales = signal(0);
   public readonly grupos = computed(() => [
-    { clave: 'normales' as const, titulo: 'Pedidos Normales', pagina: this.pagina(),
-      totalRegistros: this.totalRegistros(), pedidos: this.registros(), articulos: this.articulos() },
     { clave: 'especiales' as const, titulo: 'Pedidos Especiales', pagina: this.paginaEspeciales(),
       totalRegistros: this.totalRegistrosEspeciales(), pedidos: this.registrosEspeciales(),
       articulos: this.articulosEspeciales() },
+    { clave: 'normales' as const, titulo: 'Pedidos Normales', pagina: this.pagina(),
+      totalRegistros: this.totalRegistros(), pedidos: this.registros(), articulos: this.articulos() },
   ]);
   public readonly cargando = signal(false);
   public readonly actualizando = signal(false);
@@ -99,7 +104,7 @@ export class HistorialComponent implements OnInit {
   public readonly confirmarImpresion = signal(false);
   public readonly guardandoImpresion = signal(false);
   public readonly errorRegistroImpresion = signal('');
-  public readonly configuracionDetalle: ConfiguracionDetallePedido = {
+  private readonly configuracionDetalleBase: ConfiguracionDetallePedido = {
     contexto: 'Historial',
     titulo: 'Detalle del pedido',
     descripcion: 'Revisá los artículos y los datos de entrega.',
@@ -108,7 +113,6 @@ export class HistorialComponent implements OnInit {
     etiquetaRetorno: 'Regresar al historial',
     tituloInformacion: 'Datos de entrega',
     etiquetaArticulos: 'Artículos entregados',
-    permitirImpresion: true,
   };
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     if (!this.idOrigen()) return null;
@@ -155,11 +159,15 @@ export class HistorialComponent implements OnInit {
   });
   public readonly configuracionDetalleVisual = computed<ConfiguracionDetallePedido>(() => {
     const pedido = this.registros()[0];
-    return pedido?.entregaSap ? { ...this.configuracionDetalle, titulo: 'Detalle de la entrega SAP',
+    const configuracion = { ...this.configuracionDetalleBase, permitirImpresion: !this.modoSoloConsulta() };
+    return pedido?.entregaSap ? { ...configuracion, titulo: 'Detalle de la entrega SAP',
       etiquetaEstado: pedido.estadoHistorial || 'Entregado, Sin factura',
       severidadEstado: pedido.estadoHistorial === 'Facturado' ? 'exito' : 'informacion' }
-      : this.configuracionDetalle;
+      : configuracion;
   });
+  public modoSoloConsulta(): boolean {
+    return obtenerPermisosRol(this.autenticacion.usuario()?.codigoRol).soloConsultaOperativa;
+  }
 
   public numeroDocumento(pedido: HistorialValidado | ArticuloHistorial): string {
     return pedido.entregaSap ? `Entrega SAP ${pedido.entregaSap.docNum}` : pedido.numeroPedido;
@@ -172,6 +180,7 @@ export class HistorialComponent implements OnInit {
   public ngOnInit(): void {
     this.destruirRef.onDestroy(() => {
       clearTimeout(this.temporizadorImpresion);
+      this.consultaListado?.unsubscribe();
       this.impresionPedidoPos.finalizar();
     });
     const idOrigen = this.ruta.snapshot.paramMap.get('idOrigen');
@@ -195,6 +204,7 @@ export class HistorialComponent implements OnInit {
     this.limpiarSeleccionImpresion();
     this.pagina.set(1);
     this.paginaEspeciales.set(1);
+    this.confirmarFiltrosAplicados();
     this.guardarFiltros();
     this.actualizarUrl();
     this.cargar();
@@ -203,6 +213,7 @@ export class HistorialComponent implements OnInit {
     this.limpiarSeleccionImpresion();
     this.pagina.set(1);
     this.paginaEspeciales.set(1);
+    this.confirmarFiltrosAplicados();
     this.guardarFiltros();
     this.actualizarUrl();
     this.cargar();
@@ -221,6 +232,7 @@ export class HistorialComponent implements OnInit {
     this.filtros = { fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
       numeroPedido: '', codigosAlmacen: [], cantidadPorPagina: 25 };
     this.pagina.set(1); this.paginaEspeciales.set(1);
+    this.confirmarFiltrosAplicados();
     this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
   public estaSeleccionado(codigoAlmacen: string): boolean {
@@ -230,14 +242,14 @@ export class HistorialComponent implements OnInit {
     this.filtros.codigosAlmacen = seleccionado
       ? [...new Set([...this.filtros.codigosAlmacen, codigoAlmacen])]
       : this.filtros.codigosAlmacen.filter((codigo) => codigo !== codigoAlmacen);
-    this.guardarFiltros();
+    this.filtrosGlobales.actualizar({ codigosAlmacen: this.filtros.codigosAlmacen });
   }
   public quitarAlmacen(codigoAlmacen: string): void {
     this.alternarAlmacen(codigoAlmacen, false);
   }
   public limpiarAlmacenes(): void {
     this.filtros.codigosAlmacen = [];
-    this.guardarFiltros();
+    this.filtrosGlobales.actualizar({ codigosAlmacen: [] });
   }
   public nombreAlmacen(codigoAlmacen: string): string {
     return this.almacenes().find((almacen) => almacen.codigoAlmacen === codigoAlmacen)?.nombreAlmacen
@@ -295,9 +307,18 @@ export class HistorialComponent implements OnInit {
     this.lineasSeleccionadasImpresion.set(seleccion);
   }
 
-  public imprimirSeleccionados(): void {
-    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()) return;
-    const elegidos = [...this.articulosGrupo('normales'), ...this.articulosGrupo('especiales')]
+  public cantidadSeleccionadaImpresion(grupo: 'normales' | 'especiales'): number {
+    const seleccionadas = this.lineasSeleccionadasImpresion();
+    return this.articulosGrupo(grupo).filter((articulo) => articulo.identificadorDetalle?.trim()
+      && seleccionadas.has(this.claveImpresion(articulo))).length;
+  }
+
+  public imprimirSeleccionados(grupo: 'normales' | 'especiales' | null = null): void {
+    if (this.modoSoloConsulta() || this.preparandoImpresion()
+      || this.confirmarImpresion() || this.guardandoImpresion()) return;
+    const visibles = grupo ? this.articulosGrupo(grupo)
+      : [...this.articulosGrupo('normales'), ...this.articulosGrupo('especiales')];
+    const elegidos = visibles
       .filter((articulo) => articulo.identificadorDetalle?.trim()
         && this.lineasSeleccionadasImpresion().has(this.claveImpresion(articulo)));
     if (elegidos.length === 0) return;
@@ -459,29 +480,33 @@ export class HistorialComponent implements OnInit {
     const fechaHastaUrl = parametros.get('fechaHasta');
     this.filtros.fechaDesde = esFechaCalendarioValida(fechaDesdeUrl) ? fechaDesdeUrl : fechaActual;
     this.filtros.fechaHasta = esFechaCalendarioValida(fechaHastaUrl) ? fechaHastaUrl : fechaActual;
-    this.filtros.numeroPedido = parametros.get('numeroPedido') || guardados.numeroPedido || '';
+    this.filtros.numeroPedido = parametros.get('numeroPedido') || '';
     const codigosUrl = parametros.getAll('codigoAlmacen')
       .map((codigo) => codigo.trim()).filter(Boolean);
     this.filtros.codigosAlmacen = codigosUrl.length > 0
       ? [...new Set(codigosUrl)] : globales.codigosAlmacen;
     const cantidad = Number(parametros.get('cantidadPorPagina') ?? guardados.cantidadPorPagina);
     if ([25, 50, 100].includes(cantidad)) this.filtros.cantidadPorPagina = cantidad;
-    this.pagina.set(Math.max(1, Number(parametros.get('pagina') ?? guardados.pagina) || 1));
-    this.paginaEspeciales.set(Math.max(1,
-      Number(parametros.get('paginaEspeciales') ?? guardados.paginaEspeciales) || 1));
+    this.pagina.set(Math.max(1, Number(parametros.get('pagina')) || 1));
+    this.paginaEspeciales.set(Math.max(1, Number(parametros.get('paginaEspeciales')) || 1));
     const vista = parametros.get('vista') ?? guardados.vista;
     this.vista.set(vista === 'pedido' ? 'pedido' : 'articulos');
+    this.confirmarFiltrosAplicados();
     this.guardarFiltros();
     this.actualizarUrl();
   }
 
   private parametrosActuales(): URLSearchParams {
-    const parametros = new URLSearchParams({ fechaDesde: this.filtros.fechaDesde,
-      fechaHasta: this.filtros.fechaHasta, pagina: String(this.pagina()),
+    const parametros = new URLSearchParams({ fechaDesde: this.filtrosAplicados.fechaDesde,
+      fechaHasta: this.filtrosAplicados.fechaHasta, pagina: String(this.pagina()),
       paginaEspeciales: String(this.paginaEspeciales()),
-      cantidadPorPagina: String(this.filtros.cantidadPorPagina) });
-    if (this.filtros.numeroPedido.trim()) parametros.set('numeroPedido', this.filtros.numeroPedido.trim());
-    for (const codigoAlmacen of this.filtros.codigosAlmacen) parametros.append('codigoAlmacen', codigoAlmacen);
+      cantidadPorPagina: String(this.filtrosAplicados.cantidadPorPagina) });
+    if (this.filtrosAplicados.numeroPedido.trim()) {
+      parametros.set('numeroPedido', this.filtrosAplicados.numeroPedido.trim());
+    }
+    for (const codigoAlmacen of this.filtrosAplicados.codigosAlmacen) {
+      parametros.append('codigoAlmacen', codigoAlmacen);
+    }
     parametros.set('vista', this.vista());
     return parametros;
   }
@@ -498,67 +523,86 @@ export class HistorialComponent implements OnInit {
   }
 
   private cargar(esAutomatica = false): void {
-    if (this.cargando() || this.actualizando()) {
-      if (!esAutomatica) this.recargaManualPendiente = true;
-      return;
+    if (esAutomatica && (this.cargando() || this.actualizando())) return;
+    if (!esAutomatica) {
+      this.consultaListado?.unsubscribe();
+      this.actualizando.set(false);
+      this.cargando.set(true);
+      this.haCargado = false;
+      this.error.set(null);
+      this.vaciarVistaActual();
+    } else if (this.haCargado) {
+      this.actualizando.set(true);
+    } else {
+      this.cargando.set(true);
     }
-    if (this.haCargado) this.actualizando.set(true); else this.cargando.set(true);
-    if (!esAutomatica) this.error.set(null);
+    const secuencia = ++this.secuenciaConsulta;
     const vistaConsulta = this.vista();
+    const filtrosConsulta = { ...this.filtrosAplicados,
+      codigosAlmacen: [...this.filtrosAplicados.codigosAlmacen] };
     const consultar = (clasificacion: 'normal' | 'especial', pagina: number):
     Observable<RespuestaHistorial | RespuestaArticulosHistorial> => vistaConsulta === 'articulos'
-      ? this.servicio.buscarArticulos({ ...this.filtros, pagina, clasificacion })
-      : this.servicio.buscar({ ...this.filtros, pagina, clasificacion });
-    forkJoin({
-      normales: consultar('normal', this.pagina()).pipe(catchError(() => of(null))),
-      especiales: consultar('especial', this.paginaEspeciales()).pipe(catchError(() => of(null))),
+      ? this.servicio.buscarArticulos({ ...filtrosConsulta, pagina, clasificacion })
+      : this.servicio.buscar({ ...filtrosConsulta, pagina, clasificacion });
+    this.consultaListado = forkJoin({
+      normales: consultar('normal', this.pagina()),
+      especiales: consultar('especial', this.paginaEspeciales()),
     })
       .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
         next: ({ normales, especiales }) => {
-          if (!normales && !especiales) {
-            if (!this.haCargado && this.vista() === vistaConsulta) {
-              this.registros.set([]); this.registrosEspeciales.set([]);
-              this.articulos.set([]); this.articulosEspeciales.set([]);
-              this.totalRegistros.set(0); this.totalRegistrosEspeciales.set(0);
-              this.error.set(obtenerMensajeError(null, 'historial'));
-            }
-            this.finalizarConsulta(vistaConsulta);
-            return;
-          }
+          if (secuencia !== this.secuenciaConsulta) return;
           if (vistaConsulta === 'articulos') {
-            if (normales) this.articulos.set(normales.datos as ArticuloHistorial[]);
-            if (especiales) this.articulosEspeciales.set(especiales.datos as ArticuloHistorial[]);
+            this.articulos.set(normales.datos as ArticuloHistorial[]);
+            this.articulosEspeciales.set(especiales.datos as ArticuloHistorial[]);
             this.reconciliarSeleccionImpresion();
           } else {
-            if (normales) this.registros.set(normales.datos as HistorialValidado[]);
-            if (especiales) this.registrosEspeciales.set(especiales.datos as HistorialValidado[]);
+            this.registros.set(normales.datos as HistorialValidado[]);
+            this.registrosEspeciales.set(especiales.datos as HistorialValidado[]);
           }
           if (this.vista() === vistaConsulta) {
-            if (normales) {
-              this.hayMas.set(normales.paginacion.hayMas);
-              this.totalRegistros.set(
-                normales.paginacion.totalRegistros ?? normales.datos.length,
-              );
-            }
-            if (especiales) this.totalRegistrosEspeciales.set(
+            this.hayMas.set(normales.paginacion.hayMas);
+            this.totalRegistros.set(
+              normales.paginacion.totalRegistros ?? normales.datos.length,
+            );
+            this.totalRegistrosEspeciales.set(
               especiales.paginacion.totalRegistros ?? especiales.datos.length,
             );
             this.haCargado = true;
           } else {
             this.hayMas.set(false); this.haCargado = false;
           }
-          this.finalizarConsulta(vistaConsulta);
+          this.finalizarConsulta(vistaConsulta, secuencia);
+        },
+        error: (error: unknown) => {
+          if (secuencia !== this.secuenciaConsulta) return;
+          if (!esAutomatica) this.error.set(obtenerMensajeError(error, 'historial'));
+          this.finalizarConsulta(vistaConsulta, secuencia);
         },
       });
   }
 
-  private finalizarConsulta(vistaConsulta: VistaHistorial): void {
+  private finalizarConsulta(vistaConsulta: VistaHistorial, secuencia: number): void {
+    if (secuencia !== this.secuenciaConsulta) return;
     this.cargando.set(false);
     this.actualizando.set(false);
-    if (this.vista() !== vistaConsulta || this.recargaManualPendiente) {
-      this.recargaManualPendiente = false;
-      queueMicrotask(() => this.cargar());
+    if (this.vista() !== vistaConsulta) queueMicrotask(() => this.cargar());
+  }
+
+  private vaciarVistaActual(): void {
+    if (this.vista() === 'articulos') {
+      this.articulos.set([]);
+      this.articulosEspeciales.set([]);
+    } else {
+      this.registros.set([]);
+      this.registrosEspeciales.set([]);
     }
+    this.totalRegistros.set(0);
+    this.totalRegistrosEspeciales.set(0);
+  }
+
+  private confirmarFiltrosAplicados(): void {
+    this.filtrosAplicados = { ...this.filtros,
+      codigosAlmacen: [...this.filtros.codigosAlmacen] };
   }
 
   private cargarDetalle(idOrigen: string, automatica = false): void {
@@ -581,17 +625,18 @@ export class HistorialComponent implements OnInit {
 
   private guardarFiltros(): void {
     try {
-      this.filtrosGlobales.actualizar({ fechaDesde: this.filtros.fechaDesde,
-        fechaHasta: this.filtros.fechaHasta, codigosAlmacen: this.filtros.codigosAlmacen });
+      this.filtrosGlobales.actualizar({ fechaDesde: this.filtrosAplicados.fechaDesde,
+        fechaHasta: this.filtrosAplicados.fechaHasta,
+        codigosAlmacen: this.filtrosAplicados.codigosAlmacen });
       guardarFiltrosSesion(claveFiltrosHistorial, {
-        fechaDesde: this.filtros.fechaDesde,
-        fechaHasta: this.filtros.fechaHasta,
-        numeroPedido: this.filtros.numeroPedido.trim(),
-        codigosAlmacen: this.filtros.codigosAlmacen,
+        fechaDesde: this.filtrosAplicados.fechaDesde,
+        fechaHasta: this.filtrosAplicados.fechaHasta,
+        numeroPedido: this.filtrosAplicados.numeroPedido.trim(),
+        codigosAlmacen: this.filtrosAplicados.codigosAlmacen,
         vista: this.vista(),
         pagina: this.pagina(),
         paginaEspeciales: this.paginaEspeciales(),
-        cantidadPorPagina: this.filtros.cantidadPorPagina,
+        cantidadPorPagina: this.filtrosAplicados.cantidadPorPagina,
       });
     } catch { /* Los filtros continúan disponibles durante la navegación actual. */ }
   }

@@ -27,7 +27,7 @@ describe('PedidosService', () => {
     }).subscribe();
 
     const solicitud = controladorHttp.expectOne(
-      (peticion) => peticion.url === 'http://localhost:3280/api/pedidos',
+      (peticion) => peticion.url === '/api/pedidos',
     );
     expect(solicitud.request.params.get('numeroPedido')).toBe('101468453');
     expect(solicitud.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01', 'BSPS02']);
@@ -42,7 +42,7 @@ describe('PedidosService', () => {
     servicio.obtenerDetallePedido('FOLIO/CON ESPACIO', ['BSPS01', 'BSPS02']).subscribe();
 
     const solicitud = controladorHttp.expectOne(
-      (peticion) => peticion.url === 'http://localhost:3280/api/pedidos/FOLIO%2FCON%20ESPACIO',
+      (peticion) => peticion.url === '/api/pedidos/FOLIO%2FCON%20ESPACIO',
     );
     expect(solicitud.request.method).toBe('GET');
     expect(solicitud.request.params.getAll('codigoAlmacen')).toEqual(['BSPS01', 'BSPS02']);
@@ -53,7 +53,7 @@ describe('PedidosService', () => {
     servicio.obtenerInventarioArticulo('ART/001', 'BSPS03').subscribe();
 
     const solicitud = controladorHttp.expectOne(
-      (peticion) => peticion.url === 'http://localhost:3280/api/articulos/ART%2F001/inventario',
+      (peticion) => peticion.url === '/api/articulos/ART%2F001/inventario',
     );
     expect(solicitud.request.method).toBe('GET');
     expect(solicitud.request.params.get('codigoAlmacen')).toBe('BSPS03');
@@ -67,9 +67,23 @@ describe('PedidosService', () => {
     });
   });
 
+  it('reutiliza el endpoint de inventario sin forzar una bodega en la consulta global', () => {
+    servicio.obtenerInventarioArticulo('ART-001').subscribe();
+
+    const solicitud = controladorHttp.expectOne(
+      '/api/articulos/ART-001/inventario',
+    );
+    expect(solicitud.request.method).toBe('GET');
+    expect(solicitud.request.params.has('codigoAlmacen')).toBe(false);
+    solicitud.flush({
+      codigoArticulo: 'ART-001', descripcion: 'Artículo', codigoAlmacen: 'BSPS01',
+      nombreAlmacen: 'Bodega', existenciaFisica: 0, existencias: [],
+    });
+  });
+
   it('construye una URL segura para cargar la fotografía en segundo plano', () => {
     expect(servicio.obtenerUrlImagenArticulo('ART/001 CON ESPACIO')).toBe(
-      'http://localhost:3280/api/articulos/ART%2F001%20CON%20ESPACIO/imagen',
+      '/api/articulos/ART%2F001%20CON%20ESPACIO/imagen',
     );
   });
 
@@ -81,7 +95,7 @@ describe('PedidosService', () => {
     servicio.despacharLineas(lineas).subscribe();
 
     const solicitud = controladorHttp.expectOne(
-      'http://localhost:3280/api/pedidos-despachados',
+      '/api/pedidos-despachados',
     );
     expect(solicitud.request.method).toBe('POST');
     expect(solicitud.request.body).toEqual({ lineas });

@@ -30,13 +30,15 @@ describe('inventario de artículo', () => {
     expect(obtener).toHaveBeenCalledWith('A-01', 'B01');
   });
 
-  it('rechaza parámetros inválidos y responde 404 cuando no existe relación', async () => {
+  it('permite omitir bodega, rechaza valores inválidos y responde 404 cuando no existe relación', async () => {
     const repositorio = { obtener: vi.fn().mockResolvedValue(null) } as unknown as InventarioArticuloRepositorio;
     const aplicacion = crearAplicacion(repositorio);
-    const [invalida, inexistente] = await Promise.all([
+    const [sinBodega, invalida, inexistente] = await Promise.all([
       solicitud(aplicacion).get('/api/articulos/A-01/inventario'),
+      solicitud(aplicacion).get('/api/articulos/A-01/inventario?codigoAlmacen=***'),
       solicitud(aplicacion).get('/api/articulos/A-01/inventario?codigoAlmacen=NOEXISTE'),
     ]);
+    expect(sinBodega.status).toBe(404);
     expect(invalida.status).toBe(400);
     expect(inexistente.status).toBe(404);
   });

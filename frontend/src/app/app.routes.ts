@@ -18,6 +18,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'inventario',
+    canActivate: [autenticacionGuard],
+    loadComponent: () =>
+      import('./funcionalidades/inventario/inventario.component').then(
+        ({ InventarioComponent }) => InventarioComponent,
+      ),
+  },
+  {
     path: 'pedidos-despachados',
     canActivate: [autenticacionGuard],
     loadComponent: () =>

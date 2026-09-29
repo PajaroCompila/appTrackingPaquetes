@@ -13,6 +13,7 @@ import {
 import { SonidoNotificacionService } from './compartido/notificaciones/sonido-notificacion.service';
 import { formatearFechaHoraHonduras } from './compartido/fechas/fecha-honduras';
 import { PedidosNotificacionesGlobalesService } from './compartido/notificaciones/pedidos-notificaciones-globales.service';
+import { obtenerPermisosRol } from './funcionalidades/autenticacion/permisos-rol';
 
 @Component({
   selector: 'app-root',
@@ -103,6 +104,10 @@ export class App {
 
   public cantidadArticulosNotificacion(cantidad: number): string {
     return cantidad === 1 ? '1 artículo' : `${cantidad} artículos`;
+  }
+
+  public puedeVerDashboard(): boolean {
+    return obtenerPermisosRol(this.usuario()?.codigoRol).verDashboard;
   }
 
   @HostListener('document:click', ['$event'])

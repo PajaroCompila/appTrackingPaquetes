@@ -1,0 +1,77 @@
+:host { display: block; }
+.pagina-inventario { display: grid; gap: 1.25rem; }
+.encabezado-pagina { margin-bottom: .15rem; }
+
+.buscador-inventario { display: grid; gap: 1.1rem; padding: 1.35rem; }
+.encabezado-buscador { display: flex; align-items: center; gap: .85rem; }
+.encabezado-buscador h2, .encabezado-buscador p { margin: 0; }
+.encabezado-buscador h2 { color: var(--azul-900); font-size: 1.15rem; }
+.encabezado-buscador p { margin-top: .18rem; color: var(--gris-600); font-size: .86rem; }
+.icono-buscador, .icono-articulo, .icono-resumen {
+  display: grid; flex: 0 0 auto; place-items: center; border-radius: .7rem;
+  background: var(--azul-100); color: var(--azul-700);
+}
+.icono-buscador { width: 2.75rem; height: 2.75rem; font-size: 1.15rem; }
+.fila-busqueda { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .8rem; }
+.campo-codigo input { min-height: 3.15rem; padding-inline: .9rem; font-size: 1rem; }
+.boton-buscar { display: inline-flex; min-width: 9.5rem; min-height: 3.15rem; align-items: center; justify-content: center; gap: .5rem; }
+.cargador-boton { width: 1rem; height: 1rem; border: 2px solid rgb(255 255 255 / 45%); border-top-color: white; border-radius: 50%; animation: girar .8s linear infinite; }
+
+.resultado-inventario { display: grid; gap: 1.1rem; }
+.estado-consulta { display: grid; min-height: 18rem; place-content: center; justify-items: center; gap: .45rem; text-align: center; }
+.estado-consulta h2, .estado-consulta p { margin: 0; }
+.estado-consulta h2 { color: var(--azul-900); font-size: 1.2rem; }
+.estado-consulta p { max-width: 34rem; color: var(--gris-600); }
+.ilustracion-estado { display: grid; width: 4.25rem; height: 4.25rem; margin-bottom: .35rem; place-items: center; border-radius: 50%; background: var(--azul-100); color: var(--azul-700); font-size: 1.7rem; }
+.estado-vacio .ilustracion-estado { background: #f0f3f6; color: #6d8093; }
+.estado-error-inventario { border-color: #e1b8b4; background: #fffafa; }
+.estado-error-inventario .ilustracion-estado { background: #fbe7e5; color: #a33a32; }
+
+.ficha-articulo { display: flex; align-items: center; gap: 1rem; border-left: 4px solid var(--azul-700); }
+.icono-articulo { width: 3.35rem; height: 3.35rem; font-size: 1.35rem; }
+.ficha-articulo h2, .ficha-articulo p { margin: 0; }
+.ficha-articulo h2 { color: var(--azul-900); font-size: clamp(1.2rem, 2.2vw, 1.55rem); overflow-wrap: anywhere; }
+.ficha-articulo > div > p:last-child { margin-top: .2rem; color: var(--gris-600); }
+.estado-encontrado { display: flex; align-items: center; gap: .35rem; margin-bottom: .2rem !important; color: #2f6c4a; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+
+.resumen-inventario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.tarjeta-resumen-inventario { display: flex; min-height: 7.8rem; align-items: center; gap: .9rem; }
+.icono-resumen { width: 3rem; height: 3rem; font-size: 1.15rem; }
+.tarjeta-resumen-inventario > div { display: grid; }
+.tarjeta-resumen-inventario span { color: var(--gris-600); font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.tarjeta-resumen-inventario strong { color: var(--azul-900); font-size: 1.7rem; line-height: 1.2; }
+.tarjeta-resumen-inventario small { color: var(--gris-600); }
+
+.detalle-bodegas { padding: 0; overflow: hidden; }
+.encabezado-seccion { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.2rem 1.25rem; border-bottom: 1px solid #e0e6eb; }
+.encabezado-seccion h2, .encabezado-seccion p { margin: 0; }
+.encabezado-seccion h2 { color: var(--azul-900); font-size: 1.15rem; }
+.contador-bodegas { padding: .3rem .65rem; border-radius: 999px; background: var(--azul-100); color: var(--azul-900); font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.tabla-inventario { overflow-x: auto; }
+.tabla-inventario th:nth-child(3), .tabla-inventario td:nth-child(3) { text-align: right; }
+.tabla-inventario tbody tr:last-child td { border-bottom: 0; }
+.codigo-bodega { color: var(--azul-900); }
+.cantidad-inventario { color: var(--azul-900); font-size: 1rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+.estado-disponibilidad { display: inline-flex; align-items: center; gap: .4rem; min-width: 8.8rem; padding: .32rem .6rem; border: 1px solid; border-radius: 999px; font-size: .78rem; font-weight: 700; }
+.punto-estado { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+.con-existencia { border-color: #b9dcc8; background: #edf8f1; color: #276843; }
+.existencia-baja { border-color: #ead8a4; background: #fff8e7; color: #7a5a0d; }
+.sin-existencia { border-color: #e5c0bd; background: #fff1f0; color: #9b352f; }
+.sin-bodegas { display: grid; min-height: 11rem; place-content: center; justify-items: center; gap: .25rem; padding: 1.5rem; color: var(--gris-600); text-align: center; }
+.sin-bodegas i { margin-bottom: .35rem; color: #7892aa; font-size: 1.8rem; }
+.sin-bodegas strong { color: var(--azul-900); }
+
+@media (max-width: 680px) {
+  .fila-busqueda, .resumen-inventario { grid-template-columns: 1fr; }
+  .boton-buscar { width: 100%; }
+  .ficha-articulo { align-items: flex-start; }
+  .encabezado-seccion { align-items: flex-start; flex-direction: column; }
+  .tabla-inventario { overflow: visible; padding: .75rem; }
+  .tabla-inventario tbody tr:last-child td { border-bottom: 0; }
+  .tabla-inventario td:nth-child(3) { text-align: left; }
+  .estado-disponibilidad { justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cargador-boton { animation: none; }
+}

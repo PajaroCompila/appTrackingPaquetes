@@ -1,11 +1,17 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { PedidosDespachadosComponent } from './pedidos-despachados.component';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
+import type { UsuarioSesion } from '../autenticacion/autenticacion.interface';
+
+const usuario = signal<UsuarioSesion>({ usuarioId: '1', nombreUsuario: 'operador', nombreVisible: 'Operador',
+  codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null, debeCambiarContrasena: false });
 
 const pedido = {
   idOrigen: 'R1:F1',
@@ -42,11 +48,13 @@ function responderListados(
 describe('PedidosDespachadosComponent', () => {
   function configurar(idOrigen: string | null, retorno: string | null = null): void {
     sessionStorage.clear();
+    usuario.set({ ...usuario(), codigoRol: 'OPERADOR_BODEGA' });
     TestBed.configureTestingModule({
       imports: [PedidosDespachadosComponent],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: AutenticacionService, useValue: { usuario } },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -60,6 +68,21 @@ describe('PedidosDespachadosComponent', () => {
       ],
     });
   }
+
+  it('DASHBOARDS consulta despachados sin controles de impresion ni escritura', () => {
+    configurar(null);
+    usuario.set({ ...usuario(), codigoRol: 'DASHBOARDS' });
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    responderListados(TestBed.inject(HttpTestingController), [pedido]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.acciones-impresion-grupo')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.columna-imprimir')).toBeNull();
+    fixture.componentInstance.seleccionarTodasImpresiones('normales');
+    fixture.componentInstance.imprimirSeleccionados('normales');
+    expect(fixture.componentInstance.articulosImpresion()).toEqual([]);
+  });
 
   it('oculta Creado en R1 y todas las filas del pedido usan la misma cabecera', () => {
     configurar(null);
@@ -85,6 +108,9 @@ describe('PedidosDespachadosComponent', () => {
     expect(enlaces[0].getAttribute('href')).toBe(enlaces[1].getAttribute('href'));
     expect(texto).toContain('05:30');
     expect(texto).toContain('Imprimir seleccionados (0)');
+    expect(fixture.nativeElement.querySelectorAll(
+      '.grupo-listado-pedidos .acciones-impresion-grupo .boton-imprimir-seleccionados',
+    )).toHaveLength(2);
     expect(texto).toContain('IMPRIMIR TODO');
   });
 
@@ -156,6 +182,10 @@ describe('PedidosDespachadosComponent', () => {
     const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]
       .map((titulo: HTMLElement) => titulo.textContent?.trim());
     expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
+    const secciones = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos')] as HTMLElement[];
+    expect(secciones.every((seccion) => Boolean(seccion.querySelector(
+      '.acciones-impresion-grupo .boton-imprimir-seleccionados',
+    )))).toBe(true);
 
     fixture.componentInstance.irPagina('especiales', 2);
     const solicitudes = http.match((solicitud) => solicitud.url.endsWith('/pedidos-despachados'));
@@ -167,6 +197,32 @@ describe('PedidosDespachadosComponent', () => {
       pagina: Number(solicitud.request.params.get('pagina')), cantidadPorPagina: 25,
       totalRegistros: 0, hayMas: false,
     } }));
+  });
+
+  it('imprime solamente la seleccion de la seccion indicada', async () => {
+    vi.useFakeTimers();
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    responderListados(http, [pedido], [{ ...pedido, idOrigen: 'R1:E1', numeroPedido: '200',
+      esEspecial: true }]);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/almacenes')).flush({ datos: [] });
+
+    fixture.componentInstance.seleccionarTodasImpresiones('normales');
+    fixture.componentInstance.seleccionarTodasImpresiones('especiales');
+    fixture.componentInstance.imprimirSeleccionados('especiales');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fixture.componentInstance.cantidadSeleccionadaImpresion('normales')).toBe(2);
+    expect(fixture.componentInstance.cantidadSeleccionadaImpresion('especiales')).toBe(2);
+    expect(fixture.componentInstance.articulosImpresion().map(({ numeroPedido }) => numeroPedido))
+      .toEqual(['200', '200']);
+    expect(imprimir).toHaveBeenCalledOnce();
+    fixture.destroy();
+    imprimir.mockRestore();
+    vi.useRealTimers();
   });
 
   it('consulta por idOrigen e imprime el detalle con el mismo componente POS', async () => {

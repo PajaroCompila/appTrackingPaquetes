@@ -153,6 +153,13 @@
   .selector-multiple fieldset { position: static; max-height: 16rem; }
 }
 .acciones-transferencia { display:flex; justify-content:flex-end; gap:.75rem; margin: 0 0 .75rem; }
+.acciones-impresion-grupo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-inline: .25rem;
+  margin-bottom: .75rem;
+}
 .mensaje-transferencia { margin:.5rem 0; color:var(--azul-700); font-weight:600; }
   .codigo-consultable { cursor: pointer; }
   .codigo-consultable:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }

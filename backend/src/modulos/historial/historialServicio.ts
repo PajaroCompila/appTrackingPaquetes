@@ -78,8 +78,10 @@ export class HistorialServicio {
         || a.idOrigen.localeCompare(b.idOrigen));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
-    await this.agregarResponsablesPedidos(registros);
-    if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar(registros);
+    await Promise.all([
+      this.agregarResponsablesPedidos(registros),
+      this.seguimientoRepositorio?.aplicar(registros) ?? Promise.resolve(),
+    ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };
@@ -126,8 +128,10 @@ export class HistorialServicio {
         || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
-    await this.agregarResponsablesArticulos(registros);
-    if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicarArticulos(registros);
+    await Promise.all([
+      this.agregarResponsablesArticulos(registros),
+      this.seguimientoRepositorio?.aplicarArticulos(registros) ?? Promise.resolve(),
+    ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };

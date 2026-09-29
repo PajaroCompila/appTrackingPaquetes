@@ -62,11 +62,13 @@ export class PedidosService {
 
   public obtenerInventarioArticulo(
     codigoArticulo: string,
-    codigoAlmacen: string,
+    codigoAlmacen?: string,
   ): Observable<InventarioArticulo> {
+    let parametros = new HttpParams();
+    if (codigoAlmacen?.trim()) parametros = parametros.set('codigoAlmacen', codigoAlmacen.trim());
     return this.clienteHttp.get<InventarioArticulo>(
       `${environment.urlApi}/articulos/${encodeURIComponent(codigoArticulo)}/inventario`,
-      { params: new HttpParams().set('codigoAlmacen', codigoAlmacen) },
+      { params: parametros },
     );
   }
 

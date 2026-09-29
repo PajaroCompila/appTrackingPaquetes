@@ -12,7 +12,7 @@ describe('AlmacenesService', () => {
     let cantidad = 0;
 
     servicio.obtenerAlmacenes().subscribe(({ datos }) => cantidad = datos.length);
-    const solicitud = controladorHttp.expectOne('http://localhost:3280/api/almacenes');
+    const solicitud = controladorHttp.expectOne('/api/almacenes');
     solicitud.flush({ datos: [{
       codigoAlmacen: 'BSPS01', nombreAlmacen: 'Bodega principal',
       codigoSucursal: 'SPS', nombreSucursal: 'San Pedro Sula_P',

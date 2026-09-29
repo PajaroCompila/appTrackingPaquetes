@@ -37,11 +37,13 @@ export const esquemaReasignar = esquemaGuardarAsignacion.extend({
 }).strict();
 
 export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
+  if (codigoRol?.toUpperCase() === 'DASHBOARDS') return false;
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
     || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(nombreUsuario.trim().toLowerCase());
 }
 
 export function puedeReasignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
+  if (codigoRol?.toUpperCase() === 'DASHBOARDS') return false;
   return codigoRol?.toUpperCase() === 'ADMINISTRADOR'
     || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(nombreUsuario.trim().toLowerCase());
 }
@@ -49,6 +51,7 @@ export function puedeReasignarPedidos(codigoRol: string | null, nombreUsuario: s
 export function usuariosAsignablesParaSesion(
   usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
 ): readonly TecnicoAsignable[] {
+  if (usuario.codigoRol?.toUpperCase() === 'DASHBOARDS') return [];
   const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
   if (nombreUsuario === 'tlopez') return tommyAsignable;
   if (nombreUsuario === 'bodegatbm') return kevinAsignable;

@@ -35,6 +35,7 @@ import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiem
 import { AsignacionImpresionComponent } from '../../compartido/detalle-pedido/asignacion-impresion.component';
 import type { ArticuloDetalleVisual } from '../../compartido/detalle-pedido/detalle-pedido-vista.interface';
 import { ImpresionPedidoPosService } from './impresion-pedido-pos.service';
+import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
 
 interface FormularioFiltros {
   numeroPedido: string;
@@ -104,6 +105,7 @@ export class ListaPedidosComponent implements OnInit {
   private temporizadorImpresion?: ReturnType<typeof setTimeout>;
   private versionAsignacionImpresion = 0;
   private firmaAsignacionImpresion = '';
+  private grupoImpresionActivo: GrupoPedidos['clave'] | null = null;
 
   public filtrosFormulario = formularioInicial();
   public readonly pedidos = signal<PedidoResumen[]>([]);
@@ -285,8 +287,13 @@ export class ListaPedidosComponent implements OnInit {
 
   public puedeAsignarPedidos(): boolean {
     const usuario = this.autenticacion.usuario();
+    if (obtenerPermisosRol(usuario?.codigoRol).soloConsultaOperativa) return false;
     return usuario?.codigoRol === 'ADMINISTRADOR'
       || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
+  }
+
+  public modoSoloConsulta(): boolean {
+    return obtenerPermisosRol(this.autenticacion.usuario()?.codigoRol).soloConsultaOperativa;
   }
 
   public asignacionActual(
@@ -358,7 +365,7 @@ export class ListaPedidosComponent implements OnInit {
     usuarioAsignado: string,
   ): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    if (!identidad || !this.puedeAsignar()
+    if (!identidad || !this.puedeAsignar() || !this.puedeAsignarPedidos()
       || (this.asignacionConfirmada(pedido, articulo) && !this.asignacionDesbloqueada(pedido, articulo))
       || this.asignacionGuardando(pedido, articulo)) return;
     if (usuarioAsignado
@@ -386,7 +393,8 @@ export class ListaPedidosComponent implements OnInit {
   public desbloquearAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
     const identidad = this.identidadAsignacion(pedido, articulo);
     const actual = this.asignacionActual(pedido, articulo);
-    if (!identidad || !actual?.usuarioAsignado || !actual.actualizadoEn || !this.puedeReasignar()) return;
+    if (!identidad || !actual?.usuarioAsignado || !actual.actualizadoEn
+      || !this.puedeReasignar() || this.modoSoloConsulta()) return;
     const clave = claveArticuloAsignado(identidad);
     this.seleccionesAsignacion.update((selecciones) => {
       const nuevas = new Map(selecciones);
@@ -401,13 +409,15 @@ export class ListaPedidosComponent implements OnInit {
   public puedeConfirmarReasignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): boolean {
     const identidad = this.identidadAsignacion(pedido, articulo);
     const actual = this.asignacionActual(pedido, articulo);
-    if (!identidad || !actual?.actualizadoEn || !this.puedeReasignar() || !this.asignacionDesbloqueada(pedido, articulo) || this.asignacionGuardando(pedido, articulo)) return false;
+    if (!identidad || !actual?.actualizadoEn || !this.puedeReasignar() || this.modoSoloConsulta()
+      || !this.asignacionDesbloqueada(pedido, articulo) || this.asignacionGuardando(pedido, articulo)) return false;
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad));
     return Boolean(seleccion && seleccion !== actual.usuarioAsignado && this.usuariosAsignables().some(({ usuario }) => usuario === seleccion));
   }
 
   public reasignarAsignacion(pedido: PedidoResumen, articulo: ArticuloPedidoResumen): void {
-    if (!this.puedeReasignar() || this.asignacionGuardando(pedido, articulo)) return;
+    if (!this.puedeReasignar() || this.modoSoloConsulta()
+      || this.asignacionGuardando(pedido, articulo)) return;
     if (this.asignacionDesbloqueada(pedido, articulo)) this.confirmarReasignacion(pedido, articulo);
     else this.desbloquearAsignacion(pedido, articulo);
   }
@@ -458,7 +468,8 @@ export class ListaPedidosComponent implements OnInit {
     articulo: ArticuloPedidoResumen,
   ): boolean {
     const identidad = this.identidadAsignacion(pedido, articulo);
-    if (!identidad || !this.puedeAsignar() || this.asignacionConfirmada(pedido, articulo)
+    if (!identidad || !this.puedeAsignar() || !this.puedeAsignarPedidos()
+      || this.asignacionConfirmada(pedido, articulo)
       || this.asignacionGuardando(pedido, articulo)) return false;
     const seleccion = this.seleccionesAsignacion().get(claveArticuloAsignado(identidad))
       ?? this.usuarioAsignableExclusivo(identidad.idOrigen);
@@ -628,12 +639,18 @@ export class ListaPedidosComponent implements OnInit {
     this.mensajeImpresion.set('');
   }
 
-  public imprimirSeleccionados(): void {
-    if (this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()
+  public cantidadSeleccionadaImpresion(grupo: GrupoPedidos['clave']): number {
+    const seleccionadas = this.lineasSeleccionadasImpresion();
+    return this.clavesVisiblesGrupo(grupo).filter((clave) => seleccionadas.has(clave)).length;
+  }
+
+  public imprimirSeleccionados(grupo: GrupoPedidos['clave'] | null = null): void {
+    if (this.modoSoloConsulta() || this.preparandoImpresion() || this.confirmarImpresion() || this.guardandoImpresion()
       || this.hayFlujoAsignacionImpresion() || this.lineasSeleccionadasImpresion().size === 0) return;
+    this.grupoImpresionActivo = grupo;
     const elegidos = this.obtenerLineasSeleccionadasImpresion();
     if (elegidos.length === 0) {
-      this.limpiarSeleccionImpresion();
+      this.grupoImpresionActivo = null;
       return;
     }
     this.validarResponsablesImpresion(elegidos);
@@ -791,6 +808,7 @@ export class ListaPedidosComponent implements OnInit {
     this.articulosSinResponsableImpresion.set([]);
     this.usuariosAsignablesImpresion.set([]);
     this.errorAsignacionImpresion.set('');
+    this.grupoImpresionActivo = null;
   }
 
   @HostListener('window:afterprint')
@@ -811,6 +829,7 @@ export class ListaPedidosComponent implements OnInit {
     this.confirmarImpresion.set(false);
     this.preparandoImpresion.set(false);
     this.errorRegistroImpresion.set('');
+    this.grupoImpresionActivo = null;
   }
 
   public registrarImpresionConfirmada(): void {
@@ -847,13 +866,16 @@ export class ListaPedidosComponent implements OnInit {
     return grupo === 'normales' ? this.pedidos() : this.pedidosEspeciales();
   }
 
-  private obtenerLineasSeleccionadasImpresion(): {
+  private obtenerLineasSeleccionadasImpresion(
+    grupo: GrupoPedidos['clave'] | null = this.grupoImpresionActivo,
+  ): {
     pedido: PedidoResumen;
     articulo: ArticuloPedidoResumen;
   }[] {
     const seleccionadas = this.lineasSeleccionadasImpresion();
     const agregadas = new Set<string>();
-    return [...this.pedidos(), ...this.pedidosEspeciales()].flatMap((pedido) =>
+    const pedidos = grupo ? this.pedidosGrupo(grupo) : [...this.pedidos(), ...this.pedidosEspeciales()];
+    return pedidos.flatMap((pedido) =>
       pedido.articulos.flatMap((articulo, indice) => {
         const clave = this.claveEstableLinea(pedido, articulo, indice);
         if (!articulo.identificadorDetalle?.trim() || !this.puedeOperarArticulo(pedido, articulo)
@@ -937,7 +959,7 @@ export class ListaPedidosComponent implements OnInit {
   }
 
   public transferir(): void {
-    if (this.lineasSeleccionadasTransferencia().size === 0 || this.transfiriendo()) return;
+    if (this.modoSoloConsulta() || this.lineasSeleccionadasTransferencia().size === 0 || this.transfiriendo()) return;
     const lineas = this.obtenerIdentidadesSeleccionadasTransferencia();
     if (lineas.length === 0) return;
     this.transfiriendo.set(true);

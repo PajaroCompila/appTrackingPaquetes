@@ -95,13 +95,15 @@
     } @else if (error()) {
       <div class="estado-interfaz estado-error"><p>No pudimos cargar los pedidos despachados.</p></div>
     } @else {
-      <div class="acciones-transferencia">
-        <button class="boton boton-secundario boton-imprimir-seleccionados" type="button"
-          [disabled]="lineasSeleccionadasImpresion().size === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
-          (click)="imprimirSeleccionados()">Imprimir seleccionados ({{ lineasSeleccionadasImpresion().size }})</button>
-      </div>
       @for (grupo of grupos(); track grupo.clave) {
         <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-despachados-' + grupo.clave">
+          @if (!modoSoloConsulta()) {
+          <div class="acciones-impresion-grupo">
+            <button class="boton boton-secundario boton-imprimir-seleccionados" type="button"
+              [disabled]="cantidadSeleccionadaImpresion(grupo.clave) === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
+              (click)="imprimirSeleccionados(grupo.clave)">Imprimir seleccionados ({{ cantidadSeleccionadaImpresion(grupo.clave) }})</button>
+          </div>
+          }
           <h2 [id]="'titulo-despachados-' + grupo.clave">{{ grupo.titulo }}</h2>
           @if (grupo.pedidos.length === 0) {
             <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
@@ -120,12 +122,12 @@
             <col class="ancho-usuario" />
             <col class="ancho-detalle" />
             <col class="ancho-tiempo-total" />
-            <col class="ancho-imprimir" />
+            @if (!modoSoloConsulta()) { <col class="ancho-imprimir" /> }
           </colgroup>
-          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th><th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
             etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
             [bloqueado]="grupo.pedidos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
-            (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th></tr></thead>
+            (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th>}</tr></thead>
           @for (pedido of grupo.pedidos; track pedido.idOrigen + ':' + pedido.articulos[0]?.identificadorDetalle) {
             <tbody class="grupo-pedido">
               @for (articulo of pedido.articulos; track articulo.identificadorDetalle) {
@@ -140,7 +142,7 @@
                   <td data-label="Usuario" [title]="articulo.usuarioAsignado || '—'"><span class="texto-dos-lineas">{{ articulo.usuarioAsignado || '—' }}</span></td>
                   <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
                   <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalDespacho(pedido, articulo.transferidoEn || pedido.despachadoEn) }}</strong></td>
-                  <td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+                  @if (!modoSoloConsulta()) {<td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
                     <label class="selector-linea selector-impresion" title="Seleccionar para imprimir">
                       <input type="checkbox" [disabled]="!articulo.identificadorDetalle || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
                         [checked]="estaSeleccionadoParaImpresion(pedido, articulo)"
@@ -148,7 +150,7 @@
                         (change)="alternarSeleccionImpresion(pedido, articulo, $any($event.target).checked)" />
                       <span aria-hidden="true">✓</span>
                     </label>
-                  </td>
+                  </td>}
                 </tr>
               }
             </tbody>
@@ -157,10 +159,10 @@
       </div> } @else {
         <div class="panel tabla-contenedor tabla-pedidos-agrupados" role="tabpanel">
           <table>
-            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th><th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
               etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
               [bloqueado]="grupo.pedidos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
-              (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th></tr></thead>
+              (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th>}</tr></thead>
             <tbody>
               @for (pedido of grupo.pedidos; track pedido.idOrigen) {
                 <tr>
@@ -176,7 +178,7 @@
                   <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle"
                     [routerLink]="['/pedidos-despachados', pedido.idOrigen]"
                     [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
-                  <td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
+                  @if (!modoSoloConsulta()) {<td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
                     <label class="selector-linea selector-impresion" title="Seleccionar pedido para imprimir">
                       <input type="checkbox" [checked]="pedidoSeleccionadoParaImpresion(pedido)"
                         [disabled]="preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
@@ -184,7 +186,7 @@
                         (change)="alternarPedidoImpresion(pedido, $any($event.target).checked)" />
                       <span aria-hidden="true">✓</span>
                     </label>
-                  </td>
+                  </td>}
                 </tr>
               }
             </tbody>
@@ -203,7 +205,7 @@
       }
     }
   }
-  @if (!idOrigen()) {
+  @if (!idOrigen() && !modoSoloConsulta()) {
     <app-vista-impresion-pedido [articulos]="articulosImpresion()" [fechaHora]="fechaHoraImpresion()" />
     <app-confirmacion-impresion [abierta]="confirmarImpresion()" [guardando]="guardandoImpresion()"
       [error]="errorRegistroImpresion()" (confirmar)="registrarImpresionConfirmada()"

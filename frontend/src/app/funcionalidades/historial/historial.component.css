@@ -24,7 +24,6 @@
 .tabla-articulos th:nth-child(8), .tabla-articulos td:nth-child(8) { width: 11%; }
 .tabla-articulos th:nth-child(9), .tabla-articulos td:nth-child(9) { width: 7%; }
 .tabla-articulos th:nth-child(10), .tabla-articulos td:nth-child(10) { width: 10%; }
-.acciones-impresion-historial { margin-top: .75rem; }
 .dato-consultable { cursor: pointer; transition: color var(--transicion-rapida) var(--easing-corporativo); }
 .dato-consultable:hover, .dato-consultable:focus-visible { color: var(--azul-700); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18rem; }
 .texto-dos-lineas { display: -webkit-box; width: 100%; overflow: hidden; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

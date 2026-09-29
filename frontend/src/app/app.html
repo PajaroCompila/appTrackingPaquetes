@@ -3,10 +3,11 @@
     <aside class="barra-lateral" aria-label="Navegación principal">
       <img class="marca-icono" src="/imagenes/isotipo-pajaro-azul.png" alt="Pájaro Azul" />
       <nav class="navegacion-principal" appCerrarTooltipNavegacion>
-        @if (usuario()?.codigoRol === 'ADMINISTRADOR' || usuario()?.codigoRol === 'DASHBOARDS' || usuario()?.codigoRol === 'CONSULTA') {
+        @if (puedeVerDashboard()) {
           <a routerLink="/dashboard" routerLinkActive="activo" aria-label="Dashboard"><i class="pi pi-chart-bar" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Dashboard</span></a>
         }
         <a routerLink="/pedidos" routerLinkActive="activo" aria-label="Pedidos pendientes"><i class="pi pi-list-check" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos pendientes</span></a>
+        <a routerLink="/inventario" routerLinkActive="activo" aria-label="Inventario"><i class="pi pi-box" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Inventario</span></a>
         <a routerLink="/pedidos-despachados" routerLinkActive="activo" aria-label="Pedidos despachados"><i class="pi pi-check-circle" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos despachados</span></a>
         <a routerLink="/pedidos-devueltos" routerLinkActive="activo" aria-label="Pedidos devueltos"><i class="pi pi-arrow-left" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Pedidos devueltos</span></a>
         <a routerLink="/historial-validados" routerLinkActive="activo" aria-label="Historial"><i class="pi pi-history" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Historial</span></a>

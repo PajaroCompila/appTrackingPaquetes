@@ -37,12 +37,12 @@
       <p class="aviso">Pedido {{ registros()[0].numeroPedido }} fue facturado con {{ registros()[0].pendientes }} {{ registros()[0].pendientes === 1 ? 'artículo pendiente' : 'artículos pendientes' }} de entrega.</p>
     }
     <div class="panel tabla-contenedor"><table><thead><tr>
-      <th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Vendedor</th><th>Estado financiero</th><th>Estado operativo</th><th>Responsable</th><th>{{ idOrigen() ? 'Confirmar entrega' : 'Ver detalle' }}</th>
+      <th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Vendedor</th><th>Estado financiero</th><th>Estado operativo</th><th>Responsable</th>@if (!idOrigen() || !modoSoloConsulta()) {<th>{{ idOrigen() ? 'Confirmar entrega' : 'Ver detalle' }}</th>}
     </tr></thead><tbody>
       @for (p of registros(); track $index) {@for (l of p.lineas; track l.identificadorDetalle) {
         <tr><td data-label="Pedido"><strong>{{ p.numeroPedido }}</strong></td><td data-label="Código"><strong [appCodigoArticuloInventario]="l.codigoArticulo" [codigoAlmacenInventario]="l.codigoAlmacen">{{ l.codigoArticulo }}</strong></td><td data-label="Descripción">{{ l.descripcion }}</td><td data-label="Cantidad">{{ l.cantidad }}</td><td data-label="Bodega">{{ l.codigoAlmacen }}</td><td data-label="Vendedor">{{ p.nombreVendedor || '—' }}</td><td data-label="Estado financiero"><span class="estado-financiero">Facturado</span></td><td data-label="Estado operativo"><span class="estado-pendiente">Pendiente de entrega</span></td><td data-label="Responsable"><strong>{{ l.responsable || 'Sin responsable configurado' }}</strong></td>
-          <td [attr.data-label]="idOrigen() ? 'Confirmar entrega' : 'Ver detalle'">@if (idOrigen()) {<button type="button" class="boton boton-primario" [disabled]="confirmando() || actualizando() || !puedeConfirmar(l)" (click)="confirmar(l)">Confirmar entrega</button>}
-            @else {<a class="enlace-detalle" [routerLink]="['/pedidos/facturados-pendientes',p.idOrigen]">Ver detalle</a>}</td></tr>
+          @if (!idOrigen() || !modoSoloConsulta()) {<td [attr.data-label]="idOrigen() ? 'Confirmar entrega' : 'Ver detalle'">@if (idOrigen()) {<button type="button" class="boton boton-primario" [disabled]="confirmando() || actualizando() || !puedeConfirmar(l)" (click)="confirmar(l)">Confirmar entrega</button>}
+            @else {<a class="enlace-detalle" [routerLink]="['/pedidos/facturados-pendientes',p.idOrigen]">Ver detalle</a>}</td>}</tr>
       }}</tbody></table></div>
   } @else {
     <div class="panel tabla-contenedor"><table><thead><tr><th>Pedido</th><th>Total artículos</th><th>Controlados manualmente</th><th>Confirmados</th><th>Pendientes</th><th>Sin validación manual</th><th>Estado financiero</th><th>Estado operativo</th><th>Vendedor</th><th>Ver detalle</th></tr></thead><tbody>

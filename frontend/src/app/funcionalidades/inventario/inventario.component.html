@@ -1,0 +1,130 @@
+<section class="pagina pagina-inventario" aria-labelledby="titulo-inventario-pagina">
+  <header class="encabezado-pagina">
+    <div>
+      <p class="sobrelinea">Consulta</p>
+      <h1 id="titulo-inventario-pagina">Inventario</h1>
+      <p>Consulte la existencia de un artículo por medio de su código.</p>
+    </div>
+  </header>
+
+  <form class="panel buscador-inventario" (ngSubmit)="buscar()">
+    <div class="encabezado-buscador">
+      <span class="icono-buscador" aria-hidden="true"><i class="pi pi-search"></i></span>
+      <div>
+        <h2>Buscar artículo</h2>
+        <p>Escriba o escanee el código para consultar SAP.</p>
+      </div>
+    </div>
+    <div class="fila-busqueda">
+      <div class="campo campo-codigo">
+        <label for="codigoArticuloInventario">Código del artículo</label>
+        <input
+          #codigoInput
+          id="codigoArticuloInventario"
+          name="codigoArticulo"
+          type="text"
+          maxlength="100"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Ingrese o escanee el código del artículo"
+          [(ngModel)]="codigoArticulo"
+        />
+      </div>
+      <button class="boton boton-primario boton-buscar" type="submit" [disabled]="estado() === 'cargando' || !codigoArticulo.trim()">
+        @if (estado() === 'cargando') {
+          <span class="cargador-boton" aria-hidden="true"></span>
+          Consultando
+        } @else {
+          <i class="pi pi-search" aria-hidden="true"></i>
+          Buscar
+        }
+      </button>
+    </div>
+  </form>
+
+  <div class="resultado-inventario" aria-live="polite">
+    @if (estado() === 'inicial') {
+      <section class="panel estado-consulta estado-inicial">
+        <span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-box"></i></span>
+        <h2>Busque un artículo</h2>
+        <p>Ingrese o escanee el código del artículo para consultar su existencia.</p>
+      </section>
+    } @else if (estado() === 'cargando') {
+      <section class="panel estado-consulta" role="status">
+        <span class="cargador" aria-hidden="true"></span>
+        <h2>Consultando inventario</h2>
+        <p>Buscando el artículo {{ codigoConsultado() }} en SAP…</p>
+      </section>
+    } @else if (estado() === 'no-encontrado') {
+      <section class="panel estado-consulta estado-vacio" role="status">
+        <span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-search"></i></span>
+        <h2>No se encontró el artículo</h2>
+        <p>Revise el código {{ codigoConsultado() }} e intente nuevamente.</p>
+      </section>
+    } @else if (estado() === 'error') {
+      <section class="panel estado-consulta estado-error-inventario" role="alert">
+        <span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-exclamation-triangle"></i></span>
+        <h2>No pudimos consultar el inventario</h2>
+        <p>Intente nuevamente en unos momentos.</p>
+      </section>
+    } @else if (inventario(); as articulo) {
+      <section class="panel ficha-articulo" aria-labelledby="codigo-articulo-encontrado">
+        <span class="icono-articulo" aria-hidden="true"><i class="pi pi-box"></i></span>
+        <div>
+          <p class="estado-encontrado"><i class="pi pi-check-circle" aria-hidden="true"></i> Artículo encontrado</p>
+          <h2 id="codigo-articulo-encontrado">{{ articulo.codigoArticulo }}</h2>
+          <p>{{ articulo.descripcion }}</p>
+        </div>
+      </section>
+
+      <section class="resumen-inventario" aria-label="Resumen del inventario">
+        <article class="panel tarjeta-resumen-inventario">
+          <span class="icono-resumen"><i class="pi pi-box" aria-hidden="true"></i></span>
+          <div><span>Existencia total</span><strong>{{ formatearUnidades(existenciaTotal()) }}</strong><small>unidades físicas</small></div>
+        </article>
+        <article class="panel tarjeta-resumen-inventario">
+          <span class="icono-resumen"><i class="pi pi-warehouse" aria-hidden="true"></i></span>
+          <div><span>Bodegas con existencia</span><strong>{{ bodegasConExistencia() }}</strong><small>de {{ articulo.existencias.length }} consultadas</small></div>
+        </article>
+      </section>
+
+      <section class="panel detalle-bodegas" aria-labelledby="titulo-inventario-bodegas">
+        <header class="encabezado-seccion">
+          <div>
+            <p class="sobrelinea">Disponibilidad</p>
+            <h2 id="titulo-inventario-bodegas">Inventario por bodega</h2>
+          </div>
+          <span class="contador-bodegas">{{ articulo.existencias.length }} {{ articulo.existencias.length === 1 ? 'bodega' : 'bodegas' }}</span>
+        </header>
+
+        @if (articulo.existencias.length === 0) {
+          <div class="sin-bodegas" role="status">
+            <i class="pi pi-inbox" aria-hidden="true"></i>
+            <strong>Artículo encontrado</strong>
+            <span>Disponible: 0 unidades.</span>
+          </div>
+        } @else {
+          <div class="tabla-inventario">
+            <table>
+              <thead><tr><th>Bodega</th><th>Nombre del almacén</th><th>Existencia física</th><th>Disponibilidad</th></tr></thead>
+              <tbody>
+                @for (bodega of articulo.existencias; track bodega.codigoAlmacen) {
+                  <tr>
+                    <td data-label="Bodega"><strong class="codigo-bodega">{{ bodega.codigoAlmacen }}</strong></td>
+                    <td data-label="Nombre del almacén">{{ bodega.nombreAlmacen }}</td>
+                    <td data-label="Existencia física" class="cantidad-inventario">{{ formatearUnidades(bodega.existenciaFisica) }}</td>
+                    <td data-label="Disponibilidad">
+                      <span class="estado-disponibilidad" [class]="claseDisponibilidad(bodega.existenciaFisica)">
+                        <span class="punto-estado" aria-hidden="true"></span>{{ textoDisponibilidad(bodega.existenciaFisica) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+  </div>
+</section>

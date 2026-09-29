@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AutenticacionService } from './autenticacion.service';
+import { obtenerPermisosRol } from './permisos-rol';
 
 const destino = (servicio:AutenticacionService,router:Router,permitirCambio=false) => {
   const usuario=servicio.usuario();
@@ -19,7 +20,7 @@ export const administradorGuard=()=>{const s=inject(AutenticacionService),r=inje
 
 export const dashboardGuard = () => {
   const s = inject(AutenticacionService), r = inject(Router);
-  const validar = () => ['ADMINISTRADOR', 'DASHBOARDS', 'CONSULTA'].includes(s.usuario()?.codigoRol ?? '')
+  const validar = () => obtenerPermisosRol(s.usuario()?.codigoRol).verDashboard
     ? true : r.createUrlTree(['/pedidos']);
   return s.usuario() ? validar() : s.consultarSesion().pipe(
     map(validar), catchError(() => of(r.createUrlTree(['/login']))));

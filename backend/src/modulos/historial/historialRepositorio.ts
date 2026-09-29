@@ -384,8 +384,10 @@ export class HistorialRepositorio {
         WHERE pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
           AND pedido.estadoLocal = 'VALIDADO'
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
-          AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) >= @fechaDesde
-          AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) < DATEADD(day, 1, @fechaHasta)
+          AND ((pedido.fechaHoraPedido >= @fechaDesde
+              AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
+            OR (pedido.fechaHoraPedido IS NULL AND pedido.despachadoEn >= @fechaDesde
+              AND pedido.despachadoEn < DATEADD(day, 1, @fechaHasta)))
           AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
           AND (@clasificacion IS NULL
             OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
@@ -504,8 +506,10 @@ export class HistorialRepositorio {
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
       WHERE pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
         AND pedido.estadoLocal = 'VALIDADO'
-        AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) >= @fechaDesde
-        AND COALESCE(pedido.fechaHoraPedido, pedido.despachadoEn) < DATEADD(day, 1, @fechaHasta)
+        AND ((pedido.fechaHoraPedido >= @fechaDesde
+            AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
+          OR (pedido.fechaHoraPedido IS NULL AND pedido.despachadoEn >= @fechaDesde
+            AND pedido.despachadoEn < DATEADD(day, 1, @fechaHasta)))
         AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
         AND (@clasificacion IS NULL
           OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)

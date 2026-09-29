@@ -45,4 +45,27 @@ describe('InventarioArticuloRepositorio', () => {
     await expect(new InventarioArticuloRepositorio(consultar).obtener('A1', 'B1'))
       .resolves.toBeNull();
   });
+
+  it('reutiliza el mismo SELECT para consultar el artículo en todas las bodegas', async () => {
+    const consultar = vi.fn().mockResolvedValue({ recordset: [
+      { codigoArticulo: 'A1', descripcion: 'Artículo', codigoAlmacen: 'B1',
+        nombreAlmacen: 'Bodega sin existencia', existenciaFisica: 0, esAlmacenConsultado: 0 },
+      { codigoArticulo: 'A1', descripcion: 'Artículo', codigoAlmacen: 'B2',
+        nombreAlmacen: 'Bodega disponible', existenciaFisica: 12, esAlmacenConsultado: 0 },
+    ] }) as unknown as ConsultarInventarioSap;
+
+    const resultado = await new InventarioArticuloRepositorio(consultar).obtener('A1');
+
+    expect(resultado?.existencias).toEqual([
+      { codigoAlmacen: 'B1', nombreAlmacen: 'Bodega sin existencia', existenciaFisica: 0 },
+      { codigoAlmacen: 'B2', nombreAlmacen: 'Bodega disponible', existenciaFisica: 12 },
+    ]);
+    const [consulta, configurar] = vi.mocked(consultar).mock.calls[0]!;
+    expect(consulta).toContain('@codigoAlmacen IS NULL');
+    expect(consulta).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|EXEC)\b/i);
+    const solicitud = { input: vi.fn() };
+    solicitud.input.mockReturnValue(solicitud);
+    configurar!(solicitud as never);
+    expect(solicitud.input).toHaveBeenCalledWith('codigoAlmacen', expect.anything(), null);
+  });
 });
