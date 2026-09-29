@@ -109,6 +109,11 @@ export interface InventarioArticulo {
   existencias: ExistenciaArticuloAlmacen[];
 }
 
+export interface CoincidenciaInventarioArticulo {
+  codigoArticulo: string;
+  descripcion: string;
+}
+
 export interface ExistenciaArticuloAlmacen {
   codigoAlmacen: string;
   nombreAlmacen: string;

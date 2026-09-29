@@ -81,6 +81,13 @@ describe('PedidosService', () => {
     });
   });
 
+  it('busca coincidencias de inventario por código o descripción', () => {
+    servicio.buscarArticulosInventario('  sintetizador  ').subscribe();
+    const solicitud = controladorHttp.expectOne('/api/articulos/buscar?termino=sintetizador&limite=20');
+    expect(solicitud.request.method).toBe('GET');
+    solicitud.flush({ datos: [{ codigoArticulo: 'YAM-MODX7', descripcion: 'Sintetizador' }] });
+  });
+
   it('construye una URL segura para cargar la fotografía en segundo plano', () => {
     expect(servicio.obtenerUrlImagenArticulo('ART/001 CON ESPACIO')).toBe(
       '/api/articulos/ART%2F001%20CON%20ESPACIO/imagen',

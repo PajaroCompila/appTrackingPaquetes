@@ -3,6 +3,31 @@ import type { ConsultarInventarioSap } from './inventarioArticuloRepositorio.js'
 import { InventarioArticuloRepositorio } from './inventarioArticuloRepositorio.js';
 
 describe('InventarioArticuloRepositorio', () => {
+  it('busca coincidencias por código o descripción y conserva el SELECT parametrizado', async () => {
+    const consultar = vi.fn().mockResolvedValue({ recordset: [
+      { codigoArticulo: ' YAM-MODX7 ', descripcion: ' Sintetizador 76 teclas ' },
+      { codigoArticulo: ' YAM-PSR ', descripcion: ' Teclado portátil ' },
+    ] }) as unknown as ConsultarInventarioSap;
+    const resultado = await new InventarioArticuloRepositorio(consultar)
+      .buscar('yam', 20, ['BSPS04']);
+
+    expect(resultado).toEqual([
+      { codigoArticulo: 'YAM-MODX7', descripcion: 'Sintetizador 76 teclas' },
+      { codigoArticulo: 'YAM-PSR', descripcion: 'Teclado portátil' },
+    ]);
+    const [consulta, configurar] = vi.mocked(consultar).mock.calls[0]!;
+    expect(consulta.trim()).toMatch(/^SELECT\b/);
+    expect(consulta).toContain('articulo.[ItemCode] LIKE @coincidencia');
+    expect(consulta).toContain('articulo.[ItemName] LIKE @coincidencia');
+    expect(consulta).toContain('OPENJSON(@almacenesJson)');
+    expect(consulta).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|EXEC)\b/i);
+    const solicitud = { input: vi.fn() };
+    solicitud.input.mockReturnValue(solicitud);
+    configurar!(solicitud as never);
+    expect(solicitud.input).toHaveBeenCalledWith('termino', expect.anything(), 'yam');
+    expect(solicitud.input).toHaveBeenCalledWith('almacenesJson', expect.anything(), '["BSPS04"]');
+  });
+
   it('conserva el almacén consultado con cero y devuelve solo existencias positivas', async () => {
     const consultar = vi.fn().mockResolvedValue({ recordset: [
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B1 ',

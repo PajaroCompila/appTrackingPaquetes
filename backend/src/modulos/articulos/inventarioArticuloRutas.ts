@@ -11,6 +11,7 @@ export function crearInventarioArticuloRutas(
   const rutas = Router();
   const controlador = new InventarioArticuloControlador(repositorio);
   const controladorImagen = new ImagenArticuloControlador(repositorioImagen);
+  rutas.get('/buscar', controlador.buscar);
   rutas.get('/:codigoArticulo/inventario', controlador.obtener);
   rutas.get('/:codigoArticulo/imagen', controladorImagen.obtener);
   return rutas;

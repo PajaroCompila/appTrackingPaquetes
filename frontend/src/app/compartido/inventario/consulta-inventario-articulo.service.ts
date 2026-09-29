@@ -19,9 +19,9 @@ export class ConsultaInventarioArticuloService {
   public abrir(codigoArticuloRecibido: string | null | undefined, codigoAlmacenRecibido: string | null | undefined): void {
     const codigoArticulo = codigoArticuloRecibido?.trim();
     const codigoAlmacen = codigoAlmacenRecibido?.trim();
-    if (!codigoArticulo || !codigoAlmacen) return;
+    if (!codigoArticulo) return;
 
-    const clave = `${codigoArticulo}\u0000${codigoAlmacen}`;
+    const clave = `${codigoArticulo}\u0000${codigoAlmacen ?? ''}`;
     if (this.claveConsulta === clave && this.consultaActiva) return;
 
     this.consultaActiva?.unsubscribe();

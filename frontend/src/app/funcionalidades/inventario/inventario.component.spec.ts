@@ -1,91 +1,88 @@
-import { provideHttpClient } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
+import { ConsultaInventarioArticuloService } from '../../compartido/inventario/consulta-inventario-articulo.service';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { InventarioComponent } from './inventario.component';
 
 describe('InventarioComponent', () => {
   let fixture: ComponentFixture<InventarioComponent>;
-  const obtenerInventarioArticulo = vi.fn();
-  const inventario = {
-    codigoArticulo: 'ART-001', descripcion: 'Artículo de prueba',
-    codigoAlmacen: 'B1', nombreAlmacen: 'Bodega uno', existenciaFisica: 0,
-    existencias: [
-      { codigoAlmacen: 'B1', nombreAlmacen: 'Bodega uno', existenciaFisica: 0 },
-      { codigoAlmacen: 'B2', nombreAlmacen: 'Bodega dos', existenciaFisica: 6 },
-      { codigoAlmacen: 'B3', nombreAlmacen: 'Bodega tres', existenciaFisica: 20 },
-    ],
-  };
+  const buscarArticulosInventario = vi.fn();
+  const abrir = vi.fn();
+  const coincidencias = [
+    { codigoArticulo: 'YAM-MODX7', descripcion: 'Sintetizador 76 teclas' },
+    { codigoArticulo: 'YAM-PSR', descripcion: 'Teclado portátil' },
+  ];
 
   beforeEach(async () => {
-    obtenerInventarioArticulo.mockReset().mockReturnValue(of(inventario));
+    vi.useFakeTimers();
+    buscarArticulosInventario.mockReset().mockReturnValue(of({ datos: coincidencias }));
+    abrir.mockReset();
     await TestBed.configureTestingModule({
       imports: [InventarioComponent],
       providers: [
-        provideHttpClient(),
-        { provide: PedidosService, useValue: { obtenerInventarioArticulo } },
+        { provide: PedidosService, useValue: { buscarArticulosInventario } },
+        { provide: ConsultaInventarioArticuloService, useValue: { abrir } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(InventarioComponent);
     fixture.detectChanges();
-    await fixture.whenStable();
+    await vi.advanceTimersByTimeAsync(0);
   });
 
-  afterEach(() => fixture.destroy());
+  afterEach(() => { fixture.destroy(); vi.useRealTimers(); });
 
-  it('inicia con el buscador enfocado y sin una tabla vacía', async () => {
-    await new Promise((resolver) => setTimeout(resolver));
-    expect(document.activeElement?.getAttribute('id')).toBe('codigoArticuloInventario');
-    expect(fixture.nativeElement.textContent).toContain('Busque un artículo');
-    expect(fixture.nativeElement.querySelector('table')).toBeNull();
+  it('inicia enfocado y explica la búsqueda por código o descripción', () => {
+    expect(document.activeElement?.getAttribute('id')).toBe('terminoInventario');
+    expect(fixture.nativeElement.textContent).toContain('código o descripción');
+    expect(fixture.nativeElement.textContent).toContain('Los resultados aparecerán automáticamente');
   });
 
-  it('consulta con el botón usando el endpoint existente y muestra existencias reales', () => {
-    fixture.componentInstance.codigoArticulo = ' ART-001 ';
+  it('espera dos caracteres y busca coincidencias después de una pausa breve', async () => {
+    fixture.componentInstance.terminoBusqueda = 'y';
+    fixture.componentInstance.alCambiarTermino('y');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(buscarArticulosInventario).not.toHaveBeenCalled();
+    fixture.componentInstance.terminoBusqueda = 'yam';
+    fixture.componentInstance.alCambiarTermino('yam');
+    await vi.advanceTimersByTimeAsync(250);
     fixture.detectChanges();
-    (fixture.nativeElement.querySelector('.boton-buscar') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('ART-001');
-    expect(fixture.nativeElement.textContent).toContain('Artículo encontrado');
-    expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(3);
-    expect(fixture.nativeElement.querySelector('.sin-existencia')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.existencia-baja')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.con-existencia')).not.toBeNull();
+    expect(buscarArticulosInventario).toHaveBeenCalledWith('yam');
+    expect(fixture.nativeElement.querySelectorAll('.resultado-articulo')).toHaveLength(2);
+    expect(fixture.nativeElement.textContent).toContain('Sintetizador 76 teclas');
   });
 
-  it('consulta al enviar el formulario, equivalente a presionar ENTER', () => {
-    fixture.componentInstance.codigoArticulo = 'ART-ENTER';
+  it('abre el modal compartido al seleccionar una coincidencia', async () => {
+    fixture.componentInstance.terminoBusqueda = 'yam';
+    fixture.componentInstance.alCambiarTermino('yam');
+    await vi.advanceTimersByTimeAsync(250);
     fixture.detectChanges();
-    (fixture.nativeElement.querySelector('form') as HTMLFormElement)
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    fixture.detectChanges();
-    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('ART-ENTER');
+    (fixture.nativeElement.querySelector('.resultado-articulo') as HTMLButtonElement).click();
+    expect(abrir).toHaveBeenCalledWith('YAM-MODX7', undefined);
+    expect(fixture.componentInstance.terminoBusqueda).toBe('YAM-MODX7');
   });
 
-  it('distingue un código inexistente de una falla de consulta', () => {
-    obtenerInventarioArticulo.mockReturnValueOnce(throwError(() => ({ status: 404 })));
-    fixture.componentInstance.codigoArticulo = 'NO-EXISTE';
+  it('permite recorrer resultados con el teclado y abrir el activo con ENTER', async () => {
+    fixture.componentInstance.terminoBusqueda = 'yam';
+    fixture.componentInstance.alCambiarTermino('yam');
+    await vi.advanceTimersByTimeAsync(250);
+    fixture.componentInstance.manejarTeclado(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    fixture.componentInstance.manejarTeclado(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     fixture.componentInstance.buscar();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No se encontró el artículo');
-
-    obtenerInventarioArticulo.mockReturnValueOnce(throwError(() => ({ status: 500 })));
-    fixture.componentInstance.codigoArticulo = 'ERROR-SAP';
-    fixture.componentInstance.buscar();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No pudimos consultar el inventario');
+    expect(abrir).toHaveBeenCalledWith('YAM-PSR', undefined);
   });
 
-  it('presenta un artículo válido aunque todas sus existencias sean cero', () => {
-    obtenerInventarioArticulo.mockReturnValueOnce(of({ ...inventario, existencias: [
-      { codigoAlmacen: 'B1', nombreAlmacen: 'Bodega uno', existenciaFisica: 0 },
-    ] }));
-    fixture.componentInstance.codigoArticulo = 'ART-CERO';
-    fixture.componentInstance.buscar();
+  it('distingue ausencia de coincidencias de una falla temporal', async () => {
+    buscarArticulosInventario.mockReturnValueOnce(of({ datos: [] }));
+    fixture.componentInstance.terminoBusqueda = 'ninguno';
+    fixture.componentInstance.alCambiarTermino('ninguno');
+    await vi.advanceTimersByTimeAsync(250);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Artículo encontrado');
-    expect(fixture.nativeElement.textContent).toContain('Existencia total');
-    expect(fixture.nativeElement.querySelector('.sin-existencia')).not.toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Sin coincidencias');
+    buscarArticulosInventario.mockReturnValueOnce(throwError(() => ({ status: 503 })));
+    fixture.componentInstance.terminoBusqueda = 'error';
+    fixture.componentInstance.alCambiarTermino('error');
+    await vi.advanceTimersByTimeAsync(250);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No pudimos buscar artículos');
   });
 });

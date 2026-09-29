@@ -40,10 +40,15 @@ describe('ConsultaInventarioArticuloService', () => {
     expect(consulta.estado()).toBe('error');
   });
 
-  it('no consulta cuando falta el código o el almacén', () => {
+  it('permite consultar sin almacén desde el buscador y no consulta si falta el código', () => {
     const consulta = TestBed.inject(ConsultaInventarioArticuloService);
+    obtenerInventarioArticulo.mockReturnValue(of({
+      codigoArticulo: 'ART-1', descripcion: 'Artículo', codigoAlmacen: 'BSPS01',
+      nombreAlmacen: 'Bodega', existenciaFisica: 1, existencias: [],
+    }));
     consulta.abrir('ART-1', null);
     consulta.abrir(null, 'BSPS01');
-    expect(obtenerInventarioArticulo).not.toHaveBeenCalled();
+    expect(obtenerInventarioArticulo).toHaveBeenCalledOnce();
+    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('ART-1', undefined);
   });
 });

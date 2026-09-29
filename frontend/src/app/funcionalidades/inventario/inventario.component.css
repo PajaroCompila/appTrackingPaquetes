@@ -1,77 +1,46 @@
 :host { display: block; }
 .pagina-inventario { display: grid; gap: 1.25rem; }
 .encabezado-pagina { margin-bottom: .15rem; }
-
-.buscador-inventario { display: grid; gap: 1.1rem; padding: 1.35rem; }
+.buscador-inventario { display: grid; gap: 1rem; padding: 1.35rem; overflow: visible; }
 .encabezado-buscador { display: flex; align-items: center; gap: .85rem; }
 .encabezado-buscador h2, .encabezado-buscador p { margin: 0; }
 .encabezado-buscador h2 { color: var(--azul-900); font-size: 1.15rem; }
 .encabezado-buscador p { margin-top: .18rem; color: var(--gris-600); font-size: .86rem; }
-.icono-buscador, .icono-articulo, .icono-resumen {
-  display: grid; flex: 0 0 auto; place-items: center; border-radius: .7rem;
-  background: var(--azul-100); color: var(--azul-700);
-}
-.icono-buscador { width: 2.75rem; height: 2.75rem; font-size: 1.15rem; }
+.icono-buscador, .icono-resultado { display: grid; flex: 0 0 auto; place-items: center; background: var(--azul-100); color: var(--azul-700); }
+.icono-buscador { width: 2.75rem; height: 2.75rem; border-radius: .7rem; font-size: 1.15rem; }
 .fila-busqueda { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .8rem; }
-.campo-codigo input { min-height: 3.15rem; padding-inline: .9rem; font-size: 1rem; }
+.campo-busqueda-inteligente { position: relative; }
+.control-busqueda { position: relative; }
+.control-busqueda > .pi-search { position: absolute; z-index: 1; top: 50%; left: .95rem; color: #667f97; transform: translateY(-50%); }
+.control-busqueda input { width: 100%; min-height: 3.15rem; padding: .7rem 3rem .7rem 2.75rem; font-size: 1rem; }
+.control-busqueda input::-webkit-search-cancel-button { cursor: pointer; }
+.cargador-busqueda { position: absolute; top: 50%; right: 1rem; width: 1rem; height: 1rem; border: 2px solid #c4d1dd; border-top-color: var(--azul-700); border-radius: 50%; animation: girar .8s linear infinite; transform: translateY(-50%); }
 .boton-buscar { display: inline-flex; min-width: 9.5rem; min-height: 3.15rem; align-items: center; justify-content: center; gap: .5rem; }
-.cargador-boton { width: 1rem; height: 1rem; border: 2px solid rgb(255 255 255 / 45%); border-top-color: white; border-radius: 50%; animation: girar .8s linear infinite; }
-
-.resultado-inventario { display: grid; gap: 1.1rem; }
-.estado-consulta { display: grid; min-height: 18rem; place-content: center; justify-items: center; gap: .45rem; text-align: center; }
+.ayuda-busqueda { color: var(--gris-600); }
+.lista-resultados { position: absolute; z-index: 20; top: calc(100% + .35rem); right: 0; left: 0; max-height: min(25rem, 52vh); overflow-y: auto; border: 1px solid #c8d5e1; border-radius: .75rem; background: white; box-shadow: 0 16px 38px rgb(18 46 78 / 18%); }
+.resultado-articulo { display: grid; width: 100%; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .8rem; padding: .8rem .9rem; border: 0; border-bottom: 1px solid #e5ebf0; background: white; color: var(--azul-900); text-align: left; cursor: pointer; }
+.resultado-articulo:last-child { border-bottom: 0; }
+.resultado-articulo:hover, .resultado-articulo.activo { background: #edf5fc; }
+.resultado-articulo:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--azul-700); outline-offset: -2px; }
+.icono-resultado { width: 2.3rem; height: 2.3rem; border-radius: .55rem; }
+.datos-resultado { display: grid; min-width: 0; gap: .14rem; }
+.datos-resultado strong { overflow-wrap: anywhere; }
+.datos-resultado span { overflow: hidden; color: var(--gris-600); font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.accion-resultado { display: inline-flex; align-items: center; gap: .3rem; color: var(--azul-700); font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.estado-resultados { min-height: 6rem; }
+.estado-consulta { display: grid; min-height: 15rem; place-content: center; justify-items: center; gap: .45rem; text-align: center; }
 .estado-consulta h2, .estado-consulta p { margin: 0; }
 .estado-consulta h2 { color: var(--azul-900); font-size: 1.2rem; }
-.estado-consulta p { max-width: 34rem; color: var(--gris-600); }
+.estado-consulta p { max-width: 36rem; color: var(--gris-600); }
 .ilustracion-estado { display: grid; width: 4.25rem; height: 4.25rem; margin-bottom: .35rem; place-items: center; border-radius: 50%; background: var(--azul-100); color: var(--azul-700); font-size: 1.7rem; }
-.estado-vacio .ilustracion-estado { background: #f0f3f6; color: #6d8093; }
-.estado-error-inventario { border-color: #e1b8b4; background: #fffafa; }
-.estado-error-inventario .ilustracion-estado { background: #fbe7e5; color: #a33a32; }
-
-.ficha-articulo { display: flex; align-items: center; gap: 1rem; border-left: 4px solid var(--azul-700); }
-.icono-articulo { width: 3.35rem; height: 3.35rem; font-size: 1.35rem; }
-.ficha-articulo h2, .ficha-articulo p { margin: 0; }
-.ficha-articulo h2 { color: var(--azul-900); font-size: clamp(1.2rem, 2.2vw, 1.55rem); overflow-wrap: anywhere; }
-.ficha-articulo > div > p:last-child { margin-top: .2rem; color: var(--gris-600); }
-.estado-encontrado { display: flex; align-items: center; gap: .35rem; margin-bottom: .2rem !important; color: #2f6c4a; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-
-.resumen-inventario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.tarjeta-resumen-inventario { display: flex; min-height: 7.8rem; align-items: center; gap: .9rem; }
-.icono-resumen { width: 3rem; height: 3rem; font-size: 1.15rem; }
-.tarjeta-resumen-inventario > div { display: grid; }
-.tarjeta-resumen-inventario span { color: var(--gris-600); font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.tarjeta-resumen-inventario strong { color: var(--azul-900); font-size: 1.7rem; line-height: 1.2; }
-.tarjeta-resumen-inventario small { color: var(--gris-600); }
-
-.detalle-bodegas { padding: 0; overflow: hidden; }
-.encabezado-seccion { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.2rem 1.25rem; border-bottom: 1px solid #e0e6eb; }
-.encabezado-seccion h2, .encabezado-seccion p { margin: 0; }
-.encabezado-seccion h2 { color: var(--azul-900); font-size: 1.15rem; }
-.contador-bodegas { padding: .3rem .65rem; border-radius: 999px; background: var(--azul-100); color: var(--azul-900); font-size: .78rem; font-weight: 700; white-space: nowrap; }
-.tabla-inventario { overflow-x: auto; }
-.tabla-inventario th:nth-child(3), .tabla-inventario td:nth-child(3) { text-align: right; }
-.tabla-inventario tbody tr:last-child td { border-bottom: 0; }
-.codigo-bodega { color: var(--azul-900); }
-.cantidad-inventario { color: var(--azul-900); font-size: 1rem; font-variant-numeric: tabular-nums; font-weight: 700; }
-.estado-disponibilidad { display: inline-flex; align-items: center; gap: .4rem; min-width: 8.8rem; padding: .32rem .6rem; border: 1px solid; border-radius: 999px; font-size: .78rem; font-weight: 700; }
-.punto-estado { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
-.con-existencia { border-color: #b9dcc8; background: #edf8f1; color: #276843; }
-.existencia-baja { border-color: #ead8a4; background: #fff8e7; color: #7a5a0d; }
-.sin-existencia { border-color: #e5c0bd; background: #fff1f0; color: #9b352f; }
-.sin-bodegas { display: grid; min-height: 11rem; place-content: center; justify-items: center; gap: .25rem; padding: 1.5rem; color: var(--gris-600); text-align: center; }
-.sin-bodegas i { margin-bottom: .35rem; color: #7892aa; font-size: 1.8rem; }
-.sin-bodegas strong { color: var(--azul-900); }
-
+.ilustracion-estado.neutro { background: #f0f3f6; color: #6d8093; }
+.estado-error { border-color: #e1b8b4; background: #fffafa; }
+.ilustracion-estado.error { background: #fbe7e5; color: #a33a32; }
+.resumen-resultados { margin: 0; color: var(--gris-600); font-size: .88rem; text-align: center; }
 @media (max-width: 680px) {
-  .fila-busqueda, .resumen-inventario { grid-template-columns: 1fr; }
+  .fila-busqueda { grid-template-columns: 1fr; }
   .boton-buscar { width: 100%; }
-  .ficha-articulo { align-items: flex-start; }
-  .encabezado-seccion { align-items: flex-start; flex-direction: column; }
-  .tabla-inventario { overflow: visible; padding: .75rem; }
-  .tabla-inventario tbody tr:last-child td { border-bottom: 0; }
-  .tabla-inventario td:nth-child(3) { text-align: left; }
-  .estado-disponibilidad { justify-content: center; }
+  .accion-resultado { display: none; }
+  .resultado-articulo { grid-template-columns: auto minmax(0, 1fr); }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .cargador-boton { animation: none; }
-}
+@media (prefers-reduced-motion: reduce) { .cargador-busqueda { animation: none; } }

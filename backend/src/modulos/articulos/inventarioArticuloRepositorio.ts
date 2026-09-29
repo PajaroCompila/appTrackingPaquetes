@@ -1,6 +1,6 @@
 import sql from 'mssql';
 import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
-import type { InventarioArticulo } from './inventarioArticulo.interface.js';
+import type { CoincidenciaInventarioArticulo, InventarioArticulo } from './inventarioArticulo.interface.js';
 
 interface FilaInventarioArticulo {
   codigoArticulo: string;
@@ -15,6 +15,52 @@ export type ConsultarInventarioSap = typeof consultarSap;
 
 export class InventarioArticuloRepositorio {
   public constructor(private readonly consultar: ConsultarInventarioSap = consultarSap) {}
+
+  public async buscar(
+    termino: string,
+    limite: number,
+    codigosAlmacen?: readonly string[],
+  ): Promise<CoincidenciaInventarioArticulo[]> {
+    const escaparLike = (valor: string) => valor.replace(/[\\%_[\]]/g, '\\$&');
+    const terminoLimpio = termino.trim();
+    const coincidencia = `%${escaparLike(terminoLimpio)}%`;
+    const inicio = `${escaparLike(terminoLimpio)}%`;
+    const almacenesJson = codigosAlmacen?.length ? JSON.stringify(codigosAlmacen) : null;
+    const resultado = await this.consultar<CoincidenciaInventarioArticulo>(`
+      SELECT TOP (@limite)
+        articulo.[ItemCode] AS codigoArticulo,
+        articulo.[ItemName] AS descripcion
+      FROM [dbo].[OITM] articulo
+      WHERE (articulo.[ItemCode] LIKE @coincidencia ESCAPE '\\'
+        OR articulo.[ItemName] LIKE @coincidencia ESCAPE '\\')
+        AND (@almacenesJson IS NULL OR EXISTS (
+          SELECT 1
+          FROM [dbo].[OITW] inventarioVisible
+          INNER JOIN OPENJSON(@almacenesJson)
+            WITH (codigoAlmacen nvarchar(16) '$') permiso
+            ON permiso.codigoAlmacen = inventarioVisible.[WhsCode]
+          WHERE inventarioVisible.[ItemCode] = articulo.[ItemCode]
+        ))
+      ORDER BY
+        CASE
+          WHEN articulo.[ItemCode] = @termino THEN 0
+          WHEN articulo.[ItemCode] LIKE @inicio ESCAPE '\\' THEN 1
+          WHEN articulo.[ItemName] LIKE @inicio ESCAPE '\\' THEN 2
+          ELSE 3
+        END,
+        articulo.[ItemCode];
+    `, (solicitud) => solicitud
+      .input('termino', sql.NVarChar(100), terminoLimpio)
+      .input('coincidencia', sql.NVarChar(202), coincidencia)
+      .input('inicio', sql.NVarChar(201), inicio)
+      .input('limite', sql.Int, limite)
+      .input('almacenesJson', sql.NVarChar(sql.MAX), almacenesJson));
+
+    return resultado.recordset.map((fila) => ({
+      codigoArticulo: fila.codigoArticulo.trim(),
+      descripcion: fila.descripcion?.trim() || 'Sin descripción',
+    }));
+  }
 
   public async obtener(
     codigoArticulo: string,

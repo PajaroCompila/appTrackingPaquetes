@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
-import type { InventarioArticulo } from './inventarioArticulo.interface.js';
+import type { CoincidenciaInventarioArticulo, InventarioArticulo } from './inventarioArticulo.interface.js';
 import type { InventarioArticuloRepositorio } from './inventarioArticuloRepositorio.js';
-import { esquemaCodigoArticulo, esquemaConsultaInventario } from './inventarioArticuloValidacion.js';
+import { esquemaBusquedaInventario, esquemaCodigoArticulo, esquemaConsultaInventario } from './inventarioArticuloValidacion.js';
 import { puedeVerAlmacen } from '../usuarios/accesoAlmacenes.js';
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 
@@ -14,6 +14,32 @@ export function puedeConsultarTodoElInventario(
 
 export class InventarioArticuloControlador {
   public constructor(private readonly repositorio: InventarioArticuloRepositorio) {}
+
+  public buscar = async (
+    solicitud: Request,
+    respuesta: Response<{ datos: CoincidenciaInventarioArticulo[] }>,
+    siguiente: NextFunction,
+  ): Promise<void> => {
+    const consulta = esquemaBusquedaInventario.safeParse(solicitud.query);
+    if (!consulta.success) {
+      siguiente(new ErrorAplicacion(400, 'BUSQUEDA_INVENTARIO_INVALIDA',
+        'Escriba al menos dos caracteres para buscar.'));
+      return;
+    }
+    try {
+      const usuario = solicitud.user;
+      const accesoCompleto = usuario?.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
+        || puedeConsultarTodoElInventario(usuario)
+        || (usuario?.codigosAlmacenVisibles ?? []).length === 0;
+      const codigosAlmacen = accesoCompleto ? undefined : usuario?.codigosAlmacenVisibles;
+      respuesta.json({ datos: await this.repositorio.buscar(
+        consulta.data.termino, consulta.data.limite, codigosAlmacen,
+      ) });
+    } catch {
+      siguiente(new ErrorAplicacion(500, 'ERROR_BUSQUEDA_INVENTARIO',
+        'No fue posible buscar artículos en SAP.'));
+    }
+  };
 
   public obtener = async (
     solicitud: Request<{ codigoArticulo: string }>,

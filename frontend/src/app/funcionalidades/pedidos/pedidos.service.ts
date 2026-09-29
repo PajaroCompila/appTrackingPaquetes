@@ -4,6 +4,7 @@ import type { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type {
   FiltrosPedidos,
+  CoincidenciaInventarioArticulo,
   InventarioArticulo,
   RespuestaDetallePedido,
   RespuestaListaPedidos,
@@ -68,6 +69,17 @@ export class PedidosService {
     if (codigoAlmacen?.trim()) parametros = parametros.set('codigoAlmacen', codigoAlmacen.trim());
     return this.clienteHttp.get<InventarioArticulo>(
       `${environment.urlApi}/articulos/${encodeURIComponent(codigoArticulo)}/inventario`,
+      { params: parametros },
+    );
+  }
+
+  public buscarArticulosInventario(
+    termino: string,
+    limite = 20,
+  ): Observable<{ datos: CoincidenciaInventarioArticulo[] }> {
+    const parametros = new HttpParams().set('termino', termino.trim()).set('limite', limite);
+    return this.clienteHttp.get<{ datos: CoincidenciaInventarioArticulo[] }>(
+      `${environment.urlApi}/articulos/buscar`,
       { params: parametros },
     );
   }

@@ -3,128 +3,67 @@
     <div>
       <p class="sobrelinea">Consulta</p>
       <h1 id="titulo-inventario-pagina">Inventario</h1>
-      <p>Consulte la existencia de un artículo por medio de su código.</p>
+      <p>Busque artículos por código o descripción y consulte su existencia en SAP.</p>
     </div>
   </header>
 
   <form class="panel buscador-inventario" (ngSubmit)="buscar()">
     <div class="encabezado-buscador">
       <span class="icono-buscador" aria-hidden="true"><i class="pi pi-search"></i></span>
-      <div>
-        <h2>Buscar artículo</h2>
-        <p>Escriba o escanee el código para consultar SAP.</p>
-      </div>
+      <div><h2>Buscar artículo</h2><p>Escriba parte del código o del nombre del artículo.</p></div>
     </div>
+
     <div class="fila-busqueda">
-      <div class="campo campo-codigo">
-        <label for="codigoArticuloInventario">Código del artículo</label>
-        <input
-          #codigoInput
-          id="codigoArticuloInventario"
-          name="codigoArticulo"
-          type="text"
-          maxlength="100"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder="Ingrese o escanee el código del artículo"
-          [(ngModel)]="codigoArticulo"
-        />
-      </div>
-      <button class="boton boton-primario boton-buscar" type="submit" [disabled]="estado() === 'cargando' || !codigoArticulo.trim()">
-        @if (estado() === 'cargando') {
-          <span class="cargador-boton" aria-hidden="true"></span>
-          Consultando
-        } @else {
+      <div class="campo campo-busqueda-inteligente">
+        <label for="terminoInventario">Código o descripción</label>
+        <div class="control-busqueda">
           <i class="pi pi-search" aria-hidden="true"></i>
-          Buscar
+          <input #terminoInput id="terminoInventario" name="terminoInventario" type="search"
+            maxlength="100" autocomplete="off" spellcheck="false" role="combobox"
+            aria-autocomplete="list" aria-controls="resultados-inventario"
+            [attr.aria-expanded]="estado() === 'resultados'"
+            [attr.aria-activedescendant]="indiceActivo() >= 0 ? 'resultado-inventario-' + indiceActivo() : null"
+            placeholder="Ejemplo: YAM-MODX7 o sintetizador" [(ngModel)]="terminoBusqueda"
+            (ngModelChange)="alCambiarTermino($event)" (keydown)="manejarTeclado($event)" />
+          @if (estado() === 'buscando') {<span class="cargador-busqueda" aria-hidden="true"></span>}
+        </div>
+
+        @if (estado() === 'resultados') {
+          <div id="resultados-inventario" class="lista-resultados" role="listbox" aria-label="Artículos encontrados">
+            @for (articulo of resultados(); track articulo.codigoArticulo; let indice = $index) {
+              <button [id]="'resultado-inventario-' + indice" class="resultado-articulo" type="button"
+                role="option" [class.activo]="indiceActivo() === indice"
+                [attr.aria-selected]="indiceActivo() === indice" (mouseenter)="indiceActivo.set(indice)"
+                (click)="seleccionar(articulo)">
+                <span class="icono-resultado" aria-hidden="true"><i class="pi pi-box"></i></span>
+                <span class="datos-resultado"><strong>{{ articulo.codigoArticulo }}</strong><span>{{ articulo.descripcion }}</span></span>
+                <span class="accion-resultado">Ver inventario <i class="pi pi-chevron-right" aria-hidden="true"></i></span>
+              </button>
+            }
+          </div>
         }
+      </div>
+
+      <button class="boton boton-primario boton-buscar" type="submit"
+        [disabled]="terminoBusqueda.trim().length < 2 || estado() === 'buscando'">
+        <i class="pi pi-search" aria-hidden="true"></i> Buscar
       </button>
     </div>
+    <small class="ayuda-busqueda">Ingrese al menos 2 caracteres. Use ↑ y ↓ para recorrer los resultados.</small>
   </form>
 
-  <div class="resultado-inventario" aria-live="polite">
+  <div class="estado-resultados" aria-live="polite">
     @if (estado() === 'inicial') {
-      <section class="panel estado-consulta estado-inicial">
-        <span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-box"></i></span>
-        <h2>Busque un artículo</h2>
-        <p>Ingrese o escanee el código del artículo para consultar su existencia.</p>
-      </section>
-    } @else if (estado() === 'cargando') {
-      <section class="panel estado-consulta" role="status">
-        <span class="cargador" aria-hidden="true"></span>
-        <h2>Consultando inventario</h2>
-        <p>Buscando el artículo {{ codigoConsultado() }} en SAP…</p>
-      </section>
-    } @else if (estado() === 'no-encontrado') {
-      <section class="panel estado-consulta estado-vacio" role="status">
-        <span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-search"></i></span>
-        <h2>No se encontró el artículo</h2>
-        <p>Revise el código {{ codigoConsultado() }} e intente nuevamente.</p>
-      </section>
+      <section class="panel estado-consulta"><span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-box"></i></span>
+        <h2>Encuentre un artículo</h2><p>Los resultados aparecerán automáticamente mientras escribe.</p></section>
+    } @else if (estado() === 'sin-resultados') {
+      <section class="panel estado-consulta"><span class="ilustracion-estado neutro" aria-hidden="true"><i class="pi pi-search"></i></span>
+        <h2>Sin coincidencias</h2><p>No encontramos artículos con “{{ terminoBusqueda.trim() }}”. Intente con otro código o descripción.</p></section>
     } @else if (estado() === 'error') {
-      <section class="panel estado-consulta estado-error-inventario" role="alert">
-        <span class="ilustracion-estado" aria-hidden="true"><i class="pi pi-exclamation-triangle"></i></span>
-        <h2>No pudimos consultar el inventario</h2>
-        <p>Intente nuevamente en unos momentos.</p>
-      </section>
-    } @else if (inventario(); as articulo) {
-      <section class="panel ficha-articulo" aria-labelledby="codigo-articulo-encontrado">
-        <span class="icono-articulo" aria-hidden="true"><i class="pi pi-box"></i></span>
-        <div>
-          <p class="estado-encontrado"><i class="pi pi-check-circle" aria-hidden="true"></i> Artículo encontrado</p>
-          <h2 id="codigo-articulo-encontrado">{{ articulo.codigoArticulo }}</h2>
-          <p>{{ articulo.descripcion }}</p>
-        </div>
-      </section>
-
-      <section class="resumen-inventario" aria-label="Resumen del inventario">
-        <article class="panel tarjeta-resumen-inventario">
-          <span class="icono-resumen"><i class="pi pi-box" aria-hidden="true"></i></span>
-          <div><span>Existencia total</span><strong>{{ formatearUnidades(existenciaTotal()) }}</strong><small>unidades físicas</small></div>
-        </article>
-        <article class="panel tarjeta-resumen-inventario">
-          <span class="icono-resumen"><i class="pi pi-warehouse" aria-hidden="true"></i></span>
-          <div><span>Bodegas con existencia</span><strong>{{ bodegasConExistencia() }}</strong><small>de {{ articulo.existencias.length }} consultadas</small></div>
-        </article>
-      </section>
-
-      <section class="panel detalle-bodegas" aria-labelledby="titulo-inventario-bodegas">
-        <header class="encabezado-seccion">
-          <div>
-            <p class="sobrelinea">Disponibilidad</p>
-            <h2 id="titulo-inventario-bodegas">Inventario por bodega</h2>
-          </div>
-          <span class="contador-bodegas">{{ articulo.existencias.length }} {{ articulo.existencias.length === 1 ? 'bodega' : 'bodegas' }}</span>
-        </header>
-
-        @if (articulo.existencias.length === 0) {
-          <div class="sin-bodegas" role="status">
-            <i class="pi pi-inbox" aria-hidden="true"></i>
-            <strong>Artículo encontrado</strong>
-            <span>Disponible: 0 unidades.</span>
-          </div>
-        } @else {
-          <div class="tabla-inventario">
-            <table>
-              <thead><tr><th>Bodega</th><th>Nombre del almacén</th><th>Existencia física</th><th>Disponibilidad</th></tr></thead>
-              <tbody>
-                @for (bodega of articulo.existencias; track bodega.codigoAlmacen) {
-                  <tr>
-                    <td data-label="Bodega"><strong class="codigo-bodega">{{ bodega.codigoAlmacen }}</strong></td>
-                    <td data-label="Nombre del almacén">{{ bodega.nombreAlmacen }}</td>
-                    <td data-label="Existencia física" class="cantidad-inventario">{{ formatearUnidades(bodega.existenciaFisica) }}</td>
-                    <td data-label="Disponibilidad">
-                      <span class="estado-disponibilidad" [class]="claseDisponibilidad(bodega.existenciaFisica)">
-                        <span class="punto-estado" aria-hidden="true"></span>{{ textoDisponibilidad(bodega.existenciaFisica) }}
-                      </span>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-      </section>
+      <section class="panel estado-consulta estado-error" role="alert"><span class="ilustracion-estado error" aria-hidden="true"><i class="pi pi-exclamation-triangle"></i></span>
+        <h2>No pudimos buscar artículos</h2><p>Intente nuevamente en unos momentos.</p></section>
+    } @else if (estado() === 'resultados') {
+      <p class="resumen-resultados">{{ resultados().length }} {{ resultados().length === 1 ? 'coincidencia encontrada' : 'coincidencias encontradas' }}. Seleccione un artículo para ver su inventario.</p>
     }
   </div>
 </section>

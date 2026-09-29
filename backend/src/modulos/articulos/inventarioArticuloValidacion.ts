@@ -10,3 +10,8 @@ export const esquemaConsultaInventario = z.object({
   codigoAlmacen: codigoSeguro(16).optional(),
 }).strict();
 
+export const esquemaBusquedaInventario = z.object({
+  termino: z.string().trim().min(2).max(100),
+  limite: z.coerce.number().int().min(1).max(50).default(20),
+}).strict();
+
