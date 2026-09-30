@@ -41,7 +41,7 @@ describe('App', () => {
     fixture.detectChanges();
     const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
     expect(enlaces.map(e => e.getAttribute('href'))).toEqual([
-      '/dashboard', '/pedidos', '/inventario', '/pedidos-despachados', '/pedidos-devueltos', '/historial-validados']);
+      '/dashboard', '/pedidos', '/pedidos-despachados', '/pedidos-devueltos', '/historial-validados', '/inventario']);
     expect(fixture.nativeElement.querySelector('app-consulta-inventario-articulo-host')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.acciones-notificaciones')).not.toBeNull();
   });
@@ -63,17 +63,17 @@ describe('App', () => {
     expect(enlaces).toHaveLength(5);
     expect(enlaces.map((enlace) => enlace.getAttribute('aria-label'))).toEqual([
       'Pedidos pendientes',
-      'Inventario',
       'Pedidos despachados',
       'Pedidos devueltos',
       'Historial',
+      'Inventario',
     ]);
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
       '/pedidos',
-      '/inventario',
       '/pedidos-despachados',
       '/pedidos-devueltos',
       '/historial-validados',
+      '/inventario',
     ]);
     expect(fixture.nativeElement.querySelector('a[href="/dashboard"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/configuracion/usuarios"]')).toBeNull();
