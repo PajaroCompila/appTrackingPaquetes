@@ -25,7 +25,15 @@ export class InventarioArticuloRepositorio {
     const terminoLimpio = termino.trim();
     const coincidencia = `%${escaparLike(terminoLimpio)}%`;
     const inicio = `${escaparLike(terminoLimpio)}%`;
-    const almacenesJson = codigosAlmacen?.length ? JSON.stringify(codigosAlmacen) : null;
+    const almacenes = codigosAlmacen?.map((codigo) => codigo.trim()).filter(Boolean) ?? [];
+    const parametrosAlmacenes = almacenes.map((_, indice) => `@codigoAlmacen${indice}`);
+    const filtroAlmacenes = parametrosAlmacenes.length > 0 ? `
+        AND EXISTS (
+          SELECT 1
+          FROM [dbo].[OITW] inventarioVisible
+          WHERE inventarioVisible.[ItemCode] = articulo.[ItemCode]
+            AND inventarioVisible.[WhsCode] IN (${parametrosAlmacenes.join(', ')})
+        )` : '';
     const resultado = await this.consultar<CoincidenciaInventarioArticulo>(`
       SELECT TOP (@limite)
         articulo.[ItemCode] AS codigoArticulo,
@@ -33,14 +41,7 @@ export class InventarioArticuloRepositorio {
       FROM [dbo].[OITM] articulo
       WHERE (articulo.[ItemCode] LIKE @coincidencia ESCAPE '\\'
         OR articulo.[ItemName] LIKE @coincidencia ESCAPE '\\')
-        AND (@almacenesJson IS NULL OR EXISTS (
-          SELECT 1
-          FROM [dbo].[OITW] inventarioVisible
-          INNER JOIN OPENJSON(@almacenesJson)
-            WITH (codigoAlmacen nvarchar(16) '$') permiso
-            ON permiso.codigoAlmacen = inventarioVisible.[WhsCode]
-          WHERE inventarioVisible.[ItemCode] = articulo.[ItemCode]
-        ))
+        ${filtroAlmacenes}
       ORDER BY
         CASE
           WHEN articulo.[ItemCode] = @termino THEN 0
@@ -49,12 +50,17 @@ export class InventarioArticuloRepositorio {
           ELSE 3
         END,
         articulo.[ItemCode];
-    `, (solicitud) => solicitud
-      .input('termino', sql.NVarChar(100), terminoLimpio)
-      .input('coincidencia', sql.NVarChar(202), coincidencia)
-      .input('inicio', sql.NVarChar(201), inicio)
-      .input('limite', sql.Int, limite)
-      .input('almacenesJson', sql.NVarChar(sql.MAX), almacenesJson));
+    `, (solicitud) => {
+      solicitud
+        .input('termino', sql.NVarChar(100), terminoLimpio)
+        .input('coincidencia', sql.NVarChar(202), coincidencia)
+        .input('inicio', sql.NVarChar(201), inicio)
+        .input('limite', sql.Int, limite);
+      almacenes.forEach((codigo, indice) => {
+        solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo);
+      });
+      return solicitud;
+    });
 
     return resultado.recordset.map((fila) => ({
       codigoArticulo: fila.codigoArticulo.trim(),

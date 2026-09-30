@@ -19,13 +19,14 @@ describe('InventarioArticuloRepositorio', () => {
     expect(consulta.trim()).toMatch(/^SELECT\b/);
     expect(consulta).toContain('articulo.[ItemCode] LIKE @coincidencia');
     expect(consulta).toContain('articulo.[ItemName] LIKE @coincidencia');
-    expect(consulta).toContain('OPENJSON(@almacenesJson)');
+    expect(consulta).toContain('inventarioVisible.[WhsCode] IN (@codigoAlmacen0)');
+    expect(consulta).not.toContain('OPENJSON');
     expect(consulta).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|EXEC)\b/i);
     const solicitud = { input: vi.fn() };
     solicitud.input.mockReturnValue(solicitud);
     configurar!(solicitud as never);
     expect(solicitud.input).toHaveBeenCalledWith('termino', expect.anything(), 'yam');
-    expect(solicitud.input).toHaveBeenCalledWith('almacenesJson', expect.anything(), '["BSPS04"]');
+    expect(solicitud.input).toHaveBeenCalledWith('codigoAlmacen0', expect.anything(), 'BSPS04');
   });
 
   it('conserva el almacén consultado con cero y devuelve solo existencias positivas', async () => {
