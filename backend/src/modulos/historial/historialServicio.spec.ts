@@ -73,7 +73,11 @@ describe('HistorialServicio', () => {
       ]),
       conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map()),
-      obtenerCerradosSap: vi.fn().mockResolvedValue(['SAP:10']),
+      obtenerCerradosSap: vi.fn().mockResolvedValue([{
+        idOrigen: 'SAP:10', sapDocEntry: '10', numeroPedido: 100,
+        estadoActual: 'C', tieneEntrega: false, tieneFacturaDirecta: true,
+        tipoCierre: 'CERRADO CON FACTURA DIRECTA',
+      }]),
       marcarCerrados: vi.fn().mockResolvedValue(0),
       marcarValidados: vi.fn().mockResolvedValue(1),
     } as unknown as HistorialRepositorio;

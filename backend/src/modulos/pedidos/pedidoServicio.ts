@@ -12,6 +12,7 @@ import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from './seguimientoPedidoRepositorio.js';
 import { aplicarClasificacionEspecialPorVendedor } from './pedidoEspecial.js';
 import type { IConciliacionEntregaPedido } from './conciliacionEntregaPedido.js';
+import { esLineaFlete } from './lineaFlete.js';
 
 interface EstadoCacheSap {
   resultado?: PaginaPedidos;
@@ -62,7 +63,10 @@ export class PedidoServicio {
       const lineasDespachadas = this.despachoRepositorio
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
-      let pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
+      let pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])]
+        .map((pedido) => ({ ...pedido, articulos: pedido.articulos.filter((articulo) =>
+          !esLineaFlete(articulo.codigoArticulo, articulo.descripcion)) }))
+        .filter((pedido) => pedido.articulos.length > 0);
       aplicarClasificacionEspecialPorVendedor(pedidosOrigen);
       if (filtros.clasificacion) {
         const especiales = filtros.clasificacion === 'especial';
@@ -180,6 +184,13 @@ export class PedidoServicio {
         ? await this.pedidoSapRepositorio.obtenerDetallePedido(identificador, codigosAlmacen)
         : await this.pedidoRepositorio.obtenerDetallePedido(identificador, codigosAlmacen);
       if (!pedido) {
+        throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
+      }
+      pedido.cabecera.articulos = pedido.cabecera.articulos.filter((articulo) =>
+        !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
+      pedido.partidas = pedido.partidas.filter((partida) =>
+        !esLineaFlete(partida.codigoArticulo, partida.descripcionArticulo));
+      if (pedido.partidas.length === 0) {
         throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
       }
       aplicarClasificacionEspecialPorVendedor([pedido.cabecera]);

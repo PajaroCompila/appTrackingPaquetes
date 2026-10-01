@@ -17,6 +17,7 @@
     "db:migrate:devoluciones": "tsx scripts/migrarPedidosDevueltos.ts",
     "validar:entregas-sap": "tsx scripts/validarEntregasSap.ts",
     "validar:conciliacion-entregas": "tsx scripts/validarConciliacionEntregas.ts",
+    "validar:cierres-sap": "tsx scripts/diagnosticarCierresPedidosSap.ts",
     "db:corregir-horas-pedidos": "tsx scripts/corregirHorasPedidos.ts",
     "db:migrate:impresiones": "tsx scripts/migrarRegistroImpresiones.ts",
     "db:migrate:auditoria-impresiones": "tsx scripts/migrarAuditoriaImpresiones.ts",

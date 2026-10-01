@@ -4,6 +4,7 @@ import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedi
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 import type { EstadoDevolucion, PedidoDevuelto } from './pedidoDevueltoServicio.js';
+import { esLineaFlete } from '../pedidos/lineaFlete.js';
 
 export interface FiltrosDevolucion {
   numeroPedido?: string; fechaDesde?: string; fechaHasta?: string;
@@ -44,7 +45,8 @@ export class PedidoDevueltoRepositorio {
       fechaCancelacion: c.fechaCancelacion.toISOString(), fechaDespacho: c.fechaDespacho.toISOString(),
       fechaDevolucionCompleta: c.fechaDevolucionCompleta?.toISOString() ?? null,
       progreso: c.totalLineas ? Math.round(100 * (c.lineasRecibidas ?? 0) / c.totalLineas) : 0,
-      lineas: detalles.filter(d => d.idClave === c.idClave).map(d => ({
+      lineas: detalles.filter(d => d.idClave === c.idClave
+        && !esLineaFlete(d.codigoArticulo, d.descripcion)).map(d => ({
         identificadorDetalle: d.identificadorDetalle, codigoArticulo: d.codigoArticulo,
         descripcion: d.descripcion, cantidad: Number(d.cantidad), codigoAlmacen: d.codigoAlmacen,
         estado: d.estado, cantidadRecibida: Number(d.cantidadRecibida),

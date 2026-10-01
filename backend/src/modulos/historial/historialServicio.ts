@@ -12,6 +12,7 @@ import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 import { EntregaSapRepositorio } from './entregaSapRepositorio.js';
 import { esIdentidadEntregaSap } from './entregaSap.interface.js';
+import { esLineaFlete } from '../pedidos/lineaFlete.js';
 
 let conciliacionEnCurso: Promise<number> | null = null;
 
@@ -51,7 +52,7 @@ export class HistorialServicio {
     const cantidadValidados = await this.repositorio.marcarValidados([
       ...validados.map(({ idOrigen }) =>
         ({ idOrigen, codigoSucursal: estados.get(idOrigen)?.codigoSucursal ?? null })),
-      ...cerradosSap.map((idOrigen) => ({ idOrigen, codigoSucursal: null })),
+      ...cerradosSap.map(({ idOrigen }) => ({ idOrigen, codigoSucursal: null })),
     ]);
     return cantidadCerrados + cantidadValidados + nuevosCerradosSap;
   }
@@ -73,6 +74,11 @@ export class HistorialServicio {
     const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
     const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
     const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? []), ...(entregas?.registros ?? [])]
+      .flatMap((pedido) => {
+        const articulos = pedido.articulos.filter((articulo) =>
+          !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
+        return pedido.articulos.length > 0 && articulos.length === 0 ? [] : [{ ...pedido, articulos }];
+      })
       .sort((a, b) => (b.entregaSap?.fechaEntrega ?? b.validadoDetectadoEn ?? b.despachadoEn ?? b.fechaHoraPedido ?? '')
         .localeCompare(a.entregaSap?.fechaEntrega ?? a.validadoDetectadoEn ?? a.despachadoEn ?? a.fechaHoraPedido ?? '')
         || a.idOrigen.localeCompare(b.idOrigen));
@@ -90,16 +96,23 @@ export class HistorialServicio {
   public async obtener(idOrigen: string, rol?: string): Promise<PedidoHistorial | null> {
     if (esIdentidadEntregaSap(idOrigen)) {
       const entrega = await this.entregasRepositorio.obtener(idOrigen, rol);
+      const cantidadOriginal = entrega?.articulos.length ?? 0;
+      if (entrega) entrega.articulos = entrega.articulos.filter((articulo) =>
+        !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
       if (entrega && (rol !== 'ADMINISTRADOR' || entrega.estadoHistorial !== 'Entregado, Sin factura')) {
         delete entrega.auditoriaSap;
       }
-      return entrega;
+      return cantidadOriginal > 0 && entrega?.articulos.length === 0 ? null : entrega;
     }
     const consulta = idOrigen.startsWith('SAP:')
       ? this.repositorio.obtenerHistorial(idOrigen)
       : (this.repositorioConsulta ?? new HistorialR1Repositorio()).obtener(idOrigen);
     const pedido = await consulta;
     if (pedido) {
+      const cantidadOriginal = pedido.articulos.length;
+      pedido.articulos = pedido.articulos.filter((articulo) =>
+        !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
+      if (cantidadOriginal > 0 && pedido.articulos.length === 0) return null;
       await this.agregarResponsablesPedidos([pedido]);
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido]);
     }
@@ -123,6 +136,7 @@ export class HistorialServicio {
     const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
     const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
     const todos = [...(r1?.registros ?? []), ...(sap?.registros ?? []), ...(entregas?.registros ?? [])]
+      .filter((articulo) => !esLineaFlete(articulo.codigoArticulo, articulo.descripcion))
       .sort((a, b) => (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '')
         || b.idOrigen.localeCompare(a.idOrigen)
         || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));

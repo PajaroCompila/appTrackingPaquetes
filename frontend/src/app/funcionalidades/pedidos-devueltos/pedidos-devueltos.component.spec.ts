@@ -8,6 +8,7 @@ import { PedidosDevueltosService } from './pedidos-devueltos.service';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
+import { obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import type { PedidoDevuelto } from './pedidos-devueltos.interface';
 const pedido: PedidoDevuelto = {idClave:'a'.repeat(64),idOrigen:'SAP:949637',numeroPedido:'101471323',
   origenPedido:'SAP',nombreVendedor:'Vendedor',fechaHoraPedido:'2026-09-02T15:00:00Z',fechaCancelacion:null,
@@ -33,9 +34,10 @@ describe('historial de pedidos CANCEL', () => {
       obtener:vi.fn().mockReturnValue(of({datos:pedido})),confirmar:vi.fn()};
   });
   afterEach(()=>fixture?.destroy());
-  it('muestra el CANCEL del 2 sin heredar filtros que lo oculten',async()=>{
+  it('consulta por defecto solo los pedidos devueltos del dia actual',async()=>{
     await crear();
-    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:'',fechaHasta:'',codigosAlmacen:[]}));
+    const fechaActual=obtenerFechaLocalActual();
+    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:[]}));
     expect(fixture.nativeElement.textContent).toContain('101471323');
     expect(fixture.nativeElement.textContent).toContain('CANCELADO');
     expect(fixture.nativeElement.textContent).not.toContain('CANCEL</span>');
@@ -60,7 +62,9 @@ describe('historial de pedidos CANCEL', () => {
     await crear();const c=fixture.componentInstance;
     c.filtros.fechaDesde='2026-09-10';c.filtros.fechaHasta='2026-09-10';c.cambiarVista('articulos');await Promise.resolve();
     expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({fechaDesde:'2026-09-10',fechaHasta:'2026-09-10',vista:'articulos'}));
-    c.limpiarFiltros();await Promise.resolve();expect(c.filtros.fechaDesde).toBe('');
+    c.limpiarFiltros();await Promise.resolve();
+    const fechaActual=obtenerFechaLocalActual();
+    expect(c.filtros.fechaDesde).toBe(fechaActual);expect(c.filtros.fechaHasta).toBe(fechaActual);
   });
   it('conserva los filtros en el enlace de regreso',async()=>{
     await crear();fixture.componentInstance.filtros.numeroPedido='101471323';

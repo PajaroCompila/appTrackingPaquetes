@@ -3,6 +3,7 @@ import { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 import type { DetallePedido, FiltrosPedidos, PaginaPedidos, PedidoResumen } from './pedido.interface.js';
 import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from './gruposClienteSap.js';
 import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoEspecial.js';
+import { condicionLineaNoFleteSql } from './lineaFlete.js';
 
 interface FilaSap {
   docEntry: number; docNum: number; nombreVendedor: string | null;
@@ -74,7 +75,8 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
           AND (@fechaDesde IS NULL OR o.[DocDate] >= @fechaDesde)
           AND (@fechaHasta IS NULL OR o.[DocDate] < DATEADD(day, 1, @fechaHasta))
           AND EXISTS (SELECT 1 FROM [dbo].[RDR1] linea WHERE linea.[DocEntry] = o.[DocEntry]
-            AND linea.[LineStatus] = @estadoAbierto AND linea.[OpenQty] > 0 ${filtroBodega})
+            AND linea.[LineStatus] = @estadoAbierto AND linea.[OpenQty] > 0
+            AND ${condicionLineaNoFleteSql('linea.[ItemCode]', 'linea.[Dscription]')} ${filtroBodega})
           ${filtroClasificacion}
         ORDER BY o.[DocDate] ${orden}, o.[DocTime] ${orden}, o.[DocEntry] ${orden}
         OFFSET @desplazamiento ROWS FETCH NEXT @cantidadConsulta ROWS ONLY;
@@ -109,7 +111,9 @@ export class PedidoSapRepositorio implements IPedidoSapRepositorio {
           linea.[WhsCode] AS codigoAlmacen, almacen.[WhsName] AS nombreAlmacen
         FROM [dbo].[RDR1] linea LEFT JOIN [dbo].[OWHS] almacen ON almacen.[WhsCode] = linea.[WhsCode]
         WHERE linea.[DocEntry] IN (${docs.join(', ')}) AND linea.[LineStatus] = @estadoAbierto
-          AND linea.[OpenQty] > 0 ${codigos.length ? `AND linea.[WhsCode] IN (${almacenes.join(', ')})` : ''}
+          AND linea.[OpenQty] > 0
+          AND ${condicionLineaNoFleteSql('linea.[ItemCode]', 'linea.[Dscription]')}
+          ${codigos.length ? `AND linea.[WhsCode] IN (${almacenes.join(', ')})` : ''}
         ORDER BY linea.[DocEntry], linea.[LineNum];
       `, (r) => { r.input('estadoAbierto', sql.Char(1), 'O');
         cabeceras.forEach((c, i) => r.input(`docEntry${i}`, sql.Int, c.docEntry));

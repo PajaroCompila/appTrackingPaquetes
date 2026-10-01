@@ -3,6 +3,7 @@ import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedi
 import { esVendedorEspecial } from '../pedidos/pedidoEspecial.js';
 import type { ArticuloHistorial, FiltrosHistorial, PaginaArticulosHistorial, PaginaHistorial, PedidoHistorial } from './historial.interface.js';
 import type { EntregaSapPersistida, EntregaSapPublica } from './entregaSap.interface.js';
+import { esLineaFlete } from '../pedidos/lineaFlete.js';
 
 export interface ControlEntregasSap {
   ultimoDocEntry: number; anteriorDocEntry: number; revisionDocEntry: number; ultimaFacturaDocEntry: number;
@@ -22,7 +23,8 @@ export function proyectarEntregaSap(e: EntregaSapPersistida, detectadoEn: Date, 
     fechaEntrega: e.fechaEntrega, referenciaR1: e.referenciaR1, bases,
     facturas: [...new Map(e.facturas.map(f => [f.docEntry, { docEntry: f.docEntry, docNum: f.docNum }])).values()],
   };
-  const articulos = e.lineas.filter(l => l.cantidadEntregada > 0).map(l => ({
+  const articulos = e.lineas.filter(l => l.cantidadEntregada > 0
+    && !esLineaFlete(l.itemCode, l.descripcion)).map(l => ({
     identificadorDetalle: String(l.lineNum), codigoArticulo: l.itemCode, descripcion: l.descripcion,
     cantidad: l.cantidadEntregada, codigoAlmacen: l.whsCode, nombreAlmacen: l.nombreAlmacen,
     usuarioAsignado: null,

@@ -3,6 +3,7 @@ import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedi
 import type { PedidoResumen } from '../pedidos/pedido.interface.js';
 import type { LineaDespachoValidada } from './lineaDespachoOrigenRepositorio.js';
 import { fechaSqlSinZona, fechaTextoSinZonaParaSql } from '../../compartido/fechaSql.js';
+import { condicionLineaNoFleteSql } from '../pedidos/lineaFlete.js';
 
 export interface PedidoDespachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO';
@@ -136,12 +137,16 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       .input('cantidad', sql.Int, filtros.cantidadPorPagina);
     filtros.codigosAlmacen.forEach((codigo, indice) =>
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
-    const filtroAlmacenes = parametrosAlmacen.length > 0 ? `AND EXISTS (
+    const filtroLineasVisibles = `AND EXISTS (
       SELECT 1 FROM dbo.PedidoDespachadoDetalle filtro
       WHERE filtro.idPedidoDespachado = pedido.idPedidoDespachado
-        AND filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')}))` : '';
-    const filtroDetalleAlmacenes = parametrosAlmacen.length > 0
-      ? `WHERE detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
+        AND ${condicionLineaNoFleteSql('filtro.codigoArticulo', 'filtro.descripcion')}
+        ${parametrosAlmacen.length > 0
+          ? `AND filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''})`;
+    const filtroDetalle = `WHERE ${condicionLineaNoFleteSql(
+      'detalle.codigoArticulo', 'detalle.descripcion')}
+      ${parametrosAlmacen.length > 0
+        ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}`;
     const resultado = await solicitud.query(`WITH Pedidos AS (
         SELECT pedido.*, usuario.nombreVisible usuarioDespacho,
           seguimiento.fechaEntradaCola,
@@ -156,7 +161,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           AND (@clasificacion IS NULL
             OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
             OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
-          ${filtroAlmacenes}
+          ${filtroLineasVisibles}
         ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
           pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC
         OFFSET @inicio ROWS FETCH NEXT @cantidad ROWS ONLY
@@ -174,7 +179,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       LEFT JOIN dbo.AsignacionArticuloPedido asignacion
         ON asignacion.idOrigen = detalle.idOrigen
        AND asignacion.identificadorDetalle = detalle.identificadorDetalle
-      ${filtroDetalleAlmacenes}
+      ${filtroDetalle}
       ORDER BY CASE WHEN pedido.fechaHoraPedido IS NULL THEN 1 ELSE 0 END,
         pedido.fechaHoraPedido ASC, pedido.despachadoEn ASC, pedido.idPedidoDespachado ASC,
         TRY_CONVERT(bigint, detalle.identificadorDetalle),
@@ -247,6 +252,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
        AND asignacion.identificadorDetalle = detalle.identificadorDetalle
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
       WHERE pedido.estadoLocal = 'DESPACHADO'
+        AND ${condicionLineaNoFleteSql('detalle.codigoArticulo', 'detalle.descripcion')}
         AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
         AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
         AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
@@ -316,6 +322,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           ON asignacion.idOrigen = detalle.idOrigen
          AND asignacion.identificadorDetalle = detalle.identificadorDetalle
         WHERE detalle.idPedidoDespachado = @idPedidoDespachado
+          AND ${condicionLineaNoFleteSql('detalle.codigoArticulo', 'detalle.descripcion')}
         ORDER BY TRY_CONVERT(bigint, detalle.identificadorDetalle),
           detalle.identificadorDetalle, detalle.numeroLinea;`)).recordset;
 

@@ -14,9 +14,23 @@ import type {
 import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionBaseDatos.js';
 import { fechaSqlSinZona, fechaTextoSinZonaParaSql } from '../../compartido/fechaSql.js';
 import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from '../pedidos/gruposClienteSap.js';
+import {
+  clasificarCierreSap,
+  columnasEvidenciaCierreSap,
+  type TipoCierreSap,
+} from './cierreSap.js';
 
 export interface CandidatoValidacion { idOrigen: string; folioPedido: string }
 export interface CandidatoSap { idOrigen: string; sapDocEntry: string }
+export interface CierreSapDetectado {
+  idOrigen: string;
+  sapDocEntry: string;
+  numeroPedido: number;
+  estadoActual: string;
+  tieneEntrega: boolean;
+  tieneFacturaDirecta: boolean;
+  tipoCierre: TipoCierreSap;
+}
 export interface EstadoR1Detectado {
   codigoSucursal: string | null;
   codigoEstadoVenta: string | null;
@@ -68,25 +82,42 @@ export class HistorialRepositorio {
     return resultado.recordset;
   }
 
-  public async obtenerCerradosSap(candidatos: CandidatoSap[]): Promise<string[]> {
+  public async obtenerCerradosSap(candidatos: CandidatoSap[]): Promise<CierreSapDetectado[]> {
     if (candidatos.length === 0) return [];
     const unicos = [...new Map(candidatos.slice(0, 1000)
       .map((candidato) => [candidato.sapDocEntry, candidato])).values()];
     const parametros = unicos.map((_, indice) => `@docEntry${indice}`);
-    const resultado = await consultarSap<{ docEntry: number }>(`
-      SELECT pedido.[DocEntry] AS docEntry
+    const resultado = await consultarSap<{
+      docEntry: number;
+      docNum: number;
+      estadoActual: string;
+      tieneEntrega: number;
+      tieneFacturaDirecta: number;
+    }>(`
+      SELECT pedido.[DocEntry] AS docEntry, pedido.[DocNum] AS docNum,
+        pedido.[DocStatus] AS estadoActual,
+        ${columnasEvidenciaCierreSap('pedido')}
       FROM [dbo].[ORDR] pedido
       WHERE pedido.[DocEntry] IN (${parametros.join(', ')})
-        AND pedido.[DocStatus] = @estadoCerrado;
+        AND pedido.[DocStatus] = @estadoCerrado
+        AND pedido.[CANCELED] = @noCancelado;
     `, (solicitud) => {
-      solicitud.input('estadoCerrado', sql.Char(1), 'C');
+      solicitud.input('estadoCerrado', sql.Char(1), 'C')
+        .input('noCancelado', sql.Char(1), 'N');
       unicos.forEach(({ sapDocEntry }, indice) =>
         solicitud.input(`docEntry${indice}`, sql.Int, Number(sapDocEntry)));
       return solicitud;
     });
-    const cerrados = new Set(resultado.recordset.map(({ docEntry }) => String(docEntry)));
-    return unicos.filter(({ sapDocEntry }) => cerrados.has(sapDocEntry))
-      .map(({ idOrigen }) => idOrigen);
+    const porDocEntry = new Map(resultado.recordset.map((fila) => [String(fila.docEntry), fila]));
+    return unicos.flatMap(({ idOrigen, sapDocEntry }) => {
+      const fila = porDocEntry.get(sapDocEntry);
+      if (!fila) return [];
+      const tieneEntrega = Boolean(fila.tieneEntrega);
+      const tieneFacturaDirecta = Boolean(fila.tieneFacturaDirecta);
+      return [{ idOrigen, sapDocEntry, numeroPedido: fila.docNum,
+        estadoActual: fila.estadoActual, tieneEntrega, tieneFacturaDirecta,
+        tipoCierre: clasificarCierreSap(tieneEntrega, tieneFacturaDirecta) }];
+    });
   }
 
   public async conservarCerradosSapSinDespacho(): Promise<number> {

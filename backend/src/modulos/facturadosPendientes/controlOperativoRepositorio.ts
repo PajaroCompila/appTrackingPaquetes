@@ -8,6 +8,7 @@ import { puedeOperarResponsableDespacho } from '../despachos/despachoServicio.js
 import { resumirControlOperativo, versionLineaFisica } from './controlOperativoModelo.js';
 import type { ConfiguracionControlAlmacen, FiltrosControlOperativo, LineaControlOperativo,
   ModoControlAlmacen, PedidoControlOperativo, SeleccionConfirmacionFisica } from './controlOperativo.interface.js';
+import { esLineaFlete } from '../pedidos/lineaFlete.js';
 
 interface FilaControl {
   idOrigen: string; cabecera: string; identificadorDetalle: string; codigoArticulo: string | null;
@@ -122,6 +123,7 @@ export class ControlOperativoRepositorio {
   private proyectar(filas: FilaControl[]): PedidoControlOperativo[] {
     const grupos = new Map<string,{ cabecera: PedidoControlOperativo; lineas: LineaControlOperativo[] }>();
     for (const f of filas) {
+      if (esLineaFlete(f.codigoArticulo, f.descripcion)) continue;
       // Las identidades sintéticas o sin partida no sirven para confirmar una obligación.
       if (!/^\d{1,20}$/.test(f.identificadorDetalle) || !(Number(f.cantidad)>0) || !f.codigoArticulo) continue;
       const base = { idOrigen:f.idOrigen,identificadorDetalle:f.identificadorDetalle,

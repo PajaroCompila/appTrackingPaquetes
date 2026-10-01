@@ -8,7 +8,7 @@ import { SelectorAlmacenesDirective } from '../../compartido/interaccion/selecto
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, Subject, catchError, combineLatest, finalize, map, switchMap } from 'rxjs';
-import { esFechaCalendarioValida } from '../../compartido/estado-filtros-sesion';
+import { esFechaCalendarioValida, obtenerFechaLocalActual } from '../../compartido/estado-filtros-sesion';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
@@ -54,7 +54,7 @@ export class PedidosDevueltosComponent implements OnInit {
   public readonly idOrigen = signal<string | null>(null);
   public readonly vista = signal<'pedido' | 'articulos'>('pedido');
   public readonly filtros = {
-    numeroPedido: '', fechaDesde: '', fechaHasta: '',
+    numeroPedido: '', fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
     codigosAlmacen: [] as string[], estado: 'todos' as FiltrosPedidosDevueltos['estado'], cantidadPorPagina: 25,
   };
 
@@ -119,11 +119,12 @@ export class PedidosDevueltosComponent implements OnInit {
     });
     combineLatest([this.ruta.paramMap,this.ruta.queryParamMap]).pipe(takeUntilDestroyed(this.destruirRef))
       .subscribe(([parametros,q]) => {
+        const fechaActual = obtenerFechaLocalActual();
         this.versionRuta += 1;
         this.idOrigen.set(parametros.get('idOrigen'));
         this.filtros.numeroPedido=q.get('numeroPedido') ?? '';
-        this.filtros.fechaDesde=esFechaCalendarioValida(q.get('fechaDesde'))?q.get('fechaDesde')!:'';
-        this.filtros.fechaHasta=esFechaCalendarioValida(q.get('fechaHasta'))?q.get('fechaHasta')!:'';
+        this.filtros.fechaDesde=esFechaCalendarioValida(q.get('fechaDesde'))?q.get('fechaDesde')!:fechaActual;
+        this.filtros.fechaHasta=esFechaCalendarioValida(q.get('fechaHasta'))?q.get('fechaHasta')!:fechaActual;
         this.filtros.codigosAlmacen=q.has('codigoAlmacen')?q.getAll('codigoAlmacen'):[];
         const estado=q.get('estado');
         this.filtros.estado=estado==='pendiente'||estado==='parcial'||estado==='devuelto'?estado:'todos';
@@ -141,7 +142,8 @@ export class PedidosDevueltosComponent implements OnInit {
 
   public buscar(): void { this.guardarGlobales(); this.actualizarRuta(1); }
   public limpiarFiltros(): void {
-    Object.assign(this.filtros,{numeroPedido:'',fechaDesde:'',fechaHasta:'',codigosAlmacen:[],estado:'todos'});
+    const fechaActual = obtenerFechaLocalActual();
+    Object.assign(this.filtros,{numeroPedido:'',fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:[],estado:'todos'});
     this.buscar();
   }
   public cambiarVista(vista:'pedido'|'articulos'):void {if(this.vista()!==vista){this.vista.set(vista);this.actualizarRuta(1);}}

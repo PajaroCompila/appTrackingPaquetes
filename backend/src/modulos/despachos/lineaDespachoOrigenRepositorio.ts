@@ -4,6 +4,7 @@ import { consultarSistemaOrigen } from '../../infraestructura/sql/consultaSistem
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import type { ArticuloPedidoResumen, PedidoResumen } from '../pedidos/pedido.interface.js';
 import { GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL } from '../pedidos/gruposClienteSap.js';
+import { condicionLineaNoFleteSql } from '../pedidos/lineaFlete.js';
 import { COLUMNAS_REFERENCIA_LINEA_R1, firmaLineaR1, type ReferenciaLineaR1 } from '../pedidos/firmaLineaR1.js';
 
 export interface IdentidadLineaDespacho {
@@ -133,6 +134,10 @@ export class LineaDespachoOrigenRepositorio {
       WHERE venta.[U_SO1_STATUS] = 'A'
         AND venta.[U_SO1_TIPO] = 'PE'
         AND ISNULL(venta.[U_SO1_VERIFICADO], 'N') <> 'Y'
+        AND ${condicionLineaNoFleteSql(
+          'detalle.[U_SO1_NUMEROARTICULO]',
+          'detalle.[U_SO1_DESCRIPCION]',
+        )}
         AND (${condiciones.join(' OR ')});
     `, (solicitud) => {
       identidades.forEach(({ idOrigen, identificadorDetalle }, indice) => {
@@ -167,6 +172,7 @@ export class LineaDespachoOrigenRepositorio {
         AND pedido.[U_SO1_01RETAILONE] = 'N'
         AND cliente.[GroupCode] IN (${GRUPOS_CLIENTE_SAP_PERMITIDOS_SQL})
         AND detalle.[LineStatus] = 'O' AND detalle.[OpenQty] > 0
+        AND ${condicionLineaNoFleteSql('detalle.[ItemCode]', 'detalle.[Dscription]')}
         AND (${condiciones.join(' OR ')});
     `, (solicitud) => {
       identidades.forEach(({ idOrigen, identificadorDetalle }, indice) => {

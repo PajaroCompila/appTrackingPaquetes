@@ -11,6 +11,7 @@ import type {
 } from './pedido.interface.js';
 import { NOMBRES_VENDEDORES_ESPECIALES } from './pedidoEspecial.js';
 import { COLUMNAS_REFERENCIA_LINEA_R1, firmaLineaR1, type ReferenciaLineaR1 } from './firmaLineaR1.js';
+import { condicionLineaNoFleteSql } from './lineaFlete.js';
 
 interface FilaPedido {
   folioPedido: string;
@@ -112,13 +113,19 @@ export class PedidoRepositorio implements IPedidoRepositorio {
     const desplazamiento = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const codigosAlmacen = filtros.codigosAlmacen ?? [];
     const parametrosAlmacen = codigosAlmacen.map((_, indice) => `@codigoAlmacen${indice}`);
-    const condicionAlmacenes = codigosAlmacen.length > 0 ? `
+    const condicionLineasVisibles = `
             AND EXISTS (
               SELECT 1
               FROM [dbo].[@SO1_01VENTADETALLE] AS detalle
               WHERE detalle.[U_SO1_FOLIO] = venta.[Name]
-                AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})
-            )` : '';
+                AND ${condicionLineaNoFleteSql(
+                  'detalle.[U_SO1_NUMEROARTICULO]',
+                  'detalle.[U_SO1_DESCRIPCION]',
+                )}
+                ${codigosAlmacen.length > 0
+                  ? `AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})`
+                  : ''}
+            )`;
     const coincidenciaEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
       `UPPER(ISNULL(vendedor.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
     const condicionClasificacion = filtros.clasificacion === 'especial'
@@ -167,6 +174,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
               LEFT JOIN [dbo].[@SO1_01SUCURSALALMA] AS almacenBodega
                 ON almacenBodega.[U_SO1_CODIGOALMACEN] = detalleBodega.[U_SO1_ALMACEN]
               WHERE detalleBodega.[U_SO1_FOLIO] = venta.[Name]
+                AND ${condicionLineaNoFleteSql(
+                  'detalleBodega.[U_SO1_NUMEROARTICULO]',
+                  'detalleBodega.[U_SO1_DESCRIPCION]',
+                )}
                 ${codigosAlmacen.length > 0
                   ? `AND detalleBodega.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})`
                   : ''}
@@ -183,7 +194,7 @@ export class PedidoRepositorio implements IPedidoRepositorio {
             AND (@fechaHasta IS NULL OR venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta))
             AND (@codigoEstadoVenta IS NULL OR venta.[U_SO1_STATUS] = @codigoEstadoVenta)
             AND (@codigoSincronizacion IS NULL OR venta.[U_SO1_SINCRONIZADO] = @codigoSincronizacion)
-            ${condicionAlmacenes}
+            ${condicionLineasVisibles}
             ${condicionClasificacion}
           ORDER BY
             CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN 1 ELSE 0 END,
@@ -232,6 +243,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
             LEFT JOIN [dbo].[@SO1_01SUCURSALALMA] AS almacen
               ON almacen.[U_SO1_CODIGOALMACEN] = detalle.[U_SO1_ALMACEN]
             WHERE detalle.[U_SO1_FOLIO] IN (${parametrosFolio.join(', ')})
+              AND ${condicionLineaNoFleteSql(
+                'detalle.[U_SO1_NUMEROARTICULO]',
+                'detalle.[U_SO1_DESCRIPCION]',
+              )}
               ${codigosAlmacen.length > 0
                 ? `AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})`
                 : ''}
@@ -327,6 +342,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
               LEFT JOIN [dbo].[@SO1_01SUCURSALALMA] AS almacenBodega
                 ON almacenBodega.[U_SO1_CODIGOALMACEN] = detalleBodega.[U_SO1_ALMACEN]
               WHERE detalleBodega.[U_SO1_FOLIO] = venta.[Name]
+                AND ${condicionLineaNoFleteSql(
+                  'detalleBodega.[U_SO1_NUMEROARTICULO]',
+                  'detalleBodega.[U_SO1_DESCRIPCION]',
+                )}
                 ${codigosAlmacen.length > 0
                   ? `AND detalleBodega.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})`
                   : ''}
@@ -362,6 +381,10 @@ export class PedidoRepositorio implements IPedidoRepositorio {
           LEFT JOIN [dbo].[@SO1_01SUCURSALALMA] AS almacen
             ON almacen.[U_SO1_CODIGOALMACEN] = detalle.[U_SO1_ALMACEN]
           WHERE detalle.[U_SO1_FOLIO] = @folioPedido
+            AND ${condicionLineaNoFleteSql(
+              'detalle.[U_SO1_NUMEROARTICULO]',
+              'detalle.[U_SO1_DESCRIPCION]',
+            )}
             ${codigosAlmacen.length > 0
               ? `AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})`
               : ''}

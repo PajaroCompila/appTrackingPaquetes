@@ -5,6 +5,7 @@ import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedi
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { PedidoDevuelto } from './pedidoDevueltoServicio.js';
 import type { FiltrosDevolucion } from './pedidoDevueltoRepositorio.js';
+import { esLineaFlete } from '../pedidos/lineaFlete.js';
 
 export const MIGRACION_CANCELACIONES_SAP = `
 IF DB_NAME() <> N'PedidosBodega' THROW 51000, 'Base no autorizada.', 1;
@@ -41,8 +42,10 @@ export const CONSULTA_CANCELACIONES_SAP = `SELECT o.DocEntry docEntry,CONVERT(nv
 
 export function convertirCancelaciones(filas: FilaCanceladaSap[]): PedidoDevuelto[] {
   const pedidos = new Map<number, PedidoDevuelto>();
+  const documentosConLineas = new Set<number>();
   for (const f of filas) {
     if (f.canceled !== 'Y') continue;
+    if (f.linea !== null) documentosConLineas.add(f.docEntry);
     let p = pedidos.get(f.docEntry);
     if (!p) {
       const fecha = new Date(f.fechaPedido);
@@ -59,14 +62,16 @@ export function convertirCancelaciones(filas: FilaCanceladaSap[]): PedidoDevuelt
       };
       pedidos.set(f.docEntry, p);
     }
-    if (f.linea !== null && !p.lineas.some(l => l.identificadorDetalle === String(f.linea))) {
+    if (f.linea !== null && !esLineaFlete(f.codigoArticulo, f.descripcion)
+      && !p.lineas.some(l => l.identificadorDetalle === String(f.linea))) {
       p.lineas.push({ identificadorDetalle: String(f.linea), codigoArticulo: f.codigoArticulo?.trim() || null,
         descripcion: f.descripcion?.trim() || null, cantidad: Number(f.cantidad ?? 0),
         codigoAlmacen: f.codigoAlmacen?.trim() || null, estado: 'CANCEL' });
       p.totalLineas = p.lineas.length;
     }
   }
-  return [...pedidos.values()];
+  return [...pedidos.entries()].flatMap(([docEntry, pedido]) =>
+    documentosConLineas.has(docEntry) && pedido.lineas.length === 0 ? [] : [pedido]);
 }
 
 export class CancelacionSapHistorial {

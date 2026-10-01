@@ -7,6 +7,7 @@ import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlm
 import { type FiltrosDevolucion, type SeleccionDevolucion } from './pedidoDevueltoRepositorio.js';
 import type { PedidoDevuelto } from './pedidoDevueltoServicio.js';
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
+import { esLineaFlete } from '../pedidos/lineaFlete.js';
 
 const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v);
 const errorDatos = (e: unknown): unknown => e instanceof z.ZodError
@@ -35,7 +36,8 @@ export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = canc
       const {codigoAlmacen,...f} = esquemaFiltrosDevolucion.parse(req.query);
       const codigosAlmacen = restringirCodigosAlmacen(req.user,codigoAlmacen).map(c => c.toUpperCase());
       const r = await repo.listar({...f,codigosAlmacen});
-      const datos = r.datos.map(p => ({...p,lineas:p.lineas.filter(l => puedeVerAlmacen(req.user,l.codigoAlmacen)
+      const datos = r.datos.map(p => ({...p,lineas:p.lineas.filter(l => !esLineaFlete(l.codigoArticulo, l.descripcion)
+        && puedeVerAlmacen(req.user,l.codigoAlmacen)
         && (!codigosAlmacen.length || codigosAlmacen.includes(l.codigoAlmacen?.toUpperCase() ?? '')))})).filter(p => p.lineas.length>0 || (codigosAlmacen.length===0 && p.totalLineas===0));
       res.json({datos,paginacion:{pagina:f.pagina,cantidadPorPagina:f.cantidadPorPagina,totalRegistros:r.total,
         cantidadDevuelta:f.vista==='pedido'?datos.length:datos.reduce((n,p)=>n+p.lineas.length,0),hayMas:f.pagina*f.cantidadPorPagina<r.total}});
@@ -54,7 +56,8 @@ export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = canc
       const id = z.string().regex(/^[a-f0-9]{64}$/).parse(req.params.idClave);
       const pedido = await repo.obtener(id);
       if (!pedido) throw new ErrorAplicacion(404,'DEVOLUCION_NO_ENCONTRADA','No se encontró la devolución.');
-      const lineas = pedido.lineas.filter(l => puedeVerAlmacen(req.user,l.codigoAlmacen));
+      const lineas = pedido.lineas.filter(l => !esLineaFlete(l.codigoArticulo, l.descripcion)
+        && puedeVerAlmacen(req.user,l.codigoAlmacen));
       if (!lineas.length && !(pedido.totalLineas===0 && restringirCodigosAlmacen(req.user,[]).length===0)) throw new ErrorAplicacion(403,'PERMISO_DEVOLUCION','No tenés permiso para ver esta devolución.');
       res.json({datos:{...pedido,lineas}});
     } catch(e) {next(errorDatos(e));}
