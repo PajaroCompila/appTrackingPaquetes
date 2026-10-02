@@ -3,16 +3,6 @@ import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { CoincidenciaInventarioArticulo, InventarioArticulo } from './inventarioArticulo.interface.js';
 import type { InventarioArticuloRepositorio } from './inventarioArticuloRepositorio.js';
 import { esquemaBusquedaInventario, esquemaCodigoArticulo, esquemaConsultaInventario } from './inventarioArticuloValidacion.js';
-import { puedeVerAlmacen } from '../usuarios/accesoAlmacenes.js';
-import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
-
-export function puedeConsultarTodoElInventario(
-  usuario: Pick<IdentidadAutenticada, 'nombreUsuario' | 'codigoRol'> | undefined,
-): boolean {
-  return usuario?.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-    || ['gcruz', 'tlopez'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
-}
-
 export class InventarioArticuloControlador {
   public constructor(private readonly repositorio: InventarioArticuloRepositorio) {}
 
@@ -28,13 +18,8 @@ export class InventarioArticuloControlador {
       return;
     }
     try {
-      const usuario = solicitud.user;
-      const accesoCompleto = usuario?.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-        || puedeConsultarTodoElInventario(usuario)
-        || (usuario?.codigosAlmacenVisibles ?? []).length === 0;
-      const codigosAlmacen = accesoCompleto ? undefined : usuario?.codigosAlmacenVisibles;
       respuesta.json({ datos: await this.repositorio.buscar(
-        consulta.data.termino, consulta.data.limite, codigosAlmacen,
+        consulta.data.termino, consulta.data.limite,
       ) });
     } catch {
       siguiente(new ErrorAplicacion(500, 'ERROR_BUSQUEDA_INVENTARIO',
@@ -55,30 +40,11 @@ export class InventarioArticuloControlador {
     }
 
     try {
-      const consultaCompleta = puedeConsultarTodoElInventario(solicitud.user);
       const codigoAlmacen = consulta.data.codigoAlmacen;
-      if (codigoAlmacen && !consultaCompleta && !puedeVerAlmacen(solicitud.user!, codigoAlmacen)) {
-        siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
-        return;
-      }
       const inventario = await this.repositorio.obtener(articulo.data, codigoAlmacen);
       if (!inventario) {
         siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
         return;
-      }
-      if (!consultaCompleta && Array.isArray(inventario.existencias)) {
-        inventario.existencias = inventario.existencias.filter(({ codigoAlmacen }) =>
-          puedeVerAlmacen(solicitud.user!, codigoAlmacen));
-        if (!codigoAlmacen) {
-          const primeraVisible = inventario.existencias[0];
-          if (!primeraVisible) {
-            siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
-            return;
-          }
-          inventario.codigoAlmacen = primeraVisible.codigoAlmacen;
-          inventario.nombreAlmacen = primeraVisible.nombreAlmacen;
-          inventario.existenciaFisica = primeraVisible.existenciaFisica;
-        }
       }
       respuesta.json(inventario);
     } catch (error) {

@@ -56,6 +56,9 @@ const inventarioCompleto = {
 
 describe('acceso al inventario por almacén', () => {
   it.each([
+    ['operador', 'OPERADOR_BODEGA'],
+    ['consulta', 'CONSULTA'],
+    ['dashboard', 'DASHBOARDS'],
     ['gcruz', 'OPERADOR_BODEGA'],
     ['supervisor-admin', 'ADMINISTRADOR'],
     ['tlopez', 'OPERADOR_BODEGA'],
@@ -64,33 +67,13 @@ describe('acceso al inventario por almacén', () => {
     const buscar = vi.fn().mockResolvedValue([]);
     const app = aplicacionInventario(usuario, obtener, buscar, rol);
     await solicitud(app).get('/api/articulos/buscar?termino=articulo').expect(200);
-    expect(buscar).toHaveBeenCalledWith('articulo', 20, undefined);
+    expect(buscar).toHaveBeenCalledWith('articulo', 20);
     const general = await solicitud(app).get('/api/articulos/A1/inventario').expect(200);
     expect(general.body.existencias).toHaveLength(2);
     const otraBodega = await solicitud(app).get('/api/articulos/A1/inventario?codigoAlmacen=BSPS01').expect(200);
     expect(otraBodega.body.existencias).toHaveLength(2);
     expect(obtener).toHaveBeenLastCalledWith('A1', 'BSPS01');
   });
-  it('impide a un operador consultar una bodega no autorizada', async () => {
-    const obtener = vi.fn();
-    await solicitud(aplicacionInventario('otro', obtener))
-      .get('/api/articulos/A1/inventario?codigoAlmacen=BSPS01').expect(404);
-    expect(obtener).not.toHaveBeenCalled();
-  });
-  it('busca coincidencias respetando las bodegas visibles', async () => {
-    const buscar = vi.fn().mockResolvedValue([
-      { codigoArticulo: 'A1', descripcion: 'Artículo de prueba' },
-    ]);
-    const respuesta = await solicitud(aplicacionInventario('otro', vi.fn(), buscar))
-      .get('/api/articulos/buscar?termino=articulo');
-
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body.datos).toEqual([
-      { codigoArticulo: 'A1', descripcion: 'Artículo de prueba' },
-    ]);
-    expect(buscar).toHaveBeenCalledWith('articulo', 20, ['TCIR01']);
-  });
-
   it('rechaza búsquedas demasiado cortas sin consultar SAP', async () => {
     const buscar = vi.fn();
     const respuesta = await solicitud(aplicacionInventario('otro', vi.fn(), buscar))
@@ -99,49 +82,4 @@ describe('acceso al inventario por almacén', () => {
     expect(buscar).not.toHaveBeenCalled();
   });
 
-  it('muestra a Tommy las existencias de todas las bodegas', async () => {
-    const obtener = vi.fn().mockResolvedValue(structuredClone(inventarioCompleto));
-
-    const respuesta = await solicitud(aplicacionInventario('tlopez', obtener))
-      .get('/api/articulos/A1/inventario?codigoAlmacen=TCIR01');
-
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body.existencias.map(({ codigoAlmacen }: { codigoAlmacen: string }) =>
-      codigoAlmacen)).toEqual(['TCIR01', 'BSPS01']);
-  });
-
-  it('conserva el filtro de almacenes para otro usuario restringido', async () => {
-    const obtener = vi.fn().mockResolvedValue(structuredClone(inventarioCompleto));
-
-    const respuesta = await solicitud(aplicacionInventario('otro', obtener))
-      .get('/api/articulos/A1/inventario?codigoAlmacen=TCIR01');
-
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body.existencias.map(({ codigoAlmacen }: { codigoAlmacen: string }) =>
-      codigoAlmacen)).toEqual(['TCIR01']);
-  });
-
-  it('permite la consulta por código y limita la respuesta a las bodegas autorizadas', async () => {
-    const obtener = vi.fn().mockResolvedValue(structuredClone(inventarioCompleto));
-
-    const respuesta = await solicitud(aplicacionInventario('otro', obtener))
-      .get('/api/articulos/A1/inventario');
-
-    expect(respuesta.status).toBe(200);
-    expect(obtener).toHaveBeenCalledWith('A1', undefined);
-    expect(respuesta.body.codigoAlmacen).toBe('TCIR01');
-    expect(respuesta.body.existencias).toEqual([
-      { codigoAlmacen: 'TCIR01', nombreAlmacen: 'Circunvalación', existenciaFisica: 2 },
-    ]);
-  });
-
-  it('mantiene todas las bodegas en la consulta general autorizada para Tommy', async () => {
-    const obtener = vi.fn().mockResolvedValue(structuredClone(inventarioCompleto));
-
-    const respuesta = await solicitud(aplicacionInventario('tlopez', obtener))
-      .get('/api/articulos/A1/inventario');
-
-    expect(respuesta.status).toBe(200);
-    expect(respuesta.body.existencias).toHaveLength(2);
-  });
 });
