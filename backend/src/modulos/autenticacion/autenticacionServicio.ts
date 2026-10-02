@@ -26,9 +26,6 @@ export class AutenticacionServicio {
 
   public async iniciarSesion(nombreUsuario: string, contrasena: string) {
     const usuario = await this.repositorio.buscarUsuario(nombreUsuario);
-    if (usuario?.bloqueadoHasta && usuario.bloqueadoHasta.getTime() > Date.now()) {
-      throw new ErrorAplicacion(429, 'USUARIO_BLOQUEADO', 'Usuario o contraseña incorrectos.');
-    }
     let contrasenaValida = false;
     if (usuario?.activo && usuario.algoritmoContrasena === 'argon2id') {
       contrasenaValida = await argon2.verify(usuario.hashContrasena.toString('utf8'), contrasena);
@@ -36,7 +33,6 @@ export class AutenticacionServicio {
       await argon2.hash(contrasena, opcionesArgon2);
     }
     if (!usuario?.activo || !contrasenaValida) {
-      if (usuario?.activo) await this.repositorio.registrarIntentoFallido(usuario.usuarioId);
       throw new ErrorAplicacion(401, 'CREDENCIALES_INVALIDAS', 'Usuario o contraseña incorrectos.');
     }
     await this.repositorio.registrarAccesoCorrecto(usuario.usuarioId);

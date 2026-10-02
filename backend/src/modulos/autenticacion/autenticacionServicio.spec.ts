@@ -31,7 +31,6 @@ describe('AutenticacionServicio', () => {
         sesionId, debeCambiarContrasena: usuario.debeCambiarContrasena,
       } satisfies IdentidadAutenticada)),
       revocarSesion: vi.fn().mockResolvedValue(undefined),
-      registrarIntentoFallido: vi.fn().mockResolvedValue(undefined),
       registrarAccesoCorrecto: vi.fn().mockResolvedValue(undefined),
       cambiarContrasena: vi.fn().mockResolvedValue(undefined),
       revocarSesionesUsuario: vi.fn().mockResolvedValue(undefined),
@@ -49,13 +48,17 @@ describe('AutenticacionServicio', () => {
     expect(identidad).toMatchObject({ usuarioId: usuario.usuarioId, nombreUsuario: 'operador' });
   });
 
-  it('rechaza una contraseña incorrecta y registra el intento', async () => {
+  it('rechaza contraseñas incorrectas sin acumular intentos ni bloquear la cuenta', async () => {
     const servicio = new AutenticacionServicio(repositorio);
 
-    await expect(servicio.iniciarSesion('operador', 'incorrecta'))
-      .rejects.toMatchObject({ estadoHttp: 401, codigo: 'CREDENCIALES_INVALIDAS' });
-    expect(repositorio.registrarIntentoFallido).toHaveBeenCalledWith(usuario.usuarioId);
+    for (let intento = 0; intento < 8; intento++) {
+      await expect(servicio.iniciarSesion('operador', 'incorrecta'))
+        .rejects.toMatchObject({ estadoHttp: 401, codigo: 'CREDENCIALES_INVALIDAS' });
+    }
+    expect(usuario.intentosFallidos).toBe(0);
+    expect(usuario.bloqueadoHasta).toBeNull();
     expect(repositorio.crearSesion).not.toHaveBeenCalled();
+    await expect(servicio.iniciarSesion('operador', 'contrasena-correcta')).resolves.toHaveProperty('token');
   });
 
   it('rechaza un usuario inexistente sin registrar un intento sobre otra cuenta', async () => {
@@ -64,17 +67,15 @@ describe('AutenticacionServicio', () => {
 
     await expect(servicio.iniciarSesion('inexistente', 'incorrecta'))
       .rejects.toMatchObject({ estadoHttp: 401, codigo: 'CREDENCIALES_INVALIDAS' });
-    expect(repositorio.registrarIntentoFallido).not.toHaveBeenCalled();
   });
 
-  it('distingue un usuario bloqueado sin comprobar ni modificar su contraseña', async () => {
+  it('permite acceso correcto aunque exista un bloqueo antiguo en la base', async () => {
     usuario.bloqueadoHasta = new Date(Date.now() + 60_000);
     const servicio = new AutenticacionServicio(repositorio);
 
     await expect(servicio.iniciarSesion('operador', 'contrasena-correcta'))
-      .rejects.toMatchObject({ estadoHttp: 429, codigo: 'USUARIO_BLOQUEADO' });
-    expect(repositorio.registrarIntentoFallido).not.toHaveBeenCalled();
-    expect(repositorio.crearSesion).not.toHaveBeenCalled();
+      .resolves.toHaveProperty('token');
+    expect(repositorio.crearSesion).toHaveBeenCalledOnce();
   });
 
   it('revoca la sesión al cerrar sesión', async () => {

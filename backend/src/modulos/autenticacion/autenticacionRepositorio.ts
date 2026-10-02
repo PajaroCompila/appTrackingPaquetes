@@ -7,7 +7,6 @@ export interface IAutenticacionRepositorio {
   crearSesion(usuarioId: string, sesionId: string, expiraEn: Date): Promise<void>;
   obtenerIdentidadSesion(sesionId: string): Promise<IdentidadAutenticada | null>;
   revocarSesion(sesionId: string): Promise<void>;
-  registrarIntentoFallido(usuarioId: string): Promise<void>;
   registrarAccesoCorrecto(usuarioId: string): Promise<void>;
   cambiarContrasena(usuarioId: string, hash: Buffer): Promise<void>;
   revocarSesionesUsuario(usuarioId: string, exceptoSesionId?: string): Promise<void>;
@@ -77,17 +76,6 @@ export class AutenticacionRepositorio implements IAutenticacionRepositorio {
         SET revocadaEn = COALESCE(revocadaEn, SYSUTCDATETIME())
         WHERE idSesion = @sesionId;
       `);
-  }
-
-  public async registrarIntentoFallido(usuarioId: string): Promise<void> {
-    await obtenerPoolPedidosBodega().request().input('usuarioId', sql.UniqueIdentifier, usuarioId).query(`
-      UPDATE dbo.UsuarioAplicacion SET
-        intentosFallidos = intentosFallidos + 1,
-        bloqueadoHasta = CASE WHEN intentosFallidos + 1 >= 5
-          THEN DATEADD(minute, 15, SYSUTCDATETIME()) ELSE bloqueadoHasta END,
-        actualizadoEn = SYSUTCDATETIME()
-      WHERE idUsuario = @usuarioId;
-    `);
   }
 
   public async registrarAccesoCorrecto(usuarioId: string): Promise<void> {

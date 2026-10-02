@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import { configuracion, obtenerConfiguracionAutenticacion } from '../../configuracion/configuracion.js';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import { nombreCookieSesion, requerirAutenticacion } from './autenticacionMiddleware.js';
@@ -8,14 +7,6 @@ import { esquemaCambioContrasena, esquemaInicioSesion } from './autenticacionVal
 
 export const autenticacionRutas = Router();
 const servicio = new AutenticacionServicio();
-const limitarInicioSesion = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 5,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  message: { codigo: 'DEMASIADOS_INTENTOS', mensaje: 'IntentÃ¡ nuevamente mÃ¡s tarde.' },
-});
-
 function opcionesCookie(maxAge: number) {
   return {
     httpOnly: true,
@@ -26,7 +17,7 @@ function opcionesCookie(maxAge: number) {
   };
 }
 
-autenticacionRutas.post('/iniciar-sesion', limitarInicioSesion, async (solicitud, respuesta, siguiente) => {
+autenticacionRutas.post('/iniciar-sesion', async (solicitud, respuesta, siguiente) => {
   try {
     const validacion = esquemaInicioSesion.safeParse(solicitud.body);
     if (!validacion.success) {

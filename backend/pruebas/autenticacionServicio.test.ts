@@ -23,7 +23,6 @@ describe('AutenticacionServicio', () => {
       buscarUsuario: vi.fn().mockResolvedValue({ ...usuarioBase, hashContrasena: hash }),
       crearSesion: vi.fn().mockResolvedValue(undefined),
       obtenerIdentidadSesion: vi.fn(), revocarSesion: vi.fn().mockResolvedValue(undefined),
-      registrarIntentoFallido: vi.fn().mockResolvedValue(undefined),
       registrarAccesoCorrecto: vi.fn().mockResolvedValue(undefined),
       cambiarContrasena: vi.fn().mockResolvedValue(undefined),
       revocarSesionesUsuario: vi.fn().mockResolvedValue(undefined),
