@@ -1,6 +1,8 @@
 # Historial de pedidos cancelados
 
-Pedidos devueltos conserva pedidos SAP cuya cabecera `ORDR.CANCELED` es exactamente `Y`. La pantalla los identifica como **CANCEL**. `DocStatus=C` por sí solo no es una cancelación; los documentos abiertos, cerrados sin cancelar y documentos auxiliares con `CANCELED=C` quedan excluidos.
+Pedidos devueltos conserva pedidos SAP cuya cabecera `ORDR.CANCELED` es exactamente `Y`, identificados como **CANCELADO**. También muestra como **CERRADO** los pedidos con `CANCELED=N` y `DocStatus=C` sin entrega vigente ni factura directa vigente asociadas al pedido. Los abiertos, cerrados con entrega o factura y documentos auxiliares con `CANCELED=C` quedan excluidos.
+
+Los cierres se sincronizan en `PedidosBodega.dbo.CierreSapDevueltos`, separados del historial de cancelaciones. En cada sincronización completa se actualiza su vigencia: una reapertura, entrega, factura o cancelación retira el cierre de la lista; una cancelación se muestra con su estado correspondiente. Si SAP falla, se conserva la última sincronización completa. SAP se consulta únicamente en lectura. Ninguno de estos estados confirma una recepción física.
 
 Las lecturas de SAP no modifican documentos. El historial se guarda en `PedidosBodega.dbo.CancelacionSapHistorial`, con identidad única por DocEntry y una copia de la cabecera y las líneas RDR1. No depende de un despacho previamente registrado en la aplicación. Las importaciones son idempotentes y no eliminan las cancelaciones ya observadas, aunque SAP deje de estar disponible.
 

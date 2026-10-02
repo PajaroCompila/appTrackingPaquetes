@@ -9,6 +9,7 @@ function aplicacionInventario(
   nombreUsuario: string,
   obtener: ReturnType<typeof vi.fn>,
   buscar: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue([]),
+  codigoRol = 'OPERADOR_BODEGA',
 ) {
   const aplicacion = express();
   aplicacion.use((peticion, _respuesta, siguiente) => {
@@ -16,7 +17,7 @@ function aplicacionInventario(
       usuarioId: '00000000-0000-0000-0000-000000000001',
       nombreUsuario,
       nombreVisible: nombreUsuario,
-      codigoRol: 'OPERADOR_BODEGA',
+      codigoRol,
       codigoAlmacen: 'TCIR01',
       codigosAlmacenVisibles: ['TCIR01'],
       sesionId: 'sesion-prueba',
@@ -54,6 +55,28 @@ const inventarioCompleto = {
 };
 
 describe('acceso al inventario por almacén', () => {
+  it.each([
+    ['gcruz', 'OPERADOR_BODEGA'],
+    ['supervisor-admin', 'ADMINISTRADOR'],
+    ['tlopez', 'OPERADOR_BODEGA'],
+  ])('permite a %s buscar y consultar todas las bodegas', async (usuario, rol) => {
+    const obtener = vi.fn().mockImplementation(async () => structuredClone(inventarioCompleto));
+    const buscar = vi.fn().mockResolvedValue([]);
+    const app = aplicacionInventario(usuario, obtener, buscar, rol);
+    await solicitud(app).get('/api/articulos/buscar?termino=articulo').expect(200);
+    expect(buscar).toHaveBeenCalledWith('articulo', 20, undefined);
+    const general = await solicitud(app).get('/api/articulos/A1/inventario').expect(200);
+    expect(general.body.existencias).toHaveLength(2);
+    const otraBodega = await solicitud(app).get('/api/articulos/A1/inventario?codigoAlmacen=BSPS01').expect(200);
+    expect(otraBodega.body.existencias).toHaveLength(2);
+    expect(obtener).toHaveBeenLastCalledWith('A1', 'BSPS01');
+  });
+  it('impide a un operador consultar una bodega no autorizada', async () => {
+    const obtener = vi.fn();
+    await solicitud(aplicacionInventario('otro', obtener))
+      .get('/api/articulos/A1/inventario?codigoAlmacen=BSPS01').expect(404);
+    expect(obtener).not.toHaveBeenCalled();
+  });
   it('busca coincidencias respetando las bodegas visibles', async () => {
     const buscar = vi.fn().mockResolvedValue([
       { codigoArticulo: 'A1', descripcion: 'Artículo de prueba' },

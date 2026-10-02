@@ -7,9 +7,10 @@ import { puedeVerAlmacen } from '../usuarios/accesoAlmacenes.js';
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 
 export function puedeConsultarTodoElInventario(
-  usuario: Pick<IdentidadAutenticada, 'nombreUsuario'> | undefined,
+  usuario: Pick<IdentidadAutenticada, 'nombreUsuario' | 'codigoRol'> | undefined,
 ): boolean {
-  return usuario?.nombreUsuario.trim().toLowerCase() === 'tlopez';
+  return usuario?.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
+    || ['gcruz', 'tlopez'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
 }
 
 export class InventarioArticuloControlador {

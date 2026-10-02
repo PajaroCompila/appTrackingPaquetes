@@ -34,6 +34,15 @@ describe('historial de pedidos CANCEL', () => {
       obtener:vi.fn().mockReturnValue(of({datos:pedido})),confirmar:vi.fn()};
   });
   afterEach(()=>fixture?.destroy());
+  it('muestra CERRADO en el detalle y no permite confirmar recepcion',async()=>{
+    const cerrado: PedidoDevuelto={...pedido,estado:'CERRADO',lineas:pedido.lineas.map(l=>({...l,estado:'CERRADO'}))};
+    servicio.obtener.mockReturnValue(of({datos:cerrado}));
+    await crear(cerrado.idClave);
+    expect(fixture.nativeElement.textContent).toContain('Detalle del pedido cerrado');
+    expect(fixture.nativeElement.textContent).toContain('CERRADO');
+    expect(fixture.nativeElement.textContent).not.toContain('CANCELADO');
+    expect(fixture.componentInstance.puedeConfirmar(cerrado.lineas[0]!)).toBe(false);
+  });
   it('consulta por defecto solo los pedidos devueltos del dia actual',async()=>{
     await crear();
     const fechaActual=obtenerFechaLocalActual();

@@ -1,4 +1,4 @@
-export type EstadoDevolucion = 'CANCEL' | 'PENDIENTE DE DEVOLUCIÓN' | 'DEVOLUCIÓN PARCIAL' | 'DEVUELTO';
+export type EstadoDevolucion = 'CANCEL' | 'CERRADO' | 'PENDIENTE DE DEVOLUCIÓN' | 'DEVOLUCIÓN PARCIAL' | 'DEVUELTO';
 
 export interface LineaPedidoDevueltoBase {
   identificadorDetalle: string;

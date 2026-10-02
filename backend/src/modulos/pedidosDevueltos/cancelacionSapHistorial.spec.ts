@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CancelacionSapHistorial, convertirCancelaciones, CONSULTA_CANCELACIONES_SAP, type FilaCanceladaSap } from './cancelacionSapHistorial.js';
+import { CancelacionSapHistorial, convertirCancelaciones, CONSULTA_CANCELACIONES_SAP, CONSULTA_CIERRES_DEVUELTOS_SAP, type FilaCanceladaSap } from './cancelacionSapHistorial.js';
 import type { consultarSap } from '../../infraestructura/sql/consultaSap.js';
 
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock('../../infraestructura/sql/conexionPedidosBodega.js', () => ({
-  obtenerPoolPedidosBodega: () => ({ request: () => ({ input: function() { return this; }, query }) }),
+  obtenerPoolPedidosBodega: () => ({ request: () => ({ input: function() { return this; }, query }),
+    transaction: () => ({begin:vi.fn(),commit:vi.fn(),rollback:vi.fn(),
+      request: () => ({ input: function() { return this; }, query, batch:query })}) }),
 }));
 const fila: FilaCanceladaSap = { docEntry:1,numeroPedido:'101471323',folioPedido:null,
   fechaPedido:new Date('2026-09-02T00:00:00Z'),horaPedido:919,canceled:'Y',docStatus:'C',nombreVendedor:'Vendedor',
@@ -14,6 +16,34 @@ const filtros = {codigosAlmacen:[],estado:'todos' as const,vista:'pedido' as con
 beforeEach(() => { query.mockReset().mockResolvedValue({recordset:[]}); });
 
 describe('historial exclusivo de cancelaciones SAP', () => {
+  it('incluye cerrados solamente con evidencia de ausencia de entrega y factura', () => {
+    const cerrado = {...fila,canceled:'N',docStatus:'C',tieneEntrega:0,tieneFacturaDirecta:0};
+    const pedidos = convertirCancelaciones([cerrado,
+      {...cerrado,docEntry:2,tieneEntrega:1}, {...cerrado,docEntry:3,tieneFacturaDirecta:1},
+      {...cerrado,docEntry:4,docStatus:'O'}, {...cerrado,docEntry:5,canceled:'C'}]);
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]).toMatchObject({estado:'CERRADO',fechaCancelacion:null,fueDespachado:false});
+    expect(pedidos[0]?.lineas[0]?.estado).toBe('CERRADO');
+    expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain("o.DocStatus='C'");
+    expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('AND NOT EXISTS (SELECT 1 FROM dbo.DLN1');
+    expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('AND NOT EXISTS (SELECT 1 FROM dbo.INV1');
+  });
+  it('consulta cierres en ambas vistas y permite abrir el detalle', async () => {
+    const p=convertirCancelaciones([{...fila,canceled:'N',tieneEntrega:0,tieneFacturaDirecta:0}])[0]!;
+    query.mockImplementation(async(s:string)=>s.includes('SELECT snapshot')
+      ? {recordset:[{snapshot:JSON.stringify(p)}]} : {recordset:[]});
+    const repo=new CancelacionSapHistorial(vi.fn().mockResolvedValue({recordset:[]}) as typeof consultarSap);
+    expect((await repo.listar(filtros)).datos[0]?.estado).toBe('CERRADO');
+    expect((await repo.listar({...filtros,vista:'articulos'})).total).toBe(1);
+    expect((await repo.obtener(p.idClave))?.estado).toBe('CERRADO');
+  });
+  it('reconcilia cierres aunque SAP ya no devuelva ninguno y conserva el historial', async () => {
+    const repo=new CancelacionSapHistorial(vi.fn().mockResolvedValue({recordset:[]}) as typeof consultarSap);
+    await repo.sincronizar();
+    const sql=query.mock.calls.map(([q])=>String(q)).join('\n');
+    expect(sql).toContain('SET activo=0');
+    expect(sql).not.toMatch(/DELETE|TRUNCATE/);
+  });
   it('solo admite Y, no cerrados, abiertos ni documentos de cancelacion C', () => {
     const pedidos = convertirCancelaciones(['N','C','Y','CANCEL',''].map((canceled,i)=>({...fila,docEntry:i,canceled})));
     expect(pedidos).toHaveLength(1);
@@ -56,7 +86,7 @@ describe('historial exclusivo de cancelaciones SAP', () => {
     const fuente=vi.fn().mockResolvedValue({recordset:[fila]});
     await new CancelacionSapHistorial(fuente as typeof consultarSap).sincronizar();
     const insercion=query.mock.calls.map(([q])=>String(q)).find(q=>q.includes('INSERT dbo.CancelacionSapHistorial'))!;
-    expect(insercion).toContain('WHERE NOT EXISTS');expect(insercion).toContain('UPDLOCK,HOLDLOCK');
+    expect(insercion).toContain('AND NOT EXISTS');expect(insercion).toContain('UPDLOCK,HOLDLOCK');
     expect(insercion).not.toMatch(/DELETE|TRUNCATE/);
   });
 });

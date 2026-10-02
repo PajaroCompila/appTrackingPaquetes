@@ -58,21 +58,22 @@ export class PedidosDevueltosComponent implements OnInit {
     codigosAlmacen: [] as string[], estado: 'todos' as FiltrosPedidosDevueltos['estado'], cantidadPorPagina: 25,
   };
 
-  public readonly configuracionDetalle: ConfiguracionDetallePedido = {
-    contexto: 'Pedidos devueltos', titulo: 'Detalle del pedido cancelado',
-    descripcion: 'Pedido cancelado en SAP', etiquetaEstado: 'CANCELADO', etiquetaFecha: 'Fecha del pedido', severidadEstado: 'peligro',
+  public get configuracionDetalle(): ConfiguracionDetallePedido { return {
+    contexto: 'Pedidos devueltos', titulo: this.detalle()?.estado === 'CERRADO' ? 'Detalle del pedido cerrado' : 'Detalle del pedido cancelado',
+    descripcion: this.detalle()?.estado === 'CERRADO' ? 'Pedido cerrado sin entrega ni factura en SAP' : 'Pedido cancelado en SAP',
+    etiquetaEstado: this.estadoVisible(this.detalle()?.estado), etiquetaFecha: 'Fecha del pedido', severidadEstado: 'peligro',
     etiquetaRetorno: 'Regresar a pedidos devueltos', tituloInformacion: 'Datos del pedido',
     etiquetaArticulos: 'Artículos del pedido', permitirImpresion: false,
-  };
+  }; }
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     const p = this.detalle();
     return p ? { idOrigen:p.idOrigen,numeroPedido:p.numeroPedido,tipoDocumento:'Pedido SAP',
       vendedor:p.nombreVendedor ?? null,fechaPedido:p.fechaHoraPedido ?? null,bodega:this.bodegas(p),
-      datosOperativos:[{etiqueta:'Estado',valor:'CANCELADO',icono:'pi pi-ban'},
+      datosOperativos:[{etiqueta:'Estado',valor:this.estadoVisible(p.estado),icono:'pi pi-ban'},
         {etiqueta:'Referencia R1',valor:p.folioPedido || 'No disponible',icono:'pi pi-file'}],
       articulos:p.lineas.map(l=>({clave:l.identificadorDetalle,identificadorDetalle:l.identificadorDetalle,
         codigo:l.codigoArticulo,descripcion:l.descripcion,cantidad:l.cantidad,codigoAlmacen:l.codigoAlmacen,
-        nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:'CANCELADO'})),
+        nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:this.estadoVisible(l.estado)})),
     } : null;
   });
   public regresar(): void { void this.enrutador.navigateByUrl(this.retorno()); }
@@ -166,7 +167,7 @@ export class PedidosDevueltosComponent implements OnInit {
   public clave(p:PedidoDevuelto,l:LineaDevolucion):string {return `${p.idClave}\u0000${l.identificadorDetalle}`;}
   public puedeConfirmar(l:LineaDevolucion):boolean {
     const u=this.autenticacion.usuario();
-    if(!u||!l.codigoAlmacen||l.estado==='CANCEL'||l.estado==='DEVUELTO')return false;
+    if(!u||!l.codigoAlmacen||l.estado==='CANCEL'||l.estado==='CERRADO'||l.estado==='DEVUELTO')return false;
     if(u.codigoRol==='ADMINISTRADOR')return true;
     if(u.codigoRol!=='OPERADOR_BODEGA')return false;
     return (u.codigosAlmacenVisibles ?? []).some(c=>c.toUpperCase()===l.codigoAlmacen!.toUpperCase());
