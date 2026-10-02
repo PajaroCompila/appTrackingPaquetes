@@ -15,8 +15,26 @@ const registro = (idOrigen: string, estadoLocal: 'VALIDADO' | 'DESPACHADO', fech
 });
 
 describe('HistorialServicio', () => {
+  it('identifica el cerrado 500313581 en Pedido, Artículos y Detalle sin cambiar facturados ni entregas', async () => {
+    const cerrado = {...registro('SAP:1', 'VALIDADO', '2026-10-02T10:07:00'), numeroPedido:'500313581'};
+    const facturado = {...registro('SAP:2', 'VALIDADO', '2026-10-02T10:00:00'), numeroPedido:'500313582', estadoHistorial:'Facturado' as const};
+    const pagina = {registros:[cerrado,facturado],pagina:1,cantidadPorPagina:25,totalRegistros:2,hayMas:false};
+    const repo = {obtenerCierresSinFactura:vi.fn().mockResolvedValue(new Set(['500313581'])),
+      buscarHistorial:vi.fn().mockResolvedValue(pagina),
+      buscarArticulosHistorial:vi.fn().mockResolvedValue({...pagina,registros:[{...cerrado,codigoArticulo:'A1',identificadorDetalle:'0'}]}),
+      obtenerHistorial:vi.fn().mockResolvedValue(cerrado)} as unknown as HistorialRepositorio;
+    const r1 = {buscar:vi.fn().mockResolvedValue({...pagina,registros:[],totalRegistros:0}),
+      buscarArticulos:vi.fn().mockResolvedValue({...pagina,registros:[],totalRegistros:0})} as unknown as HistorialR1Repositorio;
+    const servicio = new HistorialServicio(repo,r1);
+    const filtros = {fechaDesde:'2026-10-02',fechaHasta:'2026-10-02',codigosAlmacen:[],pagina:1,cantidadPorPagina:25};
+    const pedidos = await servicio.buscar(filtros);
+    expect(pedidos.registros.find(p=>p.numeroPedido==='500313581')?.estadoHistorial).toBe('CERRADO');
+    expect(pedidos.registros.find(p=>p.numeroPedido==='500313582')?.estadoHistorial).toBe('Facturado');
+    expect((await servicio.buscarArticulos(filtros)).registros[0]?.estadoHistorial).toBe('CERRADO');
+    expect((await servicio.obtener('SAP:1'))?.estadoHistorial).toBe('CERRADO');
+  });
   it('valida pedidos con Y y omite pedidos cerrados con C', async () => {
-    const repositorio = {
+    const repositorio = { obtenerCierresSinFactura: vi.fn().mockResolvedValue(new Set()),
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([
         { idOrigen: 'R1:F1', folioPedido: 'F1' },
         { idOrigen: 'R1:F2', folioPedido: 'F2' },
@@ -49,7 +67,7 @@ describe('HistorialServicio', () => {
   });
 
   it('es idempotente cuando ya no quedan cabeceras en DESPACHADO', async () => {
-    const repositorio = {
+    const repositorio = { obtenerCierresSinFactura: vi.fn().mockResolvedValue(new Set()),
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([]),
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
       conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
@@ -65,7 +83,7 @@ describe('HistorialServicio', () => {
   });
 
   it('mueve al historial únicamente pedidos SAP cerrados', async () => {
-    const repositorio = {
+    const repositorio = { obtenerCierresSinFactura: vi.fn().mockResolvedValue(new Set()),
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([]),
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([
         { idOrigen: 'SAP:10', sapDocEntry: '10' },
@@ -95,7 +113,7 @@ describe('HistorialServicio', () => {
   it('combina el historial validado de R1 con pedidos SAP cerrados conservados localmente', async () => {
     const sap = registro('SAP:10', 'VALIDADO', '2026-08-15T12:00:00.000Z');
     const r1 = registro('R1:TSPS01:F1', 'VALIDADO', '2026-08-15T11:00:00.000Z');
-    const repositorio = { buscarHistorial: vi.fn().mockResolvedValue({ registros: [sap], pagina: 1,
+    const repositorio = { obtenerCierresSinFactura: vi.fn().mockResolvedValue(new Set()), buscarHistorial: vi.fn().mockResolvedValue({ registros: [sap], pagina: 1,
       cantidadPorPagina: 25, hayMas: false }) } as unknown as HistorialRepositorio;
     const repositorioR1 = { buscar: vi.fn().mockResolvedValue({ registros: [r1], pagina: 1,
       cantidadPorPagina: 25, hayMas: false }) } as unknown as HistorialR1Repositorio;
@@ -112,7 +130,7 @@ describe('HistorialServicio', () => {
 
   it('recupera el detalle SAP desde PedidosBodega sin consultar nuevamente SAP', async () => {
     const sap = registro('SAP:10', 'VALIDADO', '2026-08-15T12:00:00.000Z');
-    const repositorio = { obtenerHistorial: vi.fn().mockResolvedValue(sap) } as unknown as HistorialRepositorio;
+    const repositorio = { obtenerCierresSinFactura: vi.fn().mockResolvedValue(new Set()), obtenerHistorial: vi.fn().mockResolvedValue(sap) } as unknown as HistorialRepositorio;
     const repositorioR1 = { obtener: vi.fn() } as unknown as HistorialR1Repositorio;
 
     await expect(new HistorialServicio(repositorio, repositorioR1).obtener('SAP:10')).resolves.toEqual(sap);
@@ -121,7 +139,7 @@ describe('HistorialServicio', () => {
   });
 
   it('delega el listado por artículos sin consultar detalles uno por uno', async () => {
-    const repositorio = { buscarArticulosHistorial: vi.fn().mockResolvedValue({
+    const repositorio = { obtenerCierresSinFactura: vi.fn().mockResolvedValue(new Set()), buscarArticulosHistorial: vi.fn().mockResolvedValue({
       registros: [], pagina: 1, cantidadPorPagina: 25, hayMas: false,
     }) } as unknown as HistorialRepositorio;
     const repositorioConsulta = { buscarArticulos: vi.fn().mockResolvedValue({

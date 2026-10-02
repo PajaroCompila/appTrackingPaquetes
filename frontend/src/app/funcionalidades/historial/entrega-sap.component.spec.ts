@@ -65,4 +65,15 @@ describe('Historial de entrega SAP en la vista existente', () => {
     const {fixture} = await preparar(false,false);
     expect(fixture.componentInstance.numeroDocumento(documento())).toBe('Entrega SAP 40968'); fixture.destroy();
   });
+  it('presenta un cerrado sin etiqueta Facturado ni datos de entrega', async () => {
+    const {fixture} = await preparar(false,false);
+    const cerrado = {...documento(), numeroPedido:'500313581', estadoHistorial:'CERRADO' as const, entregaSap:undefined};
+    fixture.componentInstance.registros.set([cerrado]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Detalle del pedido cerrado');
+    expect(fixture.nativeElement.textContent).toContain('CERRADO');
+    expect(fixture.nativeElement.textContent).not.toContain('Facturado');
+    expect(fixture.componentInstance.detalleVisual()?.datosOperativos?.some(d=>d.etiqueta==='Fecha de entrega')).toBe(false);
+    fixture.destroy();
+  });
 });

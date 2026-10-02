@@ -85,6 +85,7 @@ export class HistorialServicio {
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
     await Promise.all([
+      this.aplicarCierres(registros),
       this.agregarResponsablesPedidos(registros),
       this.seguimientoRepositorio?.aplicar(registros) ?? Promise.resolve(),
     ]);
@@ -113,6 +114,7 @@ export class HistorialServicio {
       pedido.articulos = pedido.articulos.filter((articulo) =>
         !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
       if (cantidadOriginal > 0 && pedido.articulos.length === 0) return null;
+      await this.aplicarCierres([pedido]);
       await this.agregarResponsablesPedidos([pedido]);
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido]);
     }
@@ -143,12 +145,22 @@ export class HistorialServicio {
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
     const registros = todos.slice(inicio, inicio + filtros.cantidadPorPagina);
     await Promise.all([
+      this.aplicarCierres(registros),
       this.agregarResponsablesArticulos(registros),
       this.seguimientoRepositorio?.aplicarArticulos(registros) ?? Promise.resolve(),
     ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
       hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };
+  }
+
+  private async aplicarCierres(registros: Array<PedidoHistorial | PaginaArticulosHistorial['registros'][number]>): Promise<void> {
+    const pedidos = registros.filter(p => !p.entregaSap);
+    if (!pedidos.length) return;
+    const cerrados = await this.repositorio.obtenerCierresSinFactura(pedidos.map(p => p.numeroPedido));
+    for (const pedido of pedidos) {
+      if (cerrados.has(pedido.numeroPedido)) pedido.estadoHistorial = 'CERRADO';
+    }
   }
 
   private async agregarResponsablesPedidos(pedidos: PedidoHistorial[]): Promise<void> {

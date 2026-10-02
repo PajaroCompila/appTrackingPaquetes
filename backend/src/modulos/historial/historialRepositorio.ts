@@ -51,6 +51,15 @@ interface FilaCerradaSap {
 interface FilaNumeroCerradoR1 { numeroPedido: number | null }
 
 export class HistorialRepositorio {
+  public async obtenerCierresSinFactura(numeros: string[]): Promise<Set<string>> {
+    if (!numeros.length) return new Set();
+    const resultado = await this.proveedorPedidosBodega().request()
+      .input('numeros', sql.NVarChar(sql.MAX), JSON.stringify([...new Set(numeros)]))
+      .query<{ numeroPedido: string }>(`SELECT numeroPedido FROM dbo.CierreSapDevueltos
+        WHERE activo=1 AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros));`);
+    return new Set(resultado.recordset.map(f => f.numeroPedido));
+  }
+
   public constructor(
     private readonly proveedorSistemaOrigen: () => sql.ConnectionPool = obtenerPoolSistemaOrigen,
     private readonly proveedorPedidosBodega: () => sql.ConnectionPool = obtenerPoolPedidosBodega,

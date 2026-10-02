@@ -2,7 +2,7 @@ import type { PedidoResumen } from '../pedidos/pedido.interface.js';
 import type { AuditoriaEntregaSap, EntregaSapPublica, EstadoEntregaSap } from './entregaSap.interface.js';
 
 export interface PedidoHistorial extends PedidoResumen {
-  estadoHistorial?: EstadoEntregaSap;
+  estadoHistorial?: EstadoEntregaSap | 'CERRADO';
   entregaSap?: EntregaSapPublica;
   auditoriaSap?: AuditoriaEntregaSap;
   estadoLocal: 'VALIDADO' | 'DESPACHADO';
@@ -30,7 +30,7 @@ export interface PaginaHistorial {
 }
 
 export interface ArticuloHistorial {
-  estadoHistorial?: EstadoEntregaSap;
+  estadoHistorial?: EstadoEntregaSap | 'CERRADO';
   entregaSap?: EntregaSapPublica;
   idOrigen: string;
   identificadorDetalle: string | null;

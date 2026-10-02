@@ -126,7 +126,10 @@ export class HistorialComponent implements OnInit {
       vendedor: pedido.nombreVendedor,
       fechaPedido: pedido.fechaHoraPedido,
       bodega: pedido.nombresBodega,
-      datosOperativos: pedido.entregaSap ? [
+      datosOperativos: pedido.estadoHistorial === 'CERRADO' ? [
+        { etiqueta: 'Estado', valor: 'CERRADO', icono: 'pi pi-info-circle' },
+        { etiqueta: 'Bodega', valor: pedido.codigosAlmacen.join(', ') || null, icono: 'pi pi-map-marker' },
+      ] : pedido.entregaSap ? [
         { etiqueta: 'Tipo', valor: pedido.entregaSap.tipo, icono: 'pi pi-file' },
         { etiqueta: 'Entrega SAP', valor: pedido.entregaSap.docNum, icono: 'pi pi-file' },
         { etiqueta: 'DocEntry de entrega', valor: pedido.entregaSap.docEntry, icono: 'pi pi-file' },
@@ -160,6 +163,10 @@ export class HistorialComponent implements OnInit {
   public readonly configuracionDetalleVisual = computed<ConfiguracionDetallePedido>(() => {
     const pedido = this.registros()[0];
     const configuracion = { ...this.configuracionDetalleBase, permitirImpresion: !this.modoSoloConsulta() };
+    if (pedido?.estadoHistorial === 'CERRADO') return { ...configuracion,
+      titulo: 'Detalle del pedido cerrado', descripcion: 'Pedido cerrado sin entrega ni factura en SAP',
+      etiquetaEstado: 'CERRADO', severidadEstado: 'informacion',
+      tituloInformacion: 'Datos del pedido', etiquetaArticulos: 'Artículos del pedido' };
     return pedido?.entregaSap ? { ...configuracion, titulo: 'Detalle de la entrega SAP',
       etiquetaEstado: pedido.estadoHistorial || 'Entregado, Sin factura',
       severidadEstado: pedido.estadoHistorial === 'Facturado' ? 'exito' : 'informacion' }
