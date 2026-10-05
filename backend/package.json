@@ -25,6 +25,7 @@
     "db:migrate:asignaciones": "tsx scripts/migrarAsignacionesArticulos.ts",
     "db:migrate:acceso-almacenes": "tsx scripts/migrarAccesoAlmacenesUsuarios.ts",
     "db:migrate:seguimiento-pedidos": "tsx scripts/migrarSeguimientoPedidos.ts",
+    "db:migrate:tiempo-historial": "tsx scripts/migrarTiempoHistorial.ts",
     "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",
     "usuario:cambiar-contrasena": "tsx scripts/cambiarContrasenaUsuario.ts",
     "dev": "tsx watch src/servidor.ts",

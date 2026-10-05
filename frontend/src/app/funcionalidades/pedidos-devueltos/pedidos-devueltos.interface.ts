@@ -9,7 +9,8 @@ export interface PedidoDevuelto {
   numeroPedido: string; nombreVendedor?: string | null; fechaDespacho?: string | null;
   fechaHoraPedido?: string | null; fechaCancelacion?: string | null; motivo?: string | null; canceladoPor?: string | null;
   estado: EstadoDevolucion; totalLineas?: number; lineasRecibidas?: number;
-  fechaDevolucionCompleta?: string | null; lineas: LineaDevolucion[];
+  fechaDevolucionCompleta?: string | null; recibidoPor?: string | null; recibidoEn?: string | null;
+  lineas: LineaDevolucion[];
 }
 export interface FiltrosPedidosDevueltos {
   numeroPedido: string; fechaDesde: string; fechaHasta: string; codigosAlmacen: string[];

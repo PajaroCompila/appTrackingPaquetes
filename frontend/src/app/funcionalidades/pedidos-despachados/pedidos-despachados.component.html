@@ -82,6 +82,7 @@
     @if (ultimaActualizacion()) {
       <p class="estado-actualizacion">Última actualización: {{ fecha(ultimaActualizacion()) }}</p>
     }
+    @if (mensajeRecepcion()) { <p class="mensaje-asignacion" role="status">{{ mensajeRecepcion() }}</p> }
 
     <div class="pestanas-vistas" role="tablist" aria-label="Forma de ver los pedidos despachados">
       <button type="button" role="tab" [attr.aria-selected]="vista() === 'articulos'"
@@ -122,9 +123,10 @@
             <col class="ancho-usuario" />
             <col class="ancho-detalle" />
             <col class="ancho-tiempo-total" />
+            <col class="columna-asignado" />
             @if (!modoSoloConsulta()) { <col class="ancho-imprimir" /> }
           </colgroup>
-          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+          <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Despachado</th><th>Usuario</th><th>Ver detalle</th><th>Tiempo total</th><th class="columna-asignado">Recibido por</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
             etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
             [bloqueado]="grupo.pedidos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
             (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th>}</tr></thead>
@@ -137,11 +139,26 @@
                     [codigoAlmacenInventario]="articulo.codigoAlmacen">{{ articulo.codigoArticulo || '—' }}</td>
                   <td data-label="Descripción" [title]="articulo.descripcion || '—'"><span class="texto-dos-lineas descripcion-despachado">{{ articulo.descripcion || '—' }}</span></td><td data-label="Cantidad">{{ articulo.cantidad ?? '—' }}</td>
                   <td data-label="Bodega">{{ articulo.codigoAlmacen || '—' }}</td><td data-label="Fecha y hora" [title]="fecha(pedido.fechaHoraPedido)"><span class="texto-dos-lineas">{{ fecha(pedido.fechaHoraPedido) }}</span></td>
-                  <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td><td data-label="Vendedor" [title]="pedido.nombreVendedor || '—'"><span class="texto-dos-lineas">{{ pedido.nombreVendedor || '—' }}</span></td>
+                  <td data-label="Estado"><span class="etiqueta-estado" [class.espera]="pedido.estadoLocal !== 'CERRADO'">{{ estadoEntrega(pedido) }}</span></td><td data-label="Vendedor" [title]="pedido.nombreVendedor || '—'"><span class="texto-dos-lineas">{{ pedido.nombreVendedor || '—' }}</span></td>
                   <td data-label="Despachado" [title]="fecha(articulo.transferidoEn || pedido.despachadoEn)"><span class="texto-dos-lineas">{{ fecha(articulo.transferidoEn || pedido.despachadoEn) }}</span></td>
                   <td data-label="Usuario" [title]="articulo.usuarioAsignado || '—'"><span class="texto-dos-lineas">{{ articulo.usuarioAsignado || '—' }}</span></td>
                   <td class="accion-tabla columna-ver-detalle" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-despachados', pedido.idOrigen]" [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
                   <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalDespacho(pedido, articulo.transferidoEn || pedido.despachadoEn) }}</strong></td>
+                  <td class="columna-asignado" data-label="Recibido por">
+                    <div class="control-asignacion">
+                      <select class="selector-asignacion" [value]="receptorSeleccionado(pedido)"
+                        [disabled]="pedido.estadoLocal !== 'CERRADO' || !puedeAsignarDevolucion() || guardandoRecepcion(pedido)"
+                        [attr.aria-label]="'Seleccionar quién recibió el pedido ' + pedido.numeroPedido"
+                        (change)="seleccionarReceptor(pedido, $any($event.target).value)">
+                        <option value="">Sin asignar</option>
+                        @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
+                          <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
+                        }
+                      </select>
+                      <button class="boton-asignar" type="button" [disabled]="!puedeRegistrarRecepcion(pedido)"
+                        (click)="registrarRecepcion(pedido)">Asignar</button>
+                    </div>
+                  </td>
                   @if (!modoSoloConsulta()) {<td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
                     <label class="selector-linea selector-impresion" title="Seleccionar para imprimir">
                       <input type="checkbox" [disabled]="!articulo.identificadorDetalle || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
@@ -159,7 +176,7 @@
       </div> } @else {
         <div class="panel tabla-contenedor tabla-pedidos-agrupados" role="tabpanel">
           <table>
-            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
+            <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Fecha y hora</th><th>Estado</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th><th class="columna-asignado">Recibido por</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
               etiqueta="IMPRIMIR TODO" [seleccionados]="todasImpresionesSeleccionadas(grupo.clave)"
               [bloqueado]="grupo.pedidos.length === 0 || preparandoImpresion() || confirmarImpresion() || guardandoImpresion()"
               (seleccionar)="seleccionarTodasImpresiones(grupo.clave)" /></th>}</tr></thead>
@@ -170,7 +187,7 @@
                   <td data-label="Artículos">{{ pedido.articulos.length }}</td>
                   <td data-label="Bodegas">{{ pedido.codigosAlmacen.join(', ') || '—' }}</td>
                   <td data-label="Fecha y hora">{{ fecha(pedido.fechaHoraPedido) }}</td>
-                  <td data-label="Estado"><span class="etiqueta-estado espera">Pendiente de entregar al cliente</span></td>
+                  <td data-label="Estado"><span class="etiqueta-estado" [class.espera]="pedido.estadoLocal !== 'CERRADO'">{{ estadoEntrega(pedido) }}</span></td>
                   <td data-label="Vendedor">{{ pedido.nombreVendedor || '—' }}</td>
                   <td data-label="Usuario">{{ responsablesPedido(pedido) }}</td>
                   <td data-label="Tiempo total"><strong class="tiempo-total-despacho">{{ tiempoTotalDespacho(pedido) }}</strong></td>
@@ -178,6 +195,21 @@
                   <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle"
                     [routerLink]="['/pedidos-despachados', pedido.idOrigen]"
                     [queryParams]="{ retorno: rutaRetorno() }">Ver detalle</a></td>
+                  <td class="columna-asignado" data-label="Recibido por">
+                    <div class="control-asignacion">
+                      <select class="selector-asignacion" [value]="receptorSeleccionado(pedido)"
+                        [disabled]="pedido.estadoLocal !== 'CERRADO' || !puedeAsignarDevolucion() || guardandoRecepcion(pedido)"
+                        [attr.aria-label]="'Seleccionar quién recibió el pedido ' + pedido.numeroPedido"
+                        (change)="seleccionarReceptor(pedido, $any($event.target).value)">
+                        <option value="">Sin asignar</option>
+                        @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
+                          <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
+                        }
+                      </select>
+                      <button class="boton-asignar" type="button" [disabled]="!puedeRegistrarRecepcion(pedido)"
+                        (click)="registrarRecepcion(pedido)">Asignar</button>
+                    </div>
+                  </td>
                   @if (!modoSoloConsulta()) {<td class="columna-imprimir columna-accion-masiva" data-label="Imprimir">
                     <label class="selector-linea selector-impresion" title="Seleccionar pedido para imprimir">
                       <input type="checkbox" [checked]="pedidoSeleccionadoParaImpresion(pedido)"

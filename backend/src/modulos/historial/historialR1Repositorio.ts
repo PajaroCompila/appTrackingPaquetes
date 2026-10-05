@@ -104,7 +104,8 @@ export class HistorialR1Repositorio {
     return { registros: pagina.map((articulo) => {
       const meta = metadatos.get(articulo.idOrigen);
       return { ...articulo, fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
-        despachadoEn: meta?.despachadoEn?.toISOString() ?? null };
+        despachadoEn: meta?.despachadoEn?.toISOString() ?? null,
+        validadoDetectadoEn: meta?.validadoDetectadoEn?.toISOString() ?? null };
     }),
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: disponibles.reduce((total, { value }) =>

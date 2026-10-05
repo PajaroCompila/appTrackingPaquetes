@@ -112,6 +112,7 @@ describe('PedidosDespachadosComponent', () => {
       '.grupo-listado-pedidos .acciones-impresion-grupo .boton-imprimir-seleccionados',
     )).toHaveLength(2);
     expect(texto).toContain('IMPRIMIR TODO');
+    expect((fixture.nativeElement.querySelector('.columna-asignado select') as HTMLSelectElement).disabled).toBe(true);
   });
 
   it('calcula el tiempo congelado de un pedido especial con la misma regla', () => {
@@ -340,6 +341,38 @@ describe('PedidosDespachadosComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('button[type=submit]').disabled).toBe(true);
     responderListados(http, [pedido]);
+    fixture.destroy();
+  });
+
+  it('habilita el receptor solo al cerrar y lo retira de Entregados después de asignarlo', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos/asignaciones/usuarios')).flush({
+      datos: [{ usuario: 'gcruz', nombre: 'Gregorio Cruz' }],
+      puedeAsignar: true, puedeAsignarTodos: true, puedeReasignar: true,
+    });
+    responderListados(http, [{ ...pedido, estadoLocal: 'CERRADO' }]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Cerrado');
+    const selector = fixture.nativeElement.querySelector('.columna-asignado select') as HTMLSelectElement;
+    const boton = fixture.nativeElement.querySelector('.columna-asignado .boton-asignar') as HTMLButtonElement;
+    expect(selector.disabled).toBe(false);
+    expect(boton.disabled).toBe(true);
+    selector.value = 'gcruz';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(boton.disabled).toBe(false);
+    boton.click();
+    const solicitud = http.expectOne((peticion) => peticion.url.endsWith('/pedidos-despachados/recibir-devolucion'));
+    expect(solicitud.request.body).toEqual({ idOrigen: 'R1:F1', usuarioRecibio: 'gcruz' });
+    solicitud.flush({ datos: { idOrigen: 'R1:F1', estadoOrigen: 'CERRADO',
+      usuarioRecibio: 'gcruz', nombreRecibio: 'Gregorio Cruz', recibidoEn: '2026-10-05T15:00:00Z' } });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.pedidos()).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('La devolución fue registrada correctamente.');
     fixture.destroy();
   });
 });

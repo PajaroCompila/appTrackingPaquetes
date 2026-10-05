@@ -84,4 +84,13 @@ describe('historial de pedidos CANCEL', () => {
     await crear();expect(fixture.nativeElement.textContent).toContain('SAP no disponible');
     expect(fixture.componentInstance.cargando()).toBe(false);
   });
+  it('muestra de forma persistente quien recibió la devolución',async()=>{
+    const recibido={...pedido,estado:'DEVUELTO' as const,recibidoPor:'Gregorio Cruz',
+      recibidoEn:'2026-10-05T15:00:00Z',lineas:pedido.lineas.map(linea=>({...linea,
+        estado:'DEVUELTO' as const,recibidoPor:'Gregorio Cruz',recibidoEn:'2026-10-05T15:00:00Z'}))};
+    servicio.listar.mockReturnValue(of({datos:[recibido],paginacion:{pagina:1,cantidadPorPagina:25,totalRegistros:1,hayMas:false}}));
+    await crear();
+    expect(fixture.nativeElement.textContent).toContain('Gregorio Cruz');
+    expect(fixture.nativeElement.textContent).toContain('DEVUELTO');
+  });
 });

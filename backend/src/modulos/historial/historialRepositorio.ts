@@ -51,13 +51,41 @@ interface FilaCerradaSap {
 interface FilaNumeroCerradoR1 { numeroPedido: number | null }
 
 export class HistorialRepositorio {
-  public async obtenerCierresSinFactura(numeros: string[]): Promise<Set<string>> {
-    if (!numeros.length) return new Set();
+  public async registrarIngresosHistorial(idsOrigen: string[]): Promise<Map<string, string>> {
+    const unicos = [...new Set(idsOrigen.map((id) => id.trim()).filter(Boolean))];
+    if (unicos.length === 0) return new Map();
+    const resultado = await this.proveedorPedidosBodega().request()
+      .input('idsOrigen', sql.NVarChar(sql.MAX), JSON.stringify(unicos))
+      .query<{ idOrigen: string; historialIngresadoEn: Date }>(`
+        MERGE dbo.HistorialIngresoPedido WITH (HOLDLOCK) AS destino
+        USING (SELECT DISTINCT CONVERT(nvarchar(150), value) idOrigen
+          FROM OPENJSON(@idsOrigen)) AS origen
+        ON origen.idOrigen = destino.idOrigen
+        WHEN NOT MATCHED THEN INSERT(idOrigen) VALUES(origen.idOrigen);
+
+        SELECT idOrigen, historialIngresadoEn
+        FROM dbo.HistorialIngresoPedido
+        WHERE idOrigen IN (SELECT CONVERT(nvarchar(150), value) FROM OPENJSON(@idsOrigen));
+      `);
+    return new Map(resultado.recordset.map((fila) =>
+      [fila.idOrigen, fila.historialIngresadoEn.toISOString()]));
+  }
+
+  public async obtenerEstadosSinFactura(
+    numeros: string[],
+  ): Promise<Map<string, 'CERRADO' | 'CANCELADO'>> {
+    if (!numeros.length) return new Map();
     const resultado = await this.proveedorPedidosBodega().request()
       .input('numeros', sql.NVarChar(sql.MAX), JSON.stringify([...new Set(numeros)]))
-      .query<{ numeroPedido: string }>(`SELECT numeroPedido FROM dbo.CierreSapDevueltos
-        WHERE activo=1 AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros));`);
-    return new Set(resultado.recordset.map(f => f.numeroPedido));
+      .query<{ numeroPedido: string; estado: 'CERRADO' | 'CANCELADO' }>(`
+        SELECT numeroPedido, CONVERT(varchar(10), 'CERRADO') estado
+        FROM dbo.CierreSapDevueltos
+        WHERE activo=1 AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros))
+        UNION ALL
+        SELECT numeroPedido, CONVERT(varchar(10), 'CANCELADO') estado
+        FROM dbo.CancelacionSapHistorial
+        WHERE canceled='Y' AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros));`);
+    return new Map(resultado.recordset.map(f => [f.numeroPedido, f.estado]));
   }
 
   public constructor(
@@ -539,6 +567,7 @@ export class HistorialRepositorio {
         detalle.codigoAlmacen, detalle.nombreAlmacen,
         pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
         COALESCE(detalle.transferidoEn, pedido.despachadoEn) despachadoEn,
+        pedido.validadoDetectadoEn,
         ISNULL(seguimiento.excluidoSla, 0) esEspecial
       FROM dbo.PedidoDespachado pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
@@ -561,7 +590,8 @@ export class HistorialRepositorio {
         pedido.numeroPedido, detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
         detalle.codigoAlmacen, detalle.nombreAlmacen,
         pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
-        CONVERT(datetime2(3), NULL) despachadoEn, ISNULL(seguimiento.excluidoSla, 0) esEspecial
+        CONVERT(datetime2(3), NULL) despachadoEn, pedido.cerradoDetectadoEn validadoDetectadoEn,
+        ISNULL(seguimiento.excluidoSla, 0) esEspecial
       FROM dbo.PedidoSapHistorial pedido
       JOIN dbo.PedidoSapHistorialDetalle detalle
         ON detalle.idPedidoSapHistorial = pedido.idPedidoSapHistorial
@@ -595,6 +625,7 @@ export class HistorialRepositorio {
       fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
       fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
       despachadoEn: fila.despachadoEn?.toISOString() ?? null,
+      validadoDetectadoEn: fila.validadoDetectadoEn?.toISOString() ?? null,
       nombreVendedor: fila.nombreVendedor,
       esEspecial: Boolean(fila.esEspecial),
     }));

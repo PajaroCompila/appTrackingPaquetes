@@ -38,6 +38,8 @@ export interface PedidoDevuelto extends PedidoDevueltoEntrada {
   totalLineas?: number;
   lineasRecibidas?: number;
   fechaDevolucionCompleta?: string | null;
+  recibidoPor?: string | null;
+  recibidoEn?: string | null;
 }
 
 export function crearDevolucionDesdeDespacho(pedido: PedidoDevueltoEntrada): PedidoDevuelto | null {

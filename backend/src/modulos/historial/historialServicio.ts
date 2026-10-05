@@ -46,13 +46,18 @@ export class HistorialServicio {
     const cerrados = candidatos.filter(({ idOrigen }) =>
       estados.get(idOrigen)?.codigoEstadoVenta === 'C' && !estados.get(idOrigen)?.verificado);
     const validados = candidatos.filter(({ idOrigen }) => estados.get(idOrigen)?.verificado);
-    const cantidadCerrados = await this.repositorio.marcarCerrados(
-      cerrados.map(({ idOrigen }) => idOrigen),
-    );
+    const cierresSapSinDocumento = cerradosSap.filter(({ tipoCierre }) =>
+      tipoCierre === 'CERRADO SIN ENTREGA NI FACTURA');
+    const cierresSapComprobados = cerradosSap.filter(({ tipoCierre }) =>
+      tipoCierre !== 'CERRADO SIN ENTREGA NI FACTURA');
+    const cantidadCerrados = await this.repositorio.marcarCerrados([
+      ...cerrados.map(({ idOrigen }) => idOrigen),
+      ...cierresSapSinDocumento.map(({ idOrigen }) => idOrigen),
+    ]);
     const cantidadValidados = await this.repositorio.marcarValidados([
       ...validados.map(({ idOrigen }) =>
         ({ idOrigen, codigoSucursal: estados.get(idOrigen)?.codigoSucursal ?? null })),
-      ...cerradosSap.map(({ idOrigen }) => ({ idOrigen, codigoSucursal: null })),
+      ...cierresSapComprobados.map(({ idOrigen }) => ({ idOrigen, codigoSucursal: null })),
     ]);
     return cantidadCerrados + cantidadValidados + nuevosCerradosSap;
   }
@@ -87,6 +92,7 @@ export class HistorialServicio {
     await Promise.all([
       this.aplicarCierres(registros),
       this.agregarResponsablesPedidos(registros),
+      this.agregarIngresosHistorial(registros),
       this.seguimientoRepositorio?.aplicar(registros) ?? Promise.resolve(),
     ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
@@ -116,6 +122,7 @@ export class HistorialServicio {
       if (cantidadOriginal > 0 && pedido.articulos.length === 0) return null;
       await this.aplicarCierres([pedido]);
       await this.agregarResponsablesPedidos([pedido]);
+      await this.agregarIngresosHistorial([pedido]);
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido]);
     }
     return pedido;
@@ -147,6 +154,7 @@ export class HistorialServicio {
     await Promise.all([
       this.aplicarCierres(registros),
       this.agregarResponsablesArticulos(registros),
+      this.agregarIngresosHistorial(registros),
       this.seguimientoRepositorio?.aplicarArticulos(registros) ?? Promise.resolve(),
     ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
@@ -157,9 +165,22 @@ export class HistorialServicio {
   private async aplicarCierres(registros: Array<PedidoHistorial | PaginaArticulosHistorial['registros'][number]>): Promise<void> {
     const pedidos = registros.filter(p => !p.entregaSap);
     if (!pedidos.length) return;
-    const cerrados = await this.repositorio.obtenerCierresSinFactura(pedidos.map(p => p.numeroPedido));
+    const estados = await this.repositorio.obtenerEstadosSinFactura(pedidos.map(p => p.numeroPedido));
     for (const pedido of pedidos) {
-      if (cerrados.has(pedido.numeroPedido)) pedido.estadoHistorial = 'CERRADO';
+      const estado = estados.get(pedido.numeroPedido);
+      if (estado) pedido.estadoHistorial = estado;
+    }
+  }
+
+  private async agregarIngresosHistorial(
+    registros: Array<PedidoHistorial | PaginaArticulosHistorial['registros'][number]>,
+  ): Promise<void> {
+    if (registros.length === 0) return;
+    const ingresos = await this.repositorio.registrarIngresosHistorial(
+      registros.map(({ idOrigen }) => idOrigen),
+    );
+    for (const registro of registros) {
+      registro.historialIngresadoEn = ingresos.get(registro.idOrigen) ?? null;
     }
   }
 

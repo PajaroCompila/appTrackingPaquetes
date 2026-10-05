@@ -99,7 +99,7 @@
   } @else if (vista() === 'pedido') {
     <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
       <table class="tabla-pedido-devuelto">
-        <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Ver detalle</th></tr></thead>
+        <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Recibido por</th><th>Ver detalle</th></tr></thead>
         <tbody>
           @for (pedido of devoluciones(); track pedido.idClave) {
             <tr>
@@ -109,6 +109,7 @@
               <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
               <td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td>
               <td data-label="Estado"><span class="etiqueta-estado">{{ estadoVisible(pedido.estado) }}</span></td>
+              <td data-label="Recibido por"><strong>{{ recibidoPor(pedido) }}</strong></td>
               <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]" [queryParams]="parametrosRetorno()">Ver detalle</a></td>
             </tr>
           }
@@ -118,7 +119,7 @@
   } @else {
     <div class="panel tabla-contenedor tabla-articulos-devueltos" role="tabpanel" aria-labelledby="pestana-articulos">
       <table>
-        <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Ver detalle</th></tr></thead>
+        <thead><tr><th>Pedido</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Bodega destino</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Recibido por</th><th>Ver detalle</th></tr></thead>
         <tbody>
           @for (pedido of devoluciones(); track pedido.idClave) {
             @for (linea of pedido.lineas; track linea.identificadorDetalle) {
@@ -131,6 +132,7 @@
                 <td data-label="Vendedor responsable">{{ pedido.nombreVendedor || '—' }}</td>
                 <td data-label="Fecha del pedido">{{ fecha(pedido.fechaHoraPedido) }}</td>
                 <td data-label="Estado"><span class="etiqueta-estado">{{ estadoVisible(linea.estado) }}</span></td>
+                <td data-label="Recibido por"><strong>{{ linea.recibidoPor || recibidoPor(pedido) }}</strong></td>
                 <td class="accion-tabla" data-label="Ver detalle"><a class="enlace-detalle" [routerLink]="['/pedidos-devueltos', pedido.idClave]" [queryParams]="parametrosRetorno()">Ver detalle</a></td>
               </tr>
             }

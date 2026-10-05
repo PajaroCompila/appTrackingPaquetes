@@ -37,6 +37,21 @@ describe('historial exclusivo de cancelaciones SAP', () => {
     expect((await repo.listar({...filtros,vista:'articulos'})).total).toBe(1);
     expect((await repo.obtener(p.idClave))?.estado).toBe('CERRADO');
   });
+  it('oculta el despachado pendiente de recepción y muestra de forma persistente quién lo recibió', async () => {
+    const p=convertirCancelaciones([{...fila,canceled:'N',tieneEntrega:0,tieneFacturaDirecta:0}])[0]!;
+    query.mockImplementation(async(s:string)=>s.includes('SELECT h.snapshot')
+      ? {recordset:[{snapshot:JSON.stringify(p),nombreRecibio:'Gregorio Cruz',
+        recibidoEn:new Date('2026-10-05T15:00:00Z')}]} : {recordset:[]});
+    const repo=new CancelacionSapHistorial(vi.fn().mockResolvedValue({recordset:[]}) as typeof consultarSap);
+    const recibido=(await repo.listar(filtros)).datos[0]!;
+    expect(recibido).toMatchObject({estado:'DEVUELTO',fueDespachado:true,
+      recibidoPor:'Gregorio Cruz',lineasRecibidas:1});
+    expect(recibido.lineas[0]).toMatchObject({estado:'DEVUELTO',recibidoPor:'Gregorio Cruz'});
+
+    query.mockImplementation(async(s:string)=>s.includes('SELECT h.snapshot')
+      ? {recordset:[]} : {recordset:[]});
+    expect((await repo.listar(filtros)).datos).toEqual([]);
+  });
   it('reconcilia cierres aunque SAP ya no devuelva ninguno y conserva el historial', async () => {
     const repo=new CancelacionSapHistorial(vi.fn().mockResolvedValue({recordset:[]}) as typeof consultarSap);
     await repo.sincronizar();
@@ -88,5 +103,6 @@ describe('historial exclusivo de cancelaciones SAP', () => {
     const insercion=query.mock.calls.map(([q])=>String(q)).find(q=>q.includes('INSERT dbo.CancelacionSapHistorial'))!;
     expect(insercion).toContain('AND NOT EXISTS');expect(insercion).toContain('UPDLOCK,HOLDLOCK');
     expect(insercion).not.toMatch(/DELETE|TRUNCATE/);
+    expect(query.mock.calls.map(([q])=>String(q)).join('\n')).toContain("estadoLocal='CERRADO'");
   });
 });

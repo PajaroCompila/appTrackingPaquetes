@@ -4,6 +4,13 @@ export interface FechasTiempoPedido {
   fechaHoraPedido?: string | null;
 }
 
+export interface FechasTiempoHistorial extends FechasTiempoPedido {
+  despachadoEn?: string | null;
+  validadoDetectadoEn?: string | null;
+  facturadoDetectadoEn?: string | null;
+  historialIngresadoEn?: string | null;
+}
+
 export function fechaPedidoComoInstante(valor: string | null | undefined): number | null {
   if (!valor) return null;
   const normalizada = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(valor)
@@ -25,6 +32,20 @@ export function duracionPedidoMs(
   const inicio = inicioTiempoPedido(pedido);
   const terminado = typeof fin === 'number' ? fin : fechaPedidoComoInstante(fin);
   return inicio === null || terminado === null || terminado < inicio ? null : terminado - inicio;
+}
+
+export function duracionHistorialMs(pedido: FechasTiempoHistorial): number | null {
+  const finales = [
+    pedido.despachadoEn,
+    pedido.validadoDetectadoEn,
+    pedido.facturadoDetectadoEn,
+    pedido.historialIngresadoEn,
+  ];
+  for (const final of finales) {
+    const duracion = duracionPedidoMs(pedido, final);
+    if (duracion !== null) return duracion;
+  }
+  return null;
 }
 
 export function formatearDuracionPedido(duracionMs: number | null): string {

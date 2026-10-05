@@ -178,6 +178,7 @@ export class EntregaSapRepositorio {
     const todos: ArticuloHistorial[] = pedidos.flatMap(p => p.articulos.map(a => ({ ...a,
       identificadorDetalle: a.identificadorDetalle ?? null, idOrigen: p.idOrigen, numeroPedido: p.numeroPedido,
       fechaHoraPedido: p.fechaHoraPedido, nombreVendedor: p.nombreVendedor,
+      validadoDetectadoEn: p.validadoDetectadoEn,
       estadoHistorial: p.estadoHistorial, entregaSap: p.entregaSap })));
     const inicio = (filtros.pagina-1)*filtros.cantidadPorPagina;
     return { registros: todos, totalRegistros: total,

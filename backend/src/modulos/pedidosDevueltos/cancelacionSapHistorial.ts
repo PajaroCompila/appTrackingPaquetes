@@ -34,6 +34,22 @@ BEGIN
     snapshot nvarchar(max) NOT NULL CHECK(ISJSON(snapshot)=1),
     activo bit NOT NULL DEFAULT 1
   );
+END;
+IF OBJECT_ID(N'dbo.RecepcionDevolucionPedido',N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.RecepcionDevolucionPedido (
+    idPedidoDespachado bigint NOT NULL PRIMARY KEY
+      REFERENCES dbo.PedidoDespachado(idPedidoDespachado),
+    idOrigen nvarchar(150) NOT NULL UNIQUE,
+    estadoOrigen varchar(10) NOT NULL CHECK(estadoOrigen IN('CERRADO','CANCELADO')),
+    usuarioRecibio nvarchar(100) NOT NULL,
+    nombreRecibio nvarchar(200) NOT NULL,
+    registradoPorUsuarioId uniqueidentifier NOT NULL
+      REFERENCES dbo.UsuarioAplicacion(idUsuario),
+    recibidoEn datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_RecepcionDevolucionPedido_fecha
+    ON dbo.RecepcionDevolucionPedido(recibidoEn DESC,idOrigen);
 END;`;
 
 export interface FilaCanceladaSap {
@@ -42,6 +58,23 @@ export interface FilaCanceladaSap {
   nombreVendedor: string | null; linea: number | null; codigoArticulo: string | null;
   descripcion: string | null; cantidad: number | null; codigoAlmacen: string | null;
   tieneEntrega?: number; tieneFacturaDirecta?: number;
+}
+
+interface FilaHistorialDevolucion {
+  snapshot: string;
+  nombreRecibio: string | null;
+  recibidoEn: Date | null;
+}
+
+function pedidoConRecepcion(fila: FilaHistorialDevolucion): PedidoDevuelto {
+  const pedido = JSON.parse(fila.snapshot) as PedidoDevuelto;
+  if (!fila.nombreRecibio || !fila.recibidoEn) return pedido;
+  const recibidoEn = fila.recibidoEn.toISOString();
+  return { ...pedido, fueDespachado: true, estado: 'DEVUELTO', progreso: 100,
+    lineasRecibidas: pedido.lineas.length, fechaDevolucionCompleta: recibidoEn,
+    recibidoPor: fila.nombreRecibio, recibidoEn,
+    lineas: pedido.lineas.map(linea => ({ ...linea, estado: 'DEVUELTO',
+      cantidadRecibida: linea.cantidad, recibidoPor: fila.nombreRecibio, recibidoEn })) };
 }
 
 export const CONSULTA_CANCELACIONES_SAP = `SELECT o.DocEntry docEntry,CONVERT(nvarchar(100),o.DocNum) numeroPedido,
@@ -165,6 +198,20 @@ export class CancelacionSapHistorial {
       SELECT j.idClave,j.docEntry,j.numeroPedido,j.folioPedido,j.fechaPedido,j.snapshot
       FROM #SnapshotsDevueltos j
       WHERE j.estado='CERRADO' AND NOT EXISTS(SELECT 1 FROM dbo.CierreSapDevueltos h WITH(UPDLOCK,HOLDLOCK) WHERE h.docEntry=j.docEntry);
+      -- Un cierre/anulación sin salida comprobada permanece en Entregados hasta registrar
+      -- quién recibió físicamente la devolución. No altera la asignación de preparación.
+      UPDATE p SET estadoLocal='CERRADO',
+        cerradoDetectadoEn=COALESCE(p.cerradoDetectadoEn,SYSUTCDATETIME()),
+        actualizadoEn=SYSUTCDATETIME()
+      FROM dbo.PedidoDespachado p
+      WHERE p.estadoLocal='DESPACHADO' AND (
+        EXISTS(SELECT 1 FROM dbo.CancelacionSapHistorial h WHERE h.canceled='Y' AND
+          ((p.origenPedido='SAP' AND TRY_CONVERT(int,p.sapDocEntry)=h.docEntry)
+            OR (p.origenPedido='R1' AND (p.numeroPedido=h.numeroPedido OR p.folioPedido=h.folioPedido))))
+        OR EXISTS(SELECT 1 FROM dbo.CierreSapDevueltos h WHERE h.activo=1 AND
+          ((p.origenPedido='SAP' AND TRY_CONVERT(int,p.sapDocEntry)=h.docEntry)
+            OR (p.origenPedido='R1' AND (p.numeroPedido=h.numeroPedido OR p.folioPedido=h.folioPedido))))
+      );
       DROP TABLE #SnapshotsDevueltos;`);
       await transaccion.commit();
     } catch (error) {
@@ -188,15 +235,27 @@ export class CancelacionSapHistorial {
     const r = await obtenerPoolPedidosBodega().request()
       .input('numero', sql.NVarChar(100), f.numeroPedido || null)
       .input('desde', sql.VarChar(10), f.fechaDesde || null).input('hasta', sql.VarChar(10), f.fechaHasta || null)
-      .query<{ snapshot: string }>(`SELECT snapshot FROM (
+      .query<FilaHistorialDevolucion>(`WITH Historial AS (
         SELECT snapshot,numeroPedido,folioPedido,fechaPedido,docEntry FROM dbo.CancelacionSapHistorial WHERE canceled='Y'
         UNION ALL
         SELECT snapshot,numeroPedido,folioPedido,fechaPedido,docEntry FROM dbo.CierreSapDevueltos WHERE activo=1
-      ) h WHERE (@numero IS NULL OR numeroPedido=@numero OR folioPedido=@numero)
-        AND (@desde IS NULL OR fechaPedido>=CONVERT(date,@desde))
-        AND (@hasta IS NULL OR fechaPedido<=CONVERT(date,@hasta)) ORDER BY fechaPedido DESC,docEntry DESC`);
-    let pedidos = r.recordset.map(fila => JSON.parse(fila.snapshot) as PedidoDevuelto)
-      .filter(p => p.estado === 'CANCEL' || p.estado === 'CERRADO');
+      ) SELECT h.snapshot,recepcion.nombreRecibio,recepcion.recibidoEn
+      FROM Historial h OUTER APPLY(SELECT TOP(1) p.idPedidoDespachado
+        FROM dbo.PedidoDespachado p WHERE p.estadoLocal='CERRADO' AND (
+          (p.origenPedido='SAP' AND TRY_CONVERT(int,p.sapDocEntry)=h.docEntry)
+          OR (p.origenPedido='R1' AND (p.numeroPedido=h.numeroPedido OR p.folioPedido=h.folioPedido)))
+        ORDER BY p.idPedidoDespachado DESC) despachado
+      LEFT JOIN dbo.RecepcionDevolucionPedido recepcion
+        ON recepcion.idPedidoDespachado=despachado.idPedidoDespachado
+      WHERE (@numero IS NULL OR h.numeroPedido=@numero OR h.folioPedido=@numero)
+        AND (@desde IS NULL OR h.fechaPedido>=CONVERT(date,@desde))
+        AND (@hasta IS NULL OR h.fechaPedido<=CONVERT(date,@hasta))
+        AND (despachado.idPedidoDespachado IS NULL OR recepcion.idPedidoDespachado IS NOT NULL)
+      ORDER BY h.fechaPedido DESC,h.docEntry DESC`);
+    let pedidos = r.recordset.filter(fila => {
+      const estado = (JSON.parse(fila.snapshot) as PedidoDevuelto).estado;
+      return estado === 'CANCEL' || estado === 'CERRADO';
+    }).map(pedidoConRecepcion);
     if (f.codigosAlmacen.length) {
       const permitidos = new Set(f.codigosAlmacen.map(c => c.toUpperCase()));
       pedidos = pedidos.map(p => ({ ...p, lineas: p.lineas.filter(l => permitidos.has(l.codigoAlmacen?.toUpperCase() ?? '')) }))
@@ -217,9 +276,21 @@ export class CancelacionSapHistorial {
   public async obtener(id: string): Promise<PedidoDevuelto | null> {
     await this.actualizar();
     const r = await obtenerPoolPedidosBodega().request().input('id', sql.VarChar(64), id)
-      .query<{ snapshot: string }>(`SELECT snapshot FROM dbo.CancelacionSapHistorial WHERE idClave=@id AND canceled='Y'
-        UNION ALL SELECT snapshot FROM dbo.CierreSapDevueltos WHERE idClave=@id AND activo=1`);
-    return r.recordset[0] ? JSON.parse(r.recordset[0].snapshot) as PedidoDevuelto : null;
+      .query<FilaHistorialDevolucion>(`WITH Historial AS (
+        SELECT snapshot,numeroPedido,folioPedido,docEntry FROM dbo.CancelacionSapHistorial
+          WHERE idClave=@id AND canceled='Y'
+        UNION ALL SELECT snapshot,numeroPedido,folioPedido,docEntry FROM dbo.CierreSapDevueltos
+          WHERE idClave=@id AND activo=1
+      ) SELECT h.snapshot,recepcion.nombreRecibio,recepcion.recibidoEn
+      FROM Historial h OUTER APPLY(SELECT TOP(1) p.idPedidoDespachado
+        FROM dbo.PedidoDespachado p WHERE p.estadoLocal='CERRADO' AND (
+          (p.origenPedido='SAP' AND TRY_CONVERT(int,p.sapDocEntry)=h.docEntry)
+          OR (p.origenPedido='R1' AND (p.numeroPedido=h.numeroPedido OR p.folioPedido=h.folioPedido)))
+        ORDER BY p.idPedidoDespachado DESC) despachado
+      LEFT JOIN dbo.RecepcionDevolucionPedido recepcion
+        ON recepcion.idPedidoDespachado=despachado.idPedidoDespachado
+      WHERE despachado.idPedidoDespachado IS NULL OR recepcion.idPedidoDespachado IS NOT NULL;`);
+    return r.recordset[0] ? pedidoConRecepcion(r.recordset[0]) : null;
   }
 
   public async confirmar(): Promise<void> {

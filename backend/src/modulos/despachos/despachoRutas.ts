@@ -8,11 +8,15 @@ import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
 import { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 import { ConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
+import { resolverTecnicoAsignable } from '../asignaciones/asignacionRutas.js';
+import { cancelacionesSap } from '../pedidosDevueltos/cancelacionSapHistorial.js';
+import { RecepcionDevolucionRepositorio } from '../pedidosDevueltos/recepcionDevolucionRepositorio.js';
 
 export const despachoRutas = Router();
 const repositorio = new DespachoRepositorio();
 const servicio = new DespachoServicio(repositorio, new LineaDespachoOrigenRepositorio(), undefined, new ConciliacionEntregaPedido());
 const seguimientoRepositorio = new SeguimientoPedidoRepositorio();
+const recepcionDevolucionRepositorio = new RecepcionDevolucionRepositorio();
 const idOrigen = z.string().regex(/^(R1|SAP):.{1,140}$/);
 const identidadDetalle = z.string().regex(/^\d{1,20}$/);
 const codigosAlmacen = z.preprocess((valor) => {
@@ -39,9 +43,14 @@ const transferencia = z.object({
     identificadorDetalle: identidadDetalle,
   }).strict()).min(1).max(100),
 }).strict();
+const recepcionDevolucion = z.object({
+  idOrigen,
+  usuarioRecibio: z.string().trim().min(1).max(100),
+}).strict();
 
 despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
   try {
+    await cancelacionesSap.preparar();
     const originales = esquemaFiltrosDespachados.parse(solicitud.query);
     const filtros = { ...originales, codigosAlmacen: restringirCodigosAlmacen(
       solicitud.user!, originales.codigosAlmacen) };
@@ -59,6 +68,7 @@ despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
 
 despachoRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
   try {
+    await cancelacionesSap.preparar();
     const resultado = await repositorio.obtener(idOrigen.parse(solicitud.params.idOrigen));
     if (resultado) await seguimientoRepositorio.aplicar([resultado]);
     if (resultado) resultado.articulos = resultado.articulos.filter(({ codigoAlmacen }) =>
@@ -68,6 +78,27 @@ despachoRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
     respuesta.json({ datos: resultado });
   } catch (error) { siguiente(error); }
 });
+
+despachoRutas.post('/recibir-devolucion',
+  requerirRoles('ADMINISTRADOR', 'OPERADOR_BODEGA'), async (solicitud, respuesta, siguiente) => {
+    try {
+      const datos = recepcionDevolucion.parse(solicitud.body);
+      const nombreUsuario = solicitud.user!.nombreUsuario.trim().toLowerCase();
+      if (nombreUsuario === 'tlopez' && !datos.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
+        throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
+          'Solo puede registrar pedidos de Circunvalación.');
+      }
+      if (nombreUsuario === 'bodegatbm' && !datos.idOrigen.toUpperCase().startsWith('R1:TTBM01:')) {
+        throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
+          'Solo puede registrar pedidos de TBM.');
+      }
+      const tecnico = resolverTecnicoAsignable(solicitud.user!, datos.usuarioRecibio);
+      const resultado = await recepcionDevolucionRepositorio.registrar(
+        datos.idOrigen, tecnico, solicitud.user!.usuarioId,
+      );
+      respuesta.status(201).json({ datos: resultado });
+    } catch (error) { siguiente(error); }
+  });
 
 despachoRutas.post('/', requerirRoles('ADMINISTRADOR', 'OPERADOR_BODEGA'), async (solicitud, respuesta, siguiente) => {
   try {

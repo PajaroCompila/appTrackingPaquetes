@@ -20,7 +20,7 @@ import type { Almacen } from '../pedidos/almacen.interface';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { CodigoArticuloInventarioDirective } from '../../compartido/inventario/codigo-articulo-inventario.directive';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
-import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
+import { duracionHistorialMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
 import { AccionSeleccionDetalleComponent } from '../../compartido/detalle-pedido/controles-seleccion-detalle.component';
 import { VistaImpresionPedidoComponent, type ArticuloImpresionPedido } from '../pedidos/vista-impresion-pedido.component';
 import { ConfirmacionImpresionComponent } from '../../compartido/impresiones/confirmacion-impresion.component';
@@ -126,8 +126,8 @@ export class HistorialComponent implements OnInit {
       vendedor: pedido.nombreVendedor,
       fechaPedido: pedido.fechaHoraPedido,
       bodega: pedido.nombresBodega,
-      datosOperativos: pedido.estadoHistorial === 'CERRADO' ? [
-        { etiqueta: 'Estado', valor: 'CERRADO', icono: 'pi pi-info-circle' },
+      datosOperativos: pedido.estadoHistorial === 'CERRADO' || pedido.estadoHistorial === 'CANCELADO' ? [
+        { etiqueta: 'Estado', valor: pedido.estadoHistorial, icono: 'pi pi-info-circle' },
         { etiqueta: 'Bodega', valor: pedido.codigosAlmacen.join(', ') || null, icono: 'pi pi-map-marker' },
       ] : pedido.entregaSap ? [
         { etiqueta: 'Tipo', valor: pedido.entregaSap.tipo, icono: 'pi pi-file' },
@@ -163,9 +163,11 @@ export class HistorialComponent implements OnInit {
   public readonly configuracionDetalleVisual = computed<ConfiguracionDetallePedido>(() => {
     const pedido = this.registros()[0];
     const configuracion = { ...this.configuracionDetalleBase, permitirImpresion: !this.modoSoloConsulta() };
-    if (pedido?.estadoHistorial === 'CERRADO') return { ...configuracion,
-      titulo: 'Detalle del pedido cerrado', descripcion: 'Pedido cerrado sin entrega ni factura en SAP',
-      etiquetaEstado: 'CERRADO', severidadEstado: 'informacion',
+    if (pedido?.estadoHistorial === 'CERRADO' || pedido?.estadoHistorial === 'CANCELADO') return { ...configuracion,
+      titulo: pedido.estadoHistorial === 'CANCELADO' ? 'Detalle del pedido cancelado' : 'Detalle del pedido cerrado',
+      descripcion: pedido.estadoHistorial === 'CANCELADO'
+        ? 'Pedido cancelado en SAP' : 'Pedido cerrado sin entrega ni factura en SAP',
+      etiquetaEstado: pedido.estadoHistorial, severidadEstado: 'informacion',
       tituloInformacion: 'Datos del pedido', etiquetaArticulos: 'Artículos del pedido' };
     return pedido?.entregaSap ? { ...configuracion, titulo: 'Detalle de la entrega SAP',
       etiquetaEstado: pedido.estadoHistorial || 'Entregado, Sin factura',
@@ -228,6 +230,7 @@ export class HistorialComponent implements OnInit {
   public cambiarVista(vista: VistaHistorial): void {
     if (this.vista() === vista) return;
     this.limpiarSeleccionImpresion();
+    this.confirmarFiltrosAplicados();
     this.vista.set(vista); this.pagina.set(1); this.paginaEspeciales.set(1);
     this.haCargado = false; this.hayMas.set(false);
     if (vista === 'articulos') { this.articulos.set([]); this.articulosEspeciales.set([]); }
@@ -452,6 +455,7 @@ export class HistorialComponent implements OnInit {
   public irPagina(grupo: 'normales' | 'especiales', pagina: number): void {
     if (this.cargando()) return;
     this.limpiarSeleccionImpresion();
+    this.confirmarFiltrosAplicados();
     if (grupo === 'normales') this.pagina.set(pagina); else this.paginaEspeciales.set(pagina);
     this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
@@ -463,9 +467,8 @@ export class HistorialComponent implements OnInit {
   }
   public tiempoTotalHistorial(
     pedido: HistorialValidado | ArticuloHistorial,
-    fin?: string | null,
   ): string {
-    return formatearDuracionPedido(duracionPedidoMs(pedido, fin ?? pedido.despachadoEn));
+    return formatearDuracionPedido(duracionHistorialMs(pedido));
   }
   public regresar(): void {
     const retorno = this.ruta.snapshot.queryParamMap.get('retorno');
@@ -519,13 +522,18 @@ export class HistorialComponent implements OnInit {
   }
 
   private actualizarUrl(): void {
-    const parametros = this.parametrosActuales();
-    const queryParams: Record<string, string | string[]> = {};
-    parametros.forEach((valor, clave) => {
-      const existente = queryParams[clave];
-      queryParams[clave] = existente === undefined ? valor
-        : Array.isArray(existente) ? [...existente, valor] : [existente, valor];
-    });
+    const queryParams: Record<string, string | string[]> = {
+      fechaDesde: this.filtrosAplicados.fechaDesde,
+      fechaHasta: this.filtrosAplicados.fechaHasta,
+      pagina: String(this.pagina()),
+      paginaEspeciales: String(this.paginaEspeciales()),
+      cantidadPorPagina: String(this.filtrosAplicados.cantidadPorPagina),
+      codigoAlmacen: [...this.filtrosAplicados.codigosAlmacen],
+      vista: this.vista(),
+    };
+    if (this.filtrosAplicados.numeroPedido.trim()) {
+      queryParams['numeroPedido'] = this.filtrosAplicados.numeroPedido.trim();
+    }
     void this.enrutador.navigate([], { relativeTo: this.ruta, queryParams, replaceUrl: true });
   }
 

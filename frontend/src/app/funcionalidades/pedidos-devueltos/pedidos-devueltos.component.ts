@@ -59,8 +59,12 @@ export class PedidosDevueltosComponent implements OnInit {
   };
 
   public get configuracionDetalle(): ConfiguracionDetallePedido { return {
-    contexto: 'Pedidos devueltos', titulo: this.detalle()?.estado === 'CERRADO' ? 'Detalle del pedido cerrado' : 'Detalle del pedido cancelado',
-    descripcion: this.detalle()?.estado === 'CERRADO' ? 'Pedido cerrado sin entrega ni factura en SAP' : 'Pedido cancelado en SAP',
+    contexto: 'Pedidos devueltos', titulo: this.detalle()?.estado === 'DEVUELTO'
+      ? 'Detalle del pedido devuelto' : this.detalle()?.estado === 'CERRADO'
+        ? 'Detalle del pedido cerrado' : 'Detalle del pedido cancelado',
+    descripcion: this.detalle()?.estado === 'DEVUELTO'
+      ? 'Devolución recibida físicamente' : this.detalle()?.estado === 'CERRADO'
+        ? 'Pedido cerrado sin entrega ni factura en SAP' : 'Pedido cancelado en SAP',
     etiquetaEstado: this.estadoVisible(this.detalle()?.estado), etiquetaFecha: 'Fecha del pedido', severidadEstado: 'peligro',
     etiquetaRetorno: 'Regresar a pedidos devueltos', tituloInformacion: 'Datos del pedido',
     etiquetaArticulos: 'Artículos del pedido', permitirImpresion: false,
@@ -70,7 +74,9 @@ export class PedidosDevueltosComponent implements OnInit {
     return p ? { idOrigen:p.idOrigen,numeroPedido:p.numeroPedido,tipoDocumento:'Pedido SAP',
       vendedor:p.nombreVendedor ?? null,fechaPedido:p.fechaHoraPedido ?? null,bodega:this.bodegas(p),
       datosOperativos:[{etiqueta:'Estado',valor:this.estadoVisible(p.estado),icono:'pi pi-ban'},
-        {etiqueta:'Referencia R1',valor:p.folioPedido || 'No disponible',icono:'pi pi-file'}],
+        {etiqueta:'Referencia R1',valor:p.folioPedido || 'No disponible',icono:'pi pi-file'},
+        ...(p.recibidoPor ? [{etiqueta:'Recibido por',valor:p.recibidoPor,icono:'pi pi-user'},
+          {etiqueta:'Fecha de recepción',valor:p.recibidoEn ?? null,icono:'pi pi-calendar',esFecha:true}] : [])],
       articulos:p.lineas.map(l=>({clave:l.identificadorDetalle,identificadorDetalle:l.identificadorDetalle,
         codigo:l.codigoArticulo,descripcion:l.descripcion,cantidad:l.cantidad,codigoAlmacen:l.codigoAlmacen,
         nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:this.estadoVisible(l.estado)})),
@@ -161,6 +167,9 @@ export class PedidosDevueltosComponent implements OnInit {
   }
   public nombreAlmacen(codigo:string):string {return this.almacenes().find(a=>a.codigoAlmacen===codigo)?.nombreAlmacen || codigo;}
   public bodegas(p:PedidoDevuelto):string {return [...new Set(p.lineas.flatMap(l=>l.codigoAlmacen?[l.codigoAlmacen]:[]))].join(', ') || '—';}
+  public recibidoPor(p:PedidoDevuelto):string {
+    return p.recibidoPor || p.lineas.find(l=>l.recibidoPor)?.recibidoPor || '—';
+  }
   public estadoVisible(estado:string | null | undefined):string {return estado === 'CANCEL' ? 'CANCELADO' : estado || '—';}
   public progreso(p:PedidoDevuelto):string {return `${p.lineasRecibidas ?? p.lineas.filter(l=>l.estado==='DEVUELTO').length} / ${p.totalLineas ?? p.lineas.length}`;}
   public fecha(v:string|null|undefined):string {return formatearFechaHoraHonduras(v);}

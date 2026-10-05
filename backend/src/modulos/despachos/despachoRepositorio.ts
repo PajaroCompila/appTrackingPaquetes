@@ -6,7 +6,7 @@ import { fechaSqlSinZona, fechaTextoSinZonaParaSql } from '../../compartido/fech
 import { condicionLineaNoFleteSql } from '../pedidos/lineaFlete.js';
 
 export interface PedidoDespachado extends PedidoResumen {
-  estadoLocal: 'DESPACHADO';
+  estadoLocal: 'DESPACHADO' | 'CERRADO';
   despachadoEn: string;
   usuarioDespacho: string;
 }
@@ -154,7 +154,10 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-        WHERE pedido.estadoLocal = 'DESPACHADO' AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
+        WHERE pedido.estadoLocal IN ('DESPACHADO','CERRADO')
+          AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
+            WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado)
+          AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
           AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
           AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
           AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
@@ -194,7 +197,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           nombreVendedor: fila.nombreVendedor, codigosAlmacen: [], nombresBodega: fila.nombreAlmacen,
           fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
-          estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
+          estadoLocal: fila.estadoLocal, despachadoEn: fila.despachadoEn.toISOString(),
           usuarioDespacho: fila.usuarioDespacho,
           fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
           esEspecial: Boolean(fila.esEspecial),
@@ -251,7 +254,9 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         ON asignacion.idOrigen = detalle.idOrigen
        AND asignacion.identificadorDetalle = detalle.identificadorDetalle
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-      WHERE pedido.estadoLocal = 'DESPACHADO'
+      WHERE pedido.estadoLocal IN ('DESPACHADO','CERRADO')
+        AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
+          WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado)
         AND ${condicionLineaNoFleteSql('detalle.codigoArticulo', 'detalle.descripcion')}
         AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
         AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
@@ -278,7 +283,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       nombresBodega: fila.detalleNombreAlmacen,
       fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
       codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null,
-      estadoLocal: 'DESPACHADO', despachadoEn: fila.despachadoEn.toISOString(),
+      estadoLocal: fila.estadoLocal, despachadoEn: fila.despachadoEn.toISOString(),
       usuarioDespacho: fila.usuarioDespacho,
       fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
       esEspecial: Boolean(fila.esEspecial),
@@ -306,7 +311,10 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-        WHERE pedido.idOrigen = @idOrigen AND pedido.estadoLocal = 'DESPACHADO';`)).recordset[0];
+        WHERE pedido.idOrigen = @idOrigen
+          AND pedido.estadoLocal IN ('DESPACHADO','CERRADO')
+          AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
+            WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado);`)).recordset[0];
     if (!cabecera) return null;
 
     const detalles = (await pool.request()
@@ -344,7 +352,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       esEspecial: Boolean(cabecera.esEspecial),
       codigoEstadoVenta: 'DESPACHADO',
       codigoSincronizacion: null,
-      estadoLocal: 'DESPACHADO',
+      estadoLocal: cabecera.estadoLocal,
       despachadoEn: cabecera.despachadoEn.toISOString(),
       usuarioDespacho: cabecera.usuarioDespacho,
       responsablesAsignados: [...new Set(detalles.map((detalle) => detalle.usuarioAsignado)

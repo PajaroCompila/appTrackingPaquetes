@@ -29,9 +29,11 @@ import type { LineaRegistroImpresion } from '../../compartido/impresiones/impres
 import { ImpresionPedidoPosService } from '../pedidos/impresion-pedido-pos.service';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
+import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
+import type { TecnicoAsignable } from '../../compartido/asignaciones/asignacion.interface';
 
 interface Despachado extends PedidoResumen {
-  estadoLocal: 'DESPACHADO';
+  estadoLocal: 'DESPACHADO' | 'CERRADO';
   despachadoEn: string;
   usuarioDespacho: string;
   esParcial?: boolean | null;
@@ -87,6 +89,7 @@ export class PedidosDespachadosComponent implements OnInit {
   private readonly inyector = inject(Injector);
   private readonly impresionPedidoPos = inject(ImpresionPedidoPosService);
   private readonly autenticacion = inject(AutenticacionService);
+  private readonly asignacionesServicio = inject(AsignacionesService);
   private readonly actualizarAhora = new Subject<boolean>();
   private haCargado = false;
   private consultaEnCurso = false;
@@ -122,14 +125,22 @@ export class PedidosDespachadosComponent implements OnInit {
   public readonly confirmarImpresion = signal(false);
   public readonly guardandoImpresion = signal(false);
   public readonly errorRegistroImpresion = signal('');
+  public readonly usuariosAsignables = signal<readonly TecnicoAsignable[]>([]);
+  public readonly puedeAsignarDevolucion = signal(false);
+  public readonly receptoresSeleccionados = signal<ReadonlyMap<string, string>>(new Map());
+  public readonly recepcionesGuardando = signal<ReadonlySet<string>>(new Set());
+  public readonly mensajeRecepcion = signal('');
   public readonly configuracionDetalle = computed<ConfiguracionDetallePedido>(() => {
     const pedido = this.pedidos()[0];
     return {
       contexto: 'Registro local',
-      titulo: 'Detalle del pedido despachado',
-      descripcion: 'Datos del pedido despachado.',
-      etiquetaEstado: pedido?.esParcial === true ? 'Despacho parcial' : 'Despachado',
-      severidadEstado: pedido?.esParcial === true ? 'advertencia' : 'exito',
+      titulo: pedido?.estadoLocal === 'CERRADO' ? 'Detalle del pedido cerrado' : 'Detalle del pedido despachado',
+      descripcion: pedido?.estadoLocal === 'CERRADO'
+        ? 'Pedido cerrado o cancelado pendiente de recepción física.' : 'Datos del pedido despachado.',
+      etiquetaEstado: pedido?.estadoLocal === 'CERRADO'
+        ? 'Cerrado' : pedido?.esParcial === true ? 'Despacho parcial' : 'Despachado',
+      severidadEstado: pedido?.estadoLocal === 'CERRADO'
+        ? 'informacion' : pedido?.esParcial === true ? 'advertencia' : 'exito',
       etiquetaRetorno: 'Regresar a pedidos despachados',
       tituloInformacion: 'Información de entrega',
       etiquetaArticulos: 'Artículos despachados del pedido',
@@ -190,6 +201,7 @@ export class PedidosDespachadosComponent implements OnInit {
       return;
     }
 
+    this.cargarUsuariosAsignables();
     this.hidratarFiltros();
     this.cargarAlmacenes();
     this.iniciarActualizacionAutomatica();
@@ -496,6 +508,58 @@ export class PedidosDespachadosComponent implements OnInit {
     return pedido.modificado ? pedido.modificadoPor?.trim() || 'No disponible' : '—';
   }
 
+  public estadoEntrega(pedido: Despachado): string {
+    return pedido.estadoLocal === 'CERRADO' ? 'Cerrado' : 'Pendiente de entrega al cliente';
+  }
+
+  public receptorSeleccionado(pedido: Despachado): string {
+    return this.receptoresSeleccionados().get(pedido.idOrigen) ?? '';
+  }
+
+  public seleccionarReceptor(pedido: Despachado, usuario: string): void {
+    this.receptoresSeleccionados.update(actual => {
+      const siguiente = new Map(actual);
+      if (usuario) siguiente.set(pedido.idOrigen, usuario); else siguiente.delete(pedido.idOrigen);
+      return siguiente;
+    });
+    this.mensajeRecepcion.set('');
+  }
+
+  public guardandoRecepcion(pedido: Despachado): boolean {
+    return this.recepcionesGuardando().has(pedido.idOrigen);
+  }
+
+  public puedeRegistrarRecepcion(pedido: Despachado): boolean {
+    return pedido.estadoLocal === 'CERRADO' && this.puedeAsignarDevolucion()
+      && Boolean(this.receptorSeleccionado(pedido)) && !this.guardandoRecepcion(pedido);
+  }
+
+  public registrarRecepcion(pedido: Despachado): void {
+    const usuarioRecibio = this.receptorSeleccionado(pedido);
+    if (!this.puedeRegistrarRecepcion(pedido) || !usuarioRecibio) return;
+    this.recepcionesGuardando.update(actual => new Set(actual).add(pedido.idOrigen));
+    this.mensajeRecepcion.set('');
+    this.clienteHttp.post(`${environment.urlApi}/pedidos-despachados/recibir-devolucion`, {
+      idOrigen: pedido.idOrigen, usuarioRecibio,
+    }).pipe(takeUntilDestroyed(this.destruirRef), finalize(() => {
+      this.recepcionesGuardando.update(actual => {
+        const siguiente = new Set(actual); siguiente.delete(pedido.idOrigen); return siguiente;
+      });
+    })).subscribe({
+      next: () => {
+        this.pedidos.update(actual => actual.filter(item => item.idOrigen !== pedido.idOrigen));
+        this.pedidosEspeciales.update(actual => actual.filter(item => item.idOrigen !== pedido.idOrigen));
+        this.receptoresSeleccionados.update(actual => {
+          const siguiente = new Map(actual); siguiente.delete(pedido.idOrigen); return siguiente;
+        });
+        this.mensajeRecepcion.set('La devolución fue registrada correctamente.');
+        this.actualizarAhora.next(true);
+      },
+      error: (error: { error?: { mensaje?: string } }) => this.mensajeRecepcion.set(
+        error.error?.mensaje || 'No se pudo registrar quién recibió la devolución.'),
+    });
+  }
+
   private actualizarListado(pagina: number, paginaEspeciales: number): void {
     this.limpiarSeleccionImpresion();
     this.pagina.set(pagina); this.paginaEspeciales.set(paginaEspeciales);
@@ -546,6 +610,19 @@ export class PedidosDespachadosComponent implements OnInit {
   private cargarAlmacenes(): void {
     this.almacenesServicio.obtenerAlmacenes().pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
       next: ({ datos }) => this.almacenes.set(datos), error: () => this.almacenes.set([]),
+    });
+  }
+
+  private cargarUsuariosAsignables(): void {
+    this.asignacionesServicio.obtenerUsuarios().pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
+      next: ({ datos, puedeAsignar }) => {
+        this.usuariosAsignables.set(datos);
+        this.puedeAsignarDevolucion.set(puedeAsignar);
+      },
+      error: () => {
+        this.usuariosAsignables.set([]);
+        this.puedeAsignarDevolucion.set(false);
+      },
     });
   }
 

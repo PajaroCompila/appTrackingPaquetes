@@ -172,6 +172,83 @@ describe('HistorialComponent', () => {
     vi.useRealTimers();
   });
 
+  it('conserva todas las bodegas aplicadas al paginar y cambiar de vista', async () => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    const respuesta = { datos: [], paginacion: { pagina: 1, cantidadPorPagina: 25,
+      cantidadDevuelta: 0, totalRegistros: 100, hayMas: true } };
+    const buscar = vi.fn().mockReturnValue(of(respuesta));
+    const buscarArticulos = vi.fn().mockReturnValue(of(respuesta));
+    const navegar = vi.fn().mockResolvedValue(true);
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { buscar, buscarArticulos, obtener: vi.fn() } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: vi.fn().mockReturnValue(of({ datos: [] })) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: navegar, navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const componente = fixture.componentInstance;
+    const codigos = ['BSPS04', 'BSPS03', 'BSPS08'];
+    codigos.forEach((codigo) => componente.alternarAlmacen(codigo, true));
+    componente.buscar();
+    expect(buscarArticulos).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, clasificacion: 'especial', pagina: 1,
+    }));
+
+    componente.irPagina('normales', 2);
+    expect(componente.filtros.codigosAlmacen).toEqual(codigos);
+    fixture.detectChanges();
+    const chips = [...fixture.nativeElement.querySelectorAll('.etiqueta-almacen')]
+      .map((elemento: HTMLElement) => elemento.textContent?.trim());
+    expect(chips).toEqual(expect.arrayContaining(codigos.map((codigo) => expect.stringContaining(codigo))));
+    expect(buscarArticulos).toHaveBeenCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, clasificacion: 'normal', pagina: 2,
+    }));
+    expect(navegar).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: expect.objectContaining({
+        codigoAlmacen: codigos, pagina: '2', paginaEspeciales: '1', vista: 'articulos',
+      }),
+    }));
+
+    componente.irPagina('normales', 1);
+    componente.cambiarVista('pedido');
+    expect(buscar).toHaveBeenCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, clasificacion: 'normal', pagina: 1,
+    }));
+    expect(buscar).toHaveBeenCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, clasificacion: 'especial', pagina: 1,
+    }));
+    expect(navegar).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: expect.objectContaining({ codigoAlmacen: codigos, vista: 'pedido' }),
+    }));
+
+    componente.cambiarVista('articulos');
+    expect(buscarArticulos).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, clasificacion: 'especial', pagina: 1,
+    }));
+    componente.filtros.cantidadPorPagina = 50;
+    componente.cambiarCantidadPorPagina();
+    expect(buscarArticulos).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, cantidadPorPagina: 50, clasificacion: 'especial', pagina: 1,
+    }));
+    (componente as unknown as { cargar(automatica: boolean): void }).cargar(true);
+    expect(buscarArticulos).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen: codigos, cantidadPorPagina: 50, clasificacion: 'especial', pagina: 1,
+    }));
+    expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(codigos);
+    fixture.destroy();
+    vi.useRealTimers();
+  });
+
   it('separa normales y especiales con páginas independientes', async () => {
     sessionStorage.clear();
     vi.useFakeTimers();

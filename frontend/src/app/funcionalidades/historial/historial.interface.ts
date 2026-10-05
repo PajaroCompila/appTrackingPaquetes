@@ -2,12 +2,13 @@ import type { PedidoResumen } from '../pedidos/pedido.interface';
 import type { AuditoriaEntregaSap, EntregaSapPublica, EstadoEntregaSap } from './entrega-sap.interface';
 
 export interface HistorialValidado extends PedidoResumen {
-  estadoHistorial?: EstadoEntregaSap | 'CERRADO';
+  estadoHistorial?: EstadoEntregaSap | 'CERRADO' | 'CANCELADO';
   entregaSap?: EntregaSapPublica;
   auditoriaSap?: AuditoriaEntregaSap;
   estadoLocal: 'VALIDADO' | 'DESPACHADO';
   despachadoEn: string | null;
   validadoDetectadoEn: string | null;
+  historialIngresadoEn?: string | null;
   usuarioDespacho: string | null;
 }
 
@@ -23,7 +24,7 @@ export interface RespuestaHistorial {
 }
 
 export interface ArticuloHistorial {
-  estadoHistorial?: EstadoEntregaSap | 'CERRADO';
+  estadoHistorial?: EstadoEntregaSap | 'CERRADO' | 'CANCELADO';
   entregaSap?: EntregaSapPublica;
   idOrigen: string;
   identificadorDetalle: string | null;
@@ -36,6 +37,8 @@ export interface ArticuloHistorial {
   fechaHoraPedido: string | null;
   fechaEntradaCola?: string | null;
   despachadoEn?: string | null;
+  validadoDetectadoEn?: string | null;
+  historialIngresadoEn?: string | null;
   nombreVendedor: string | null;
   usuarioAsignado?: string | null;
   esEspecial?: boolean;
