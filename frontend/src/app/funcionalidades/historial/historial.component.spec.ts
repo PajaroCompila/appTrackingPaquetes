@@ -31,7 +31,7 @@ describe('HistorialComponent', () => {
       datos: [{ idOrigen: 'R1:H1', identificadorDetalle: '1', numeroPedido: '300',
         codigoArticulo: 'A1', descripcion: 'Articulo', cantidad: 1, codigoAlmacen: 'BSPS01',
         nombreAlmacen: 'Bodega', fechaHoraPedido: '2026-09-22T08:00:00-06:00',
-        nombreVendedor: 'Vendedor', esEspecial: false }],
+        nombreVendedor: 'Vendedor', esEspecial: false, estadoHistorial: 'CERRADO' }],
       paginacion: { pagina: 1, cantidadPorPagina: 25, cantidadDevuelta: 1,
         totalRegistros: 1, hayMas: false },
     }));
@@ -54,6 +54,7 @@ describe('HistorialComponent', () => {
 
     expect(fixture.nativeElement.querySelector('.acciones-impresion-grupo')).toBeNull();
     expect(fixture.nativeElement.querySelector('.columna-imprimir')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.etiqueta-estado-cerrado')?.textContent).toContain('CERRADO');
     fixture.componentInstance.seleccionarTodasImpresiones('normales');
     fixture.componentInstance.imprimirSeleccionados('normales');
     expect(fixture.componentInstance.articulosImpresion()).toEqual([]);
@@ -69,6 +70,7 @@ describe('HistorialComponent', () => {
       fechaHoraPedido: '2026-09-22T08:00:00-06:00', codigoEstadoVenta: 'C',
       codigoSincronizacion: 'N', estadoLocal: 'VALIDADO', despachadoEn: '2026-09-22T09:00:00-06:00',
       validadoDetectadoEn: '2026-09-22T10:00:00-06:00', usuarioDespacho: 'Gregorio Cruz',
+      estadoHistorial: 'CERRADO',
       articulos: [{ identificadorDetalle: '1', codigoArticulo: 'A-H1', descripcion: 'Artículo historial',
         cantidad: 1, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Principal', usuarioAsignado: 'Gregorio Cruz' }],
     };
@@ -92,6 +94,7 @@ describe('HistorialComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('app-vista-impresion-pedido')).toHaveLength(1);
     const detalle = fixture.debugElement.query(By.directive(DetallePedidoVistaComponent))
       .componentInstance as DetallePedidoVistaComponent;
+    expect(fixture.componentInstance.configuracionDetalleVisual().severidadEstado).toBe('peligro');
     detalle.seleccionarTodos();
     detalle.imprimirSeleccionados();
     await vi.advanceTimersByTimeAsync(0);

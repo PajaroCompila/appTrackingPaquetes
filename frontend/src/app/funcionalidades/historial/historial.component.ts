@@ -166,7 +166,8 @@ export class HistorialComponent implements OnInit {
       titulo: pedido.estadoHistorial === 'CANCELADO' ? 'Detalle del pedido cancelado' : 'Detalle del pedido cerrado',
       descripcion: pedido.estadoHistorial === 'CANCELADO'
         ? 'Pedido cancelado en SAP' : 'Pedido cerrado sin entrega ni factura en SAP',
-      etiquetaEstado: pedido.estadoHistorial, severidadEstado: 'informacion',
+      etiquetaEstado: pedido.estadoHistorial,
+      severidadEstado: pedido.estadoHistorial === 'CERRADO' ? 'peligro' : 'informacion',
       tituloInformacion: 'Datos del pedido', etiquetaArticulos: 'Artículos del pedido' };
     return pedido?.entregaSap ? { ...configuracion, titulo: 'Detalle de la entrega SAP',
       etiquetaEstado: pedido.estadoHistorial || 'Entregado, Sin factura',

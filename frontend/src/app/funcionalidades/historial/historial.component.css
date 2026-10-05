@@ -29,6 +29,7 @@
 .texto-dos-lineas { display: -webkit-box; width: 100%; overflow: hidden; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .paginacion { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; font-weight: 600; }
 .etiqueta-estado { display: inline-flex; padding: .25rem .55rem; border-radius: 999px; background: #e7f6ed; color: #166534; font-weight: 600; }
+.etiqueta-estado.etiqueta-estado-cerrado { background: #fff0ef; color: #9c2f27; }
 @media (max-width: 680px) {
   .tabla-articulos table { min-width: 0; table-layout: auto; }
   .tabla-articulos th, .tabla-articulos td { width: auto; }

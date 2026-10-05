@@ -6,6 +6,9 @@ import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { PedidoDevuelto } from './pedidoDevueltoServicio.js';
 import type { FiltrosDevolucion } from './pedidoDevueltoRepositorio.js';
 import { esLineaFlete } from '../pedidos/lineaFlete.js';
+import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
+import { validarConsultaSistemaOrigen } from '../../infraestructura/sql/consultaSistemaOrigen.js';
+import { CONDICION_HISTORIAL_R1 } from '../historial/historialR1Repositorio.js';
 
 export const MIGRACION_CANCELACIONES_SAP = `
 IF DB_NAME() <> N'PedidosBodega' THROW 51000, 'Base no autorizada.', 1;
@@ -94,10 +97,14 @@ export const CONSULTA_CIERRES_DEVUELTOS_SAP = CONSULTA_CANCELACIONES_SAP
     AND NOT EXISTS (SELECT 1 FROM dbo.INV1 l JOIN dbo.OINV h ON h.DocEntry=l.DocEntry
       WHERE l.BaseType=17 AND l.BaseEntry=o.DocEntry AND h.CANCELED='N')`);
 
-export function convertirCancelaciones(filas: FilaCanceladaSap[]): PedidoDevuelto[] {
+export function convertirCancelaciones(
+  filas: FilaCanceladaSap[],
+  pedidosFacturados = new Set<string>(),
+): PedidoDevuelto[] {
   const pedidos = new Map<number, PedidoDevuelto>();
   const documentosConLineas = new Set<number>();
   for (const f of filas) {
+    if (pedidosFacturados.has(String(f.numeroPedido).trim())) continue;
     const cerrado = f.canceled === 'N' && f.docStatus === 'C'
       && f.tieneEntrega === 0 && f.tieneFacturaDirecta === 0;
     if (f.canceled !== 'Y' && !cerrado) continue;
@@ -131,13 +138,40 @@ export function convertirCancelaciones(filas: FilaCanceladaSap[]): PedidoDevuelt
     documentosConLineas.has(docEntry) && pedido.lineas.length === 0 ? [] : [pedido]);
 }
 
+export async function obtenerPedidosFacturadosR1(numerosPedido: string[]): Promise<Set<string>> {
+  const numeros = [...new Set(numerosPedido.map((numero) => numero.trim()).filter(Boolean))];
+  if (!numeros.length) return new Set();
+  const resultados = await Promise.all(obtenerSucursalesR1().map(async (sucursal) => {
+    const pool = await obtenerPoolSucursalR1(sucursal);
+    const facturados: { numeroPedido: string }[] = [];
+    for (let inicio = 0; inicio < numeros.length; inicio += 500) {
+      const lote = numeros.slice(inicio, inicio + 500);
+      const parametros = lote.map((_, indice) => `@numeroPedido${indice}`);
+      const consulta = `SELECT DISTINCT CONVERT(nvarchar(100), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido
+        FROM dbo.[@SO1_01VENTA] venta
+        WHERE ${CONDICION_HISTORIAL_R1}
+          AND CONVERT(nvarchar(100), venta.[U_SO1_DOCUMENTOSBO]) IN (${parametros.join(', ')});`;
+      validarConsultaSistemaOrigen(consulta);
+      const solicitud = pool.request();
+      lote.forEach((numero, indice) =>
+        solicitud.input(`numeroPedido${indice}`, sql.NVarChar(100), numero));
+      facturados.push(...(await solicitud.query<{ numeroPedido: string }>(consulta)).recordset);
+    }
+    return facturados;
+  }));
+  return new Set(resultados.flat().map(({ numeroPedido }) => numeroPedido.trim()));
+}
+
 export class CancelacionSapHistorial {
   private preparada = false;
   private enCurso?: Promise<void>;
   private siguienteRevision = 0;
   private ultimoError: unknown;
 
-  constructor(private readonly fuente = consultarSap) {}
+  constructor(
+    private readonly fuente = consultarSap,
+    private readonly consultarFacturadosR1 = obtenerPedidosFacturadosR1,
+  ) {}
 
   public async preparar(): Promise<void> {
     if (this.preparada) return;
@@ -162,7 +196,10 @@ export class CancelacionSapHistorial {
     const canceladas = (await this.fuente<FilaCanceladaSap>(CONSULTA_CANCELACIONES_SAP)).recordset;
     const cerradas = (await this.fuente<FilaCanceladaSap>(CONSULTA_CIERRES_DEVUELTOS_SAP)).recordset;
     const filas = [...canceladas, ...cerradas];
-    const pedidos = convertirCancelaciones(filas);
+    const facturadosR1 = await this.consultarFacturadosR1(cerradas
+      .filter((fila) => fila.canceled === 'N' && fila.docStatus === 'C')
+      .map((fila) => String(fila.numeroPedido)));
+    const pedidos = convertirCancelaciones(filas, facturadosR1);
     const fechas = new Map(filas.map(f => [f.docEntry, f.fechaPedido.toISOString().slice(0, 10)]));
     const datos = pedidos.map(p => ({ idClave: p.idClave, docEntry: Number(p.idOrigen.slice(4)),
       numeroPedido: p.numeroPedido, folioPedido: p.folioPedido,

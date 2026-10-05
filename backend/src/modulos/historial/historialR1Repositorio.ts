@@ -49,6 +49,7 @@ interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> {
 const texto = (valor: string | null): string | null => valor?.trim() || null;
 
 export const CONDICION_HISTORIAL_R1 = `venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
+        AND venta.[U_SO1_FACTURA] = 'Y'
         AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
         AND venta.[U_SO1_DOCUMENTOSBO] <> 0`;
 
@@ -105,7 +106,8 @@ export class HistorialR1Repositorio {
       const meta = metadatos.get(articulo.idOrigen);
       return { ...articulo, fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
         despachadoEn: meta?.despachadoEn?.toISOString() ?? null,
-        validadoDetectadoEn: meta?.validadoDetectadoEn?.toISOString() ?? null };
+        validadoDetectadoEn: meta?.validadoDetectadoEn?.toISOString() ?? null,
+        estadoHistorial: 'Facturado' as const };
     }),
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: disponibles.reduce((total, { value }) =>
@@ -220,7 +222,7 @@ export class HistorialR1Repositorio {
       venta.[U_SO1_SINCRONIZADO] codigoSincronizacion
       FROM [dbo].[@SO1_01VENTA] venta LEFT JOIN [dbo].[OSLP] vendedor
         ON vendedor.[SlpCode] = venta.[U_SO1_VENDEDOR]
-      WHERE venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
+      WHERE ${CONDICION_HISTORIAL_R1}
         AND venta.[Name] = @folio;`;
     validarConsultaSistemaOrigen(consulta);
     const pool = await obtenerPoolSucursalR1(sucursal);
@@ -308,6 +310,7 @@ export class HistorialR1Repositorio {
       fechaHoraPedido: fila.fechaHoraPedido, codigoEstadoVenta: texto(fila.codigoEstadoVenta),
       fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
       codigoSincronizacion: texto(fila.codigoSincronizacion), articulos, estadoLocal: 'VALIDADO',
+      estadoHistorial: 'Facturado',
       despachadoEn: meta?.despachadoEn.toISOString() ?? null,
       validadoDetectadoEn: meta?.validadoDetectadoEn?.toISOString() ?? null,
       usuarioDespacho: meta?.usuarioDespacho ?? null };

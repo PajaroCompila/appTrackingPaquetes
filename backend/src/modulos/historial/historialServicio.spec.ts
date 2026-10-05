@@ -21,7 +21,7 @@ describe('HistorialServicio', () => {
     const facturado = {...registro('SAP:2', 'VALIDADO', '2026-10-02T10:00:00'), numeroPedido:'500313582', estadoHistorial:'Facturado' as const};
     const pagina = {registros:[cerrado,cancelado,facturado],pagina:1,cantidadPorPagina:25,totalRegistros:3,hayMas:false};
     const repo = {obtenerEstadosSinFactura:vi.fn().mockResolvedValue(new Map([
-      ['500313581','CERRADO'],['500313583','CANCELADO'],
+      ['500313581','CERRADO'],['500313583','CANCELADO'],['500313582','CERRADO'],
     ])),
       registrarIngresosHistorial:vi.fn().mockImplementation(async (ids: string[]) =>
         new Map(ids.map((id) => [id, '2026-10-02T10:10:00.000Z']))),
@@ -39,7 +39,7 @@ describe('HistorialServicio', () => {
     expect((await servicio.buscarArticulos(filtros)).registros[0]?.estadoHistorial).toBe('CERRADO');
     expect((await servicio.obtener('SAP:1'))?.estadoHistorial).toBe('CERRADO');
   });
-  it('valida pedidos con Y y omite pedidos cerrados con C', async () => {
+  it('da prioridad a la factura R1 confirmada sobre el estado cerrado', async () => {
     const repositorio = { obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([
         { idOrigen: 'R1:F1', folioPedido: 'F1' },
@@ -50,9 +50,9 @@ describe('HistorialServicio', () => {
       conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerCerradosSap: vi.fn().mockResolvedValue([]),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map([
-        ['R1:F1', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: false }],
-        ['R1:F2', { codigoSucursal: 'SPS', codigoEstadoVenta: 'A', verificado: true }],
-        ['R1:F3', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: true }],
+        ['R1:F1', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: false, facturado: false }],
+        ['R1:F2', { codigoSucursal: 'SPS', codigoEstadoVenta: 'A', verificado: true, facturado: true }],
+        ['R1:F3', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: true, facturado: true }],
       ])),
       marcarCerrados: vi.fn().mockResolvedValue(1),
       marcarValidados: vi.fn().mockResolvedValue(2),

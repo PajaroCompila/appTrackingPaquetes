@@ -35,6 +35,7 @@ export interface EstadoR1Detectado {
   codigoSucursal: string | null;
   codigoEstadoVenta: string | null;
   verificado: boolean;
+  facturado: boolean;
 }
 interface FilaCerradaSap {
   docEntry: number;
@@ -342,11 +343,13 @@ export class HistorialRepositorio {
         codigoSucursal: string | null;
         codigoEstadoVenta: string | null;
         verificado: string | null;
+        factura: string | null;
       }>(`
       SELECT venta.[Name] AS folioPedido,
         NULLIF(LTRIM(RTRIM(venta.[U_SO1_SUCURSAL])), '') AS codigoSucursal,
         NULLIF(LTRIM(RTRIM(venta.[U_SO1_STATUS])), '') AS codigoEstadoVenta,
-        NULLIF(LTRIM(RTRIM(venta.[U_SO1_VERIFICADO])), '') AS verificado
+        NULLIF(LTRIM(RTRIM(venta.[U_SO1_VERIFICADO])), '') AS verificado,
+        NULLIF(LTRIM(RTRIM(venta.[U_SO1_FACTURA])), '') AS factura
       FROM [dbo].[@SO1_01VENTA] venta
       WHERE venta.[Name] IN (${parametros.join(', ')})
         AND (venta.[U_SO1_VERIFICADO] = 'Y' OR venta.[U_SO1_STATUS] = 'C');
@@ -361,6 +364,7 @@ export class HistorialRepositorio {
           codigoSucursal: estado.codigoSucursal,
           codigoEstadoVenta: estado.codigoEstadoVenta?.trim() || null,
           verificado: estado.verificado?.trim() === 'Y',
+          facturado: estado.verificado?.trim() === 'Y' && estado.factura?.trim() === 'Y',
         }] as const] : [];
       }));
     }));

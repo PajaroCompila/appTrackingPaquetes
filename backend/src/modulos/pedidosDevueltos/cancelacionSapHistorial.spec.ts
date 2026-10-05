@@ -28,6 +28,10 @@ describe('historial exclusivo de cancelaciones SAP', () => {
     expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('AND NOT EXISTS (SELECT 1 FROM dbo.DLN1');
     expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('AND NOT EXISTS (SELECT 1 FROM dbo.INV1');
   });
+  it('excluye de Devueltos un cierre que R1 confirma como facturado', () => {
+    const cerrado = {...fila,canceled:'N',docStatus:'C',tieneEntrega:0,tieneFacturaDirecta:0};
+    expect(convertirCancelaciones([cerrado], new Set(['101471323']))).toEqual([]);
+  });
   it('consulta cierres en ambas vistas y permite abrir el detalle', async () => {
     const p=convertirCancelaciones([{...fila,canceled:'N',tieneEntrega:0,tieneFacturaDirecta:0}])[0]!;
     query.mockImplementation(async(s:string)=>s.includes('SELECT snapshot')

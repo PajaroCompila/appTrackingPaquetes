@@ -24,6 +24,7 @@ describe('estado financiero de Historial sin cambiar sus criterios',()=> {
     {idOrigen:'R1:TSPS01:PE2',facturado:false,fuente:'HISTORIAL_R1_VERIFICADO'}]));
     expect(mocks.pool).toHaveBeenCalledTimes(1);expect(mocks.origen).toHaveBeenCalledTimes(1);
     const consulta=mocks.origen.mock.calls[0]![0];expect(consulta).toContain(CONDICION_HISTORIAL_R1);
+    expect(CONDICION_HISTORIAL_R1).toContain("venta.[U_SO1_FACTURA] = 'Y'");
     expect(consulta).not.toContain('U_SO1_STATUS');expect(consulta).not.toMatch(/\b(INSERT|UPDATE|DELETE|MERGE|EXEC)\b/i);
   });
   it('sucursal caída conserva el estado anterior y permite avanzar revisión sin perder otras sucursales',async()=> {
