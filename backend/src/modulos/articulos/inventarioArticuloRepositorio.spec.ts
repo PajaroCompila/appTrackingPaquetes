@@ -33,7 +33,7 @@ describe('InventarioArticuloRepositorio', () => {
     const consultar = vi.fn().mockResolvedValue({ recordset: [
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B1 ',
         nombreAlmacen: ' Bodega consultada ', existenciaFisica: 0, esAlmacenConsultado: 1,
-        ultimaFechaIngreso: null, ultimaCantidadIngreso: null },
+        ultimaFechaIngreso: null, ultimaCantidadIngreso: Number.NaN },
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B2 ',
         nombreAlmacen: ' Bodega baja ', existenciaFisica: 6, esAlmacenConsultado: 0 },
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B3 ',

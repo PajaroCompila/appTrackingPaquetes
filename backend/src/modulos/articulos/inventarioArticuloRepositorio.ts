@@ -114,6 +114,12 @@ export class InventarioArticuloRepositorio {
       ? filas.find(({ esAlmacenConsultado }) => Boolean(esAlmacenConsultado))
       : filas[0];
     if (!seleccionada) return null;
+    const fechaIngreso = seleccionada.ultimaFechaIngreso?.trim() ?? '';
+    const cantidadIngreso = seleccionada.ultimaCantidadIngreso === null
+      || seleccionada.ultimaCantidadIngreso === undefined
+      ? null : Number(seleccionada.ultimaCantidadIngreso);
+    const ultimoIngresoValido = /^\d{4}-\d{2}-\d{2}$/.test(fechaIngreso)
+      && cantidadIngreso !== null && Number.isFinite(cantidadIngreso) && cantidadIngreso > 0;
 
     return {
       codigoArticulo: seleccionada.codigoArticulo.trim(),
@@ -121,10 +127,8 @@ export class InventarioArticuloRepositorio {
       codigoAlmacen: seleccionada.codigoAlmacen.trim(),
       nombreAlmacen: seleccionada.nombreAlmacen.trim(),
       existenciaFisica: Number(seleccionada.existenciaFisica),
-      ultimaFechaIngreso: seleccionada.ultimaFechaIngreso ?? null,
-      ultimaCantidadIngreso: seleccionada.ultimaCantidadIngreso === null
-        || seleccionada.ultimaCantidadIngreso === undefined
-        ? null : Number(seleccionada.ultimaCantidadIngreso),
+      ultimaFechaIngreso: ultimoIngresoValido ? fechaIngreso : null,
+      ultimaCantidadIngreso: ultimoIngresoValido ? cantidadIngreso : null,
       existencias: filas
         .filter(({ existenciaFisica }) => !codigoAlmacen || Number(existenciaFisica) > 0)
         .map((fila) => ({

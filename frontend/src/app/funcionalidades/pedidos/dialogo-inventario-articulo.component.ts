@@ -86,4 +86,22 @@ export class DialogoInventarioArticuloComponent implements OnChanges, AfterViewI
     const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha ?? '');
     return partes ? `${partes[3]}/${partes[2]}/${partes[1]}` : 'Sin registro';
   }
+
+  public ultimoIngresoValido(): boolean {
+    const fecha = this.inventario?.ultimaFechaIngreso;
+    const cantidad = this.inventario?.ultimaCantidadIngreso;
+    return typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha)
+      && typeof cantidad === 'number' && Number.isFinite(cantidad) && cantidad > 0;
+  }
+
+  public textoFechaUltimoIngreso(): string {
+    return this.ultimoIngresoValido()
+      ? this.formatearFechaIngreso(this.inventario?.ultimaFechaIngreso ?? null) : 'Sin registro';
+  }
+
+  public textoCantidadUltimoIngreso(): string {
+    const cantidad = this.inventario?.ultimaCantidadIngreso;
+    return this.ultimoIngresoValido() && typeof cantidad === 'number'
+      ? `${this.formatearUnidades(cantidad)} unidades` : 'Sin registro';
+  }
 }

@@ -50,7 +50,7 @@ describe('DialogoInventarioArticuloComponent', () => {
 
   it('muestra Sin registro cuando SAP no tiene movimientos de entrada', () => {
     fixture.componentRef.setInput('inventario', {
-      ...inventario, ultimaFechaIngreso: null, ultimaCantidadIngreso: null,
+      ...inventario, ultimaFechaIngreso: '2026-10-03', ultimaCantidadIngreso: Number.NaN,
     });
     fixture.detectChanges();
 
@@ -58,6 +58,7 @@ describe('DialogoInventarioArticuloComponent', () => {
     expect(datos).toHaveLength(2);
     expect(datos[0].textContent).toContain('Sin registro');
     expect(datos[1].textContent).toContain('Sin registro');
+    expect(fixture.nativeElement.textContent).not.toMatch(/NaN|undefined|null/);
   });
 
   it('mantiene separados el encabezado, la fotografía y el texto de ayuda', () => {

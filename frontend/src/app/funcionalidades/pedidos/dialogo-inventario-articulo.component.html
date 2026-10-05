@@ -121,17 +121,11 @@
           <dl class="datos-ultimo-ingreso">
             <div>
               <dt>Última fecha de ingreso</dt>
-              <dd>{{ formatearFechaIngreso(inventario.ultimaFechaIngreso) }}</dd>
+              <dd>{{ textoFechaUltimoIngreso() }}</dd>
             </div>
             <div>
               <dt>Última cantidad de ingreso</dt>
-              <dd>
-                @if (inventario.ultimaCantidadIngreso !== null) {
-                  {{ formatearUnidades(inventario.ultimaCantidadIngreso) }} unidades
-                } @else {
-                  Sin registro
-                }
-              </dd>
+              <dd>{{ textoCantidadUltimoIngreso() }}</dd>
             </div>
           </dl>
         </section>
