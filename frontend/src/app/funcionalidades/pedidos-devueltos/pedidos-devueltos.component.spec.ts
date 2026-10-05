@@ -17,14 +17,14 @@ const pedido: PedidoDevuelto = {idClave:'a'.repeat(64),idOrigen:'SAP:949637',num
 describe('historial de pedidos CANCEL', () => {
   let fixture: ComponentFixture<PedidosDevueltosComponent>;
   let servicio: {listar:ReturnType<typeof vi.fn>;obtener:ReturnType<typeof vi.fn>;confirmar:ReturnType<typeof vi.fn>};
-  async function crear(id?: string) {
+  async function crear(id?: string, codigosGlobales = ['OTRA']) {
     TestBed.configureTestingModule({imports:[PedidosDevueltosComponent],providers:[provideRouter([]),provideHttpClient(),
       {provide:PedidosDevueltosService,useValue:servicio},
       {provide:AlmacenesService,useValue:{obtenerAlmacenes:()=>of({datos:[]})}},
       {provide:AutenticacionService,useValue:{usuario:signal({codigoRol:'ADMINISTRADOR',codigosAlmacenVisibles:[]})}},
       {provide:ActivatedRoute,useValue:{paramMap:of(convertToParamMap(id?{idOrigen:id}:{})),queryParamMap:of(convertToParamMap({})),snapshot:{queryParamMap:convertToParamMap({})}}},
     ]});
-    TestBed.inject(FiltrosGlobalesService).actualizar({fechaDesde:'2026-09-28',fechaHasta:'2026-09-28',codigosAlmacen:['OTRA']});
+    TestBed.inject(FiltrosGlobalesService).actualizar({fechaDesde:'2026-09-28',fechaHasta:'2026-09-28',codigosAlmacen:codigosGlobales});
     vi.spyOn(TestBed.inject(Router),'navigate').mockResolvedValue(true);
     fixture=TestBed.createComponent(PedidosDevueltosComponent);fixture.detectChanges();await fixture.whenStable();
   }
@@ -46,7 +46,7 @@ describe('historial de pedidos CANCEL', () => {
   it('consulta por defecto solo los pedidos devueltos del dia actual',async()=>{
     await crear();
     const fechaActual=obtenerFechaLocalActual();
-    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:[]}));
+    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:['OTRA']}));
     expect(fixture.nativeElement.textContent).toContain('101471323');
     expect(fixture.nativeElement.textContent).toContain('CANCELADO');
     expect(fixture.nativeElement.textContent).not.toContain('CANCEL</span>');
@@ -74,6 +74,26 @@ describe('historial de pedidos CANCEL', () => {
     c.limpiarFiltros();await Promise.resolve();
     const fechaActual=obtenerFechaLocalActual();
     expect(c.filtros.fechaDesde).toBe(fechaActual);expect(c.filtros.fechaHasta).toBe(fechaActual);
+  });
+  it('conserva las bodegas globales al paginar, cambiar vista y refrescar',async()=>{
+    const codigos=['BSPS04','BSPS03','BSPS08'];
+    await crear(undefined,codigos);const c=fixture.componentInstance;
+    expect(c.filtros.codigosAlmacen).toEqual(codigos);
+    expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({codigosAlmacen:codigos,pagina:1}));
+    expect(TestBed.inject(FiltrosGlobalesService).obtener().codigosAlmacen).toEqual(codigos);
+
+    c.irPagina(2);await Promise.resolve();
+    expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({codigosAlmacen:codigos,pagina:2}));
+    expect(TestBed.inject(Router).navigate).toHaveBeenLastCalledWith([],expect.objectContaining({
+      queryParams:expect.objectContaining({codigoAlmacen:codigos,pagina:2}),
+    }));
+
+    c.cambiarVista('articulos');await Promise.resolve();
+    expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen:codigos,vista:'articulos',pagina:1,
+    }));
+    (c as unknown as {consultar:{next():void}}).consultar.next();
+    expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({codigosAlmacen:codigos}));
   });
   it('conserva los filtros en el enlace de regreso',async()=>{
     await crear();fixture.componentInstance.filtros.numeroPedido='101471323';

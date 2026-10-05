@@ -37,7 +37,6 @@ interface FiltrosHistorialGuardados {
   fechaDesde?: string;
   fechaHasta?: string;
   numeroPedido?: string;
-  codigosAlmacen?: string[];
   vista?: VistaHistorial;
   pagina?: number;
   paginaEspeciales?: number;
@@ -647,7 +646,6 @@ export class HistorialComponent implements OnInit {
         fechaDesde: this.filtrosAplicados.fechaDesde,
         fechaHasta: this.filtrosAplicados.fechaHasta,
         numeroPedido: this.filtrosAplicados.numeroPedido.trim(),
-        codigosAlmacen: this.filtrosAplicados.codigosAlmacen,
         vista: this.vista(),
         pagina: this.pagina(),
         paginaEspeciales: this.paginaEspeciales(),
@@ -661,15 +659,11 @@ export class HistorialComponent implements OnInit {
       const valor = leerFiltrosSesion(claveFiltrosHistorial);
       const fechaValida = (fecha: unknown): fecha is string =>
         typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha);
-      const codigos = Array.isArray(valor['codigosAlmacen'])
-        ? [...new Set(valor['codigosAlmacen'].filter((codigo): codigo is string =>
-          typeof codigo === 'string' && /^[A-Za-z0-9_-]{1,16}$/.test(codigo)))] : [];
       return {
         fechaDesde: fechaValida(valor['fechaDesde']) ? valor['fechaDesde'] : undefined,
         fechaHasta: fechaValida(valor['fechaHasta']) ? valor['fechaHasta'] : undefined,
         numeroPedido: typeof valor['numeroPedido'] === 'string' && /^\d{0,20}$/.test(valor['numeroPedido'])
           ? valor['numeroPedido'] : undefined,
-        codigosAlmacen: codigos,
         vista: valor['vista'] === 'articulos' || valor['vista'] === 'pedido'
           ? valor['vista'] : undefined,
         pagina: typeof valor['pagina'] === 'number' && valor['pagina'] > 0 ? valor['pagina'] : undefined,

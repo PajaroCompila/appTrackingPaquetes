@@ -110,6 +110,31 @@
             </ul>
           }
         </section>
+
+        <section class="minidashboard ultimo-ingreso" aria-labelledby="titulo-ultimo-ingreso">
+          <div class="encabezado-dashboard">
+            <div>
+              <p class="sobrelinea-dialogo">Movimientos de inventario</p>
+              <h3 id="titulo-ultimo-ingreso">Último ingreso del producto</h3>
+            </div>
+          </div>
+          <dl class="datos-ultimo-ingreso">
+            <div>
+              <dt>Última fecha de ingreso</dt>
+              <dd>{{ formatearFechaIngreso(inventario.ultimaFechaIngreso) }}</dd>
+            </div>
+            <div>
+              <dt>Última cantidad de ingreso</dt>
+              <dd>
+                @if (inventario.ultimaCantidadIngreso !== null) {
+                  {{ formatearUnidades(inventario.ultimaCantidadIngreso) }} unidades
+                } @else {
+                  Sin registro
+                }
+              </dd>
+            </div>
+          </dl>
+        </section>
       }
     </div>
 

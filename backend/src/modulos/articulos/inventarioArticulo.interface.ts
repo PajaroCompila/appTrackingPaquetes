@@ -10,6 +10,8 @@ export interface InventarioArticulo {
   codigoAlmacen: string;
   nombreAlmacen: string;
   existenciaFisica: number;
+  ultimaFechaIngreso: string | null;
+  ultimaCantidadIngreso: number | null;
   existencias: ExistenciaArticuloAlmacen[];
 }
 

@@ -81,4 +81,9 @@ export class DialogoInventarioArticuloComponent implements OnChanges, AfterViewI
   public formatearUnidades(cantidad: number): string {
     return new Intl.NumberFormat('es-HN', { maximumFractionDigits: 2 }).format(cantidad);
   }
+
+  public formatearFechaIngreso(fecha: string | null): string {
+    const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha ?? '');
+    return partes ? `${partes[3]}/${partes[2]}/${partes[1]}` : 'Sin registro';
+  }
 }

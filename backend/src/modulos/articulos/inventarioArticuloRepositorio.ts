@@ -9,6 +9,8 @@ interface FilaInventarioArticulo {
   nombreAlmacen: string;
   existenciaFisica: number;
   esAlmacenConsultado: boolean | number;
+  ultimaFechaIngreso: string | null;
+  ultimaCantidadIngreso: number | null;
 }
 
 export type ConsultarInventarioSap = typeof consultarSap;
@@ -79,12 +81,24 @@ export class InventarioArticuloRepositorio {
         inventario.[WhsCode] AS codigoAlmacen,
         almacen.[WhsName] AS nombreAlmacen,
         inventario.[OnHand] AS existenciaFisica,
-        CASE WHEN @codigoAlmacen IS NOT NULL AND inventario.[WhsCode] = @codigoAlmacen THEN 1 ELSE 0 END AS esAlmacenConsultado
+        CASE WHEN @codigoAlmacen IS NOT NULL AND inventario.[WhsCode] = @codigoAlmacen THEN 1 ELSE 0 END AS esAlmacenConsultado,
+        ultimoIngreso.[ultimaFechaIngreso],
+        ultimoIngreso.[ultimaCantidadIngreso]
       FROM [dbo].[OITM] articulo
       INNER JOIN [dbo].[OITW] inventario
         ON inventario.[ItemCode] = articulo.[ItemCode]
       INNER JOIN [dbo].[OWHS] almacen
         ON almacen.[WhsCode] = inventario.[WhsCode]
+      OUTER APPLY (
+        SELECT TOP (1)
+          CONVERT(char(10), movimiento.[DocDate], 23) AS ultimaFechaIngreso,
+          movimiento.[InQty] AS ultimaCantidadIngreso
+        FROM [dbo].[OINM] movimiento
+        WHERE movimiento.[ItemCode] = articulo.[ItemCode]
+          AND movimiento.[InQty] > 0
+        ORDER BY movimiento.[DocDate] DESC, movimiento.[DocTime] DESC,
+          movimiento.[TransNum] DESC, movimiento.[TransSeq] DESC
+      ) ultimoIngreso
       WHERE articulo.[ItemCode] = @codigoArticulo
         AND (@codigoAlmacen IS NULL OR inventario.[OnHand] > 0 OR inventario.[WhsCode] = @codigoAlmacen)
       ORDER BY
@@ -107,6 +121,10 @@ export class InventarioArticuloRepositorio {
       codigoAlmacen: seleccionada.codigoAlmacen.trim(),
       nombreAlmacen: seleccionada.nombreAlmacen.trim(),
       existenciaFisica: Number(seleccionada.existenciaFisica),
+      ultimaFechaIngreso: seleccionada.ultimaFechaIngreso ?? null,
+      ultimaCantidadIngreso: seleccionada.ultimaCantidadIngreso === null
+        || seleccionada.ultimaCantidadIngreso === undefined
+        ? null : Number(seleccionada.ultimaCantidadIngreso),
       existencias: filas
         .filter(({ existenciaFisica }) => !codigoAlmacen || Number(existenciaFisica) > 0)
         .map((fila) => ({

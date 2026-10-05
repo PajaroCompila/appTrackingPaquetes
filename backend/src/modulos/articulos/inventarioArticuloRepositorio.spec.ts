@@ -32,7 +32,8 @@ describe('InventarioArticuloRepositorio', () => {
   it('conserva el almacén consultado con cero y devuelve solo existencias positivas', async () => {
     const consultar = vi.fn().mockResolvedValue({ recordset: [
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B1 ',
-        nombreAlmacen: ' Bodega consultada ', existenciaFisica: 0, esAlmacenConsultado: 1 },
+        nombreAlmacen: ' Bodega consultada ', existenciaFisica: 0, esAlmacenConsultado: 1,
+        ultimaFechaIngreso: null, ultimaCantidadIngreso: null },
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B2 ',
         nombreAlmacen: ' Bodega baja ', existenciaFisica: 6, esAlmacenConsultado: 0 },
       { codigoArticulo: ' A1 ', descripcion: ' Artículo ', codigoAlmacen: ' B3 ',
@@ -44,6 +45,7 @@ describe('InventarioArticuloRepositorio', () => {
     expect(resultado).toEqual({
       codigoArticulo: 'A1', descripcion: 'Artículo', codigoAlmacen: 'B1',
       nombreAlmacen: 'Bodega consultada', existenciaFisica: 0,
+      ultimaFechaIngreso: null, ultimaCantidadIngreso: null,
       existencias: [
         { codigoAlmacen: 'B2', nombreAlmacen: 'Bodega baja', existenciaFisica: 6 },
         { codigoAlmacen: 'B3', nombreAlmacen: 'Bodega disponible', existenciaFisica: 20 },
@@ -54,6 +56,9 @@ describe('InventarioArticuloRepositorio', () => {
     const [consulta, configurar] = llamada!;
     expect(consulta.trim()).toMatch(/^SELECT\b/);
     expect(consulta).toContain('inventario.[OnHand] > 0');
+    expect(consulta).toContain('FROM [dbo].[OINM] movimiento');
+    expect(consulta).toContain('movimiento.[InQty] > 0');
+    expect(consulta).not.toMatch(/CardCode|CardName|proveedor/i);
     expect(consulta).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|EXEC)\b/i);
     const solicitud = { input: vi.fn() };
     solicitud.input.mockReturnValue(solicitud);
@@ -70,6 +75,23 @@ describe('InventarioArticuloRepositorio', () => {
 
     await expect(new InventarioArticuloRepositorio(consultar).obtener('A1', 'B1'))
       .resolves.toBeNull();
+  });
+
+  it('devuelve fecha y cantidad del mismo movimiento de entrada más reciente', async () => {
+    const consultar = vi.fn().mockResolvedValue({ recordset: [
+      { codigoArticulo: 'A1', descripcion: 'Artículo', codigoAlmacen: 'B1',
+        nombreAlmacen: 'Bodega', existenciaFisica: 0, esAlmacenConsultado: 1,
+        ultimaFechaIngreso: '2026-10-03', ultimaCantidadIngreso: 6 },
+    ] }) as unknown as ConsultarInventarioSap;
+
+    const resultado = await new InventarioArticuloRepositorio(consultar).obtener('A1', 'B1');
+
+    expect(resultado).toMatchObject({ existenciaFisica: 0,
+      ultimaFechaIngreso: '2026-10-03', ultimaCantidadIngreso: 6 });
+    const [consulta] = vi.mocked(consultar).mock.calls[0]!;
+    expect(consulta).toContain('SELECT TOP (1)');
+    expect(consulta).toContain('movimiento.[DocDate] DESC, movimiento.[DocTime] DESC');
+    expect(consulta).toContain('movimiento.[TransNum] DESC, movimiento.[TransSeq] DESC');
   });
 
   it('reutiliza el mismo SELECT para consultar el artículo en todas las bodegas', async () => {

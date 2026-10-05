@@ -193,13 +193,13 @@ describe('HistorialComponent', () => {
       ],
     }).compileComponents();
 
+    const codigos = ['BSPS04', 'BSPS03', 'BSPS08'];
+    TestBed.inject(FiltrosGlobalesService).actualizar({ codigosAlmacen: codigos });
     const fixture = TestBed.createComponent(HistorialComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const componente = fixture.componentInstance;
-    const codigos = ['BSPS04', 'BSPS03', 'BSPS08'];
-    codigos.forEach((codigo) => componente.alternarAlmacen(codigo, true));
-    componente.buscar();
+    expect(componente.filtros.codigosAlmacen).toEqual(codigos);
     expect(buscarArticulos).toHaveBeenLastCalledWith(expect.objectContaining({
       codigosAlmacen: codigos, clasificacion: 'especial', pagina: 1,
     }));

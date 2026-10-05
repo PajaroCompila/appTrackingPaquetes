@@ -77,6 +77,11 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .sin-existencias { display: grid; min-height: 8rem; place-items: center; align-content: center; gap: .5rem; border: 1px dashed #b9c8d5; border-radius: .7rem; background: #f8fafc; color: var(--gris-600); text-align: center; }
 .sin-existencias i { font-size: 1.6rem; }
 .sin-existencias p { margin: 0; }
+.ultimo-ingreso .encabezado-dashboard { margin-bottom: .8rem; }
+.datos-ultimo-ingreso { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 0; }
+.datos-ultimo-ingreso div { display: grid; gap: .25rem; padding: .85rem; border: 1px solid #d8e3eb; border-radius: .72rem; background: #f8fafc; }
+.datos-ultimo-ingreso dt { color: var(--gris-600); font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.datos-ultimo-ingreso dd { margin: 0; color: var(--azul-900); font-size: 1.05rem; font-weight: 600; }
 .fondo-visor-imagen { position: fixed; z-index: 1600; inset: 0; display: grid; place-items: center; padding: 1.25rem; background: rgb(3 13 29 / 88%); }
 .visor-imagen { position: relative; display: grid; place-items: center; padding: 1rem; border-radius: .9rem; background: white; }
 .visor-imagen img { max-width: 88vw; max-height: 86vh; object-fit: contain; }
@@ -94,7 +99,7 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 }
 @media (max-width: 680px) {
   .dialogo-inventario { max-height: 94vh; }
-  .datos-inventario, .bodegas-inventario { grid-template-columns: 1fr; }
+  .datos-inventario, .bodegas-inventario, .datos-ultimo-ingreso { grid-template-columns: 1fr; }
   .datos-inventario .dato-descripcion { grid-column: auto; }
   .encabezado-dashboard { flex-direction: column; }
   .resumen-dashboard { width: 100%; }

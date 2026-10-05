@@ -132,7 +132,9 @@ export class PedidosDevueltosComponent implements OnInit {
         this.filtros.numeroPedido=q.get('numeroPedido') ?? '';
         this.filtros.fechaDesde=esFechaCalendarioValida(q.get('fechaDesde'))?q.get('fechaDesde')!:fechaActual;
         this.filtros.fechaHasta=esFechaCalendarioValida(q.get('fechaHasta'))?q.get('fechaHasta')!:fechaActual;
-        this.filtros.codigosAlmacen=q.has('codigoAlmacen')?q.getAll('codigoAlmacen'):[];
+        const codigosUrl=q.getAll('codigoAlmacen').map(codigo=>codigo.trim()).filter(Boolean);
+        this.filtros.codigosAlmacen=codigosUrl.length
+          ? [...new Set(codigosUrl)] : this.filtrosGlobales.obtener().codigosAlmacen;
         const estado=q.get('estado');
         this.filtros.estado=estado==='pendiente'||estado==='parcial'||estado==='devuelto'?estado:'todos';
         const cantidad=Number(q.get('cantidadPorPagina'));

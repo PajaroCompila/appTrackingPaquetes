@@ -7,6 +7,7 @@ describe('DialogoInventarioArticuloComponent', () => {
   const inventario = {
     codigoArticulo: 'A1', descripcion: 'Artículo', codigoAlmacen: 'B1',
     nombreAlmacen: 'Bodega', existenciaFisica: 0,
+    ultimaFechaIngreso: '2026-10-03', ultimaCantidadIngreso: 6,
     existencias: [
       { codigoAlmacen: 'B2', nombreAlmacen: 'Bodega baja', existenciaFisica: 9 },
       { codigoAlmacen: 'B3', nombreAlmacen: 'Bodega disponible', existenciaFisica: 10 },
@@ -42,6 +43,21 @@ describe('DialogoInventarioArticuloComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('19 unidades');
     expect(fixture.nativeElement.querySelectorAll('.bodegas-inventario li')).toHaveLength(2);
     expect(fixture.nativeElement.querySelectorAll('.existencia-baja')).toHaveLength(1);
+    expect(fixture.nativeElement.textContent).toContain('03/10/2026');
+    expect(fixture.nativeElement.textContent).toContain('6 unidades');
+    expect(fixture.nativeElement.textContent).not.toMatch(/proveedor|CardCode|CardName/i);
+  });
+
+  it('muestra Sin registro cuando SAP no tiene movimientos de entrada', () => {
+    fixture.componentRef.setInput('inventario', {
+      ...inventario, ultimaFechaIngreso: null, ultimaCantidadIngreso: null,
+    });
+    fixture.detectChanges();
+
+    const datos = fixture.nativeElement.querySelectorAll('.datos-ultimo-ingreso dd');
+    expect(datos).toHaveLength(2);
+    expect(datos[0].textContent).toContain('Sin registro');
+    expect(datos[1].textContent).toContain('Sin registro');
   });
 
   it('mantiene separados el encabezado, la fotografía y el texto de ayuda', () => {
