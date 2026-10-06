@@ -48,6 +48,22 @@ interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> {
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
 
+export function seleccionarSucursalesHistorial(
+  sucursales: ConfiguracionSucursalR1[],
+  codigosAlmacen: string[],
+): ConfiguracionSucursalR1[] {
+  if (codigosAlmacen.length === 0) return sucursales;
+  const codigosSucursal = new Set<string>();
+  for (const codigo of codigosAlmacen) {
+    const coincidencia = codigo.trim().toUpperCase().match(/^[BT]([A-Z]{3})\d{2}$/);
+    if (!coincidencia) return sucursales;
+    codigosSucursal.add(coincidencia[1]!);
+  }
+  const seleccionadas = sucursales.filter(({ codigoTienda }) =>
+    codigosSucursal.has(codigoTienda.trim().toUpperCase().slice(1, 4)));
+  return seleccionadas.length === codigosSucursal.size ? seleccionadas : sucursales;
+}
+
 export const CONDICION_HISTORIAL_R1 = `venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
         AND venta.[U_SO1_FACTURA] = 'Y'
         AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
@@ -59,7 +75,8 @@ export class HistorialR1Repositorio {
   public async buscar(filtros: FiltrosHistorial): Promise<PaginaHistorial> {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const cantidadConsulta = cantidadAcumulada + 1;
-    const resultados = await Promise.allSettled(this.sucursales.map(async (sucursal) => ({
+    const sucursales = seleccionarSucursalesHistorial(this.sucursales, filtros.codigosAlmacen);
+    const resultados = await Promise.allSettled(sucursales.map(async (sucursal) => ({
       sucursal, filas: await this.consultarCabeceras(sucursal, filtros, cantidadConsulta),
     })));
     const disponibles = resultados.filter((resultado) => resultado.status === 'fulfilled');
@@ -87,7 +104,8 @@ export class HistorialR1Repositorio {
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const cantidadConsulta = cantidadAcumulada + 1;
-    const resultados = await Promise.allSettled(this.sucursales.map(async (sucursal) => ({
+    const sucursales = seleccionarSucursalesHistorial(this.sucursales, filtros.codigosAlmacen);
+    const resultados = await Promise.allSettled(sucursales.map(async (sucursal) => ({
       sucursal, filas: await this.consultarArticulos(sucursal, filtros, cantidadConsulta),
     })));
     const disponibles = resultados.filter((resultado) => resultado.status === 'fulfilled');

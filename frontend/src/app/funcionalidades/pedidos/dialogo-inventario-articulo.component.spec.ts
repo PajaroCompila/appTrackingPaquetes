@@ -48,6 +48,19 @@ describe('DialogoInventarioArticuloComponent', () => {
     expect(fixture.nativeElement.textContent).not.toMatch(/proveedor|CardCode|CardName/i);
   });
 
+  it('muestra código y descripción juntos en el encabezado de cada bodega', () => {
+    const encabezados = Array.from(
+      fixture.nativeElement.querySelectorAll('.identidad-bodega strong') as NodeListOf<HTMLElement>,
+      (elemento) => elemento.textContent?.trim(),
+    );
+
+    expect(encabezados).toEqual([
+      'B2 - Bodega baja',
+      'B3 - Bodega disponible',
+    ]);
+    expect(fixture.nativeElement.querySelectorAll('.identidad-bodega > div > span')).toHaveLength(0);
+  });
+
   it('muestra Sin registro cuando SAP no tiene movimientos de entrada', () => {
     fixture.componentRef.setInput('inventario', {
       ...inventario, ultimaFechaIngreso: '2026-10-03', ultimaCantidadIngreso: Number.NaN,

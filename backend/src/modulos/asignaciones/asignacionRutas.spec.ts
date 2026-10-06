@@ -46,17 +46,30 @@ describe('asignaciones de artículos', () => {
     ]);
   });
 
-  it('no ofrece asignación manual a un usuario normal y conserva la lista completa privilegiada', () => {
+  it('no ofrece asignación manual a un usuario normal y agrega Ana y Jorge solo a administradores', () => {
     expect(usuariosAsignablesParaSesion(usuarioNormal)).toEqual([]);
     expect(usuariosAsignablesParaSesion({
       ...usuarioNormal, codigoRol: 'ADMINISTRADOR',
-    })).toEqual(tecnicosAsignables);
+    })).toEqual([
+      ...tecnicosAsignables,
+      { usuario: 'jlara', nombre: 'Jorge Lara' },
+      { usuario: 'acalix', nombre: 'Ana Calix' },
+    ]);
     expect(usuariosAsignablesParaSesion({
       ...usuarioNormal, nombreUsuario: 'gcruz',
     })).toEqual(tecnicosAsignables);
     expect(usuariosAsignablesParaSesion({
       ...usuarioNormal, codigoRol: 'DASHBOARDS', nombreUsuario: 'gcruz',
     })).toEqual([]);
+    expect(resolverTecnicoAsignable({
+      ...usuarioNormal, codigoRol: 'ADMINISTRADOR', nombreUsuario: 'sistemas',
+    }, 'acalix')).toEqual({ usuario: 'acalix', nombre: 'Ana Calix' });
+    expect(resolverTecnicoAsignable({
+      ...usuarioNormal, codigoRol: 'ADMINISTRADOR', nombreUsuario: 'sistemas',
+    }, 'jlara')).toEqual({ usuario: 'jlara', nombre: 'Jorge Lara' });
+    expect(() => resolverTecnicoAsignable({
+      ...usuarioNormal, nombreUsuario: 'gcruz',
+    }, 'acalix')).toThrow('El técnico seleccionado no está disponible.');
   });
 
   it('limita ACALIX y JLARA a Jorge Lara y Ana Calix', () => {
@@ -181,9 +194,13 @@ describe('asignaciones de artículos', () => {
   });
 
   it.each([
-    ['sistemas', 'ADMINISTRADOR'],
-    ['gcruz', 'OPERADOR_BODEGA'],
-  ])('conserva la lista completa para %s', async (nombreUsuario, codigoRol) => {
+    ['sistemas', 'ADMINISTRADOR', [
+      ...tecnicosAsignables,
+      { usuario: 'jlara', nombre: 'Jorge Lara' },
+      { usuario: 'acalix', nombre: 'Ana Calix' },
+    ]],
+    ['gcruz', 'OPERADOR_BODEGA', tecnicosAsignables],
+  ])('conserva la lista autorizada para %s', async (nombreUsuario, codigoRol, tecnicosEsperados) => {
     const aplicacion = express();
     aplicacion.use((peticion, _respuesta, siguiente) => {
       peticion.user = {
@@ -203,7 +220,7 @@ describe('asignaciones de artículos', () => {
 
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toEqual({
-      datos: tecnicosAsignables,
+      datos: tecnicosEsperados,
       puedeAsignar: true,
       puedeAsignarTodos: true,
       puedeReasignar: true,

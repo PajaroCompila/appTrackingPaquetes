@@ -9,6 +9,7 @@ import { esLineaFlete } from '../pedidos/lineaFlete.js';
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import { validarConsultaSistemaOrigen } from '../../infraestructura/sql/consultaSistemaOrigen.js';
 import { CONDICION_HISTORIAL_R1 } from '../historial/historialR1Repositorio.js';
+import { columnasEvidenciaCierreSap } from '../historial/cierreSap.js';
 
 export const MIGRACION_CANCELACIONES_SAP = `
 IF DB_NAME() <> N'PedidosBodega' THROW 51000, 'Base no autorizada.', 1;
@@ -22,10 +23,14 @@ BEGIN
     fechaPedido date NOT NULL,
     canceled char(1) NOT NULL CHECK(canceled='Y'),
     snapshot nvarchar(max) NOT NULL CHECK(ISJSON(snapshot)=1),
-    detectadoEn datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+    detectadoEn datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+    activo bit NOT NULL DEFAULT 1
   );
   CREATE INDEX IX_CancelacionSapHistorial_fecha ON dbo.CancelacionSapHistorial(fechaPedido DESC,docEntry);
 END;
+IF COL_LENGTH(N'dbo.CancelacionSapHistorial',N'activo') IS NULL
+  ALTER TABLE dbo.CancelacionSapHistorial ADD activo bit NOT NULL
+    CONSTRAINT DF_CancelacionSapHistorial_activo DEFAULT 1;
 IF OBJECT_ID(N'dbo.CierreSapDevueltos',N'U') IS NULL
 BEGIN
   CREATE TABLE dbo.CierreSapDevueltos (
@@ -61,6 +66,7 @@ export interface FilaCanceladaSap {
   nombreVendedor: string | null; linea: number | null; codigoArticulo: string | null;
   descripcion: string | null; cantidad: number | null; codigoAlmacen: string | null;
   tieneEntrega?: number; tieneFacturaDirecta?: number;
+  tieneFacturaViaEntrega?: number;
 }
 
 interface FilaHistorialDevolucion {
@@ -83,6 +89,7 @@ function pedidoConRecepcion(fila: FilaHistorialDevolucion): PedidoDevuelto {
 export const CONSULTA_CANCELACIONES_SAP = `SELECT o.DocEntry docEntry,CONVERT(nvarchar(100),o.DocNum) numeroPedido,
   o.U_SO1_01FOLIORETAIL1 folioPedido,o.DocDate fechaPedido,o.DocTime horaPedido,
   o.CANCELED canceled,o.DocStatus docStatus,v.SlpName nombreVendedor,
+  ${columnasEvidenciaCierreSap('o')},
   d.LineNum linea,d.ItemCode codigoArticulo,d.Dscription descripcion,d.Quantity cantidad,d.WhsCode codigoAlmacen
   FROM dbo.ORDR o LEFT JOIN dbo.RDR1 d ON d.DocEntry=o.DocEntry
   LEFT JOIN dbo.OSLP v ON v.SlpCode=o.SlpCode
@@ -90,12 +97,14 @@ export const CONSULTA_CANCELACIONES_SAP = `SELECT o.DocEntry docEntry,CONVERT(nv
   ORDER BY o.DocEntry,d.LineNum`;
 
 export const CONSULTA_CIERRES_DEVUELTOS_SAP = CONSULTA_CANCELACIONES_SAP
-  .replace('v.SlpName nombreVendedor,', 'v.SlpName nombreVendedor,0 tieneEntrega,0 tieneFacturaDirecta,')
   .replace("WHERE o.CANCELED='Y'", `WHERE o.CANCELED='N' AND o.DocStatus='C'
-    AND NOT EXISTS (SELECT 1 FROM dbo.DLN1 l JOIN dbo.ODLN h ON h.DocEntry=l.DocEntry
-      WHERE l.BaseType=17 AND l.BaseEntry=o.DocEntry AND h.CANCELED='N')
     AND NOT EXISTS (SELECT 1 FROM dbo.INV1 l JOIN dbo.OINV h ON h.DocEntry=l.DocEntry
-      WHERE l.BaseType=17 AND l.BaseEntry=o.DocEntry AND h.CANCELED='N')`);
+      WHERE l.BaseType=17 AND l.BaseEntry=o.DocEntry AND h.CANCELED='N')
+    AND NOT EXISTS (SELECT 1 FROM dbo.DLN1 d0 JOIN dbo.ODLN e ON e.DocEntry=d0.DocEntry
+      JOIN dbo.INV1 l ON l.BaseType=15 AND l.BaseEntry=e.DocEntry
+      JOIN dbo.OINV h ON h.DocEntry=l.DocEntry
+      WHERE d0.BaseType=17 AND d0.BaseEntry=o.DocEntry
+        AND e.CANCELED='N' AND h.CANCELED='N')`);
 
 export function convertirCancelaciones(
   filas: FilaCanceladaSap[],
@@ -104,9 +113,10 @@ export function convertirCancelaciones(
   const pedidos = new Map<number, PedidoDevuelto>();
   const documentosConLineas = new Set<number>();
   for (const f of filas) {
-    if (pedidosFacturados.has(String(f.numeroPedido).trim())) continue;
+    if (pedidosFacturados.has(String(f.numeroPedido).trim())
+      || f.tieneFacturaDirecta === 1 || f.tieneFacturaViaEntrega === 1) continue;
     const cerrado = f.canceled === 'N' && f.docStatus === 'C'
-      && f.tieneEntrega === 0 && f.tieneFacturaDirecta === 0;
+      && f.tieneFacturaDirecta !== 1 && f.tieneFacturaViaEntrega !== 1;
     if (f.canceled !== 'Y' && !cerrado) continue;
     const estado = cerrado ? 'CERRADO' : 'CANCEL';
     if (f.linea !== null) documentosConLineas.add(f.docEntry);
@@ -223,6 +233,10 @@ export class CancelacionSapHistorial {
       SELECT j.idClave,j.docEntry,j.numeroPedido,j.folioPedido,j.fechaPedido,'Y',j.snapshot
       FROM #SnapshotsDevueltos j
       WHERE j.estado='CANCEL' AND NOT EXISTS(SELECT 1 FROM dbo.CancelacionSapHistorial h WITH(UPDLOCK,HOLDLOCK) WHERE h.docEntry=j.docEntry);
+      UPDATE h WITH(UPDLOCK,HOLDLOCK) SET activo=CASE WHEN EXISTS(
+        SELECT 1 FROM #SnapshotsDevueltos j WHERE j.docEntry=h.docEntry AND j.estado='CANCEL'
+      ) THEN 1 ELSE 0 END
+      FROM dbo.CancelacionSapHistorial h;
       -- Los cierres dejan de mostrarse si se reabren, se cancelan o adquieren entrega/factura.
       UPDATE h WITH(UPDLOCK,HOLDLOCK) SET activo=0 FROM dbo.CierreSapDevueltos h
       WHERE h.activo=1 AND NOT EXISTS(SELECT 1 FROM #SnapshotsDevueltos j
@@ -261,7 +275,7 @@ export class CancelacionSapHistorial {
     await this.preparar();
     try { await this.sincronizar(); }
     catch (error) {
-      const r = await obtenerPoolPedidosBodega().request().query('SELECT (SELECT COUNT(*) FROM dbo.CancelacionSapHistorial) + (SELECT COUNT(*) FROM dbo.CierreSapDevueltos WHERE activo=1) cantidad');
+      const r = await obtenerPoolPedidosBodega().request().query('SELECT (SELECT COUNT(*) FROM dbo.CancelacionSapHistorial WHERE activo=1) + (SELECT COUNT(*) FROM dbo.CierreSapDevueltos WHERE activo=1) cantidad');
       if (!r.recordset[0]?.cantidad) throw error;
       console.error('SAP no disponible: se conserva el historial de cancelaciones confirmado.');
     }
@@ -273,7 +287,7 @@ export class CancelacionSapHistorial {
       .input('numero', sql.NVarChar(100), f.numeroPedido || null)
       .input('desde', sql.VarChar(10), f.fechaDesde || null).input('hasta', sql.VarChar(10), f.fechaHasta || null)
       .query<FilaHistorialDevolucion>(`WITH Historial AS (
-        SELECT snapshot,numeroPedido,folioPedido,fechaPedido,docEntry FROM dbo.CancelacionSapHistorial WHERE canceled='Y'
+        SELECT snapshot,numeroPedido,folioPedido,fechaPedido,docEntry FROM dbo.CancelacionSapHistorial WHERE canceled='Y' AND activo=1
         UNION ALL
         SELECT snapshot,numeroPedido,folioPedido,fechaPedido,docEntry FROM dbo.CierreSapDevueltos WHERE activo=1
       ) SELECT h.snapshot,recepcion.nombreRecibio,recepcion.recibidoEn
@@ -315,7 +329,7 @@ export class CancelacionSapHistorial {
     const r = await obtenerPoolPedidosBodega().request().input('id', sql.VarChar(64), id)
       .query<FilaHistorialDevolucion>(`WITH Historial AS (
         SELECT snapshot,numeroPedido,folioPedido,docEntry FROM dbo.CancelacionSapHistorial
-          WHERE idClave=@id AND canceled='Y'
+          WHERE idClave=@id AND canceled='Y' AND activo=1
         UNION ALL SELECT snapshot,numeroPedido,folioPedido,docEntry FROM dbo.CierreSapDevueltos
           WHERE idClave=@id AND activo=1
       ) SELECT h.snapshot,recepcion.nombreRecibio,recepcion.recibidoEn

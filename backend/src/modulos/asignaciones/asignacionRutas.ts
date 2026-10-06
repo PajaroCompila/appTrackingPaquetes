@@ -19,6 +19,10 @@ const tecnicosAsignablesAcalixJlara = [
   { usuario: 'jlara', nombre: 'Jorge Lara' },
   { usuario: 'acalix', nombre: 'Ana Calix' },
 ] as const;
+const tecnicosAsignablesAdministrador = [
+  ...tecnicosAsignables,
+  ...tecnicosAsignablesAcalixJlara,
+] as const;
 const tommyAsignable = [{ usuario: 'tlopez', nombre: 'Tommy López' }] as const;
 const kevinAsignable = [{ usuario: 'bodegatbm', nombre: 'Kevin Carranza' }] as const;
 
@@ -52,6 +56,7 @@ export function usuariosAsignablesParaSesion(
   usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
 ): readonly TecnicoAsignable[] {
   if (usuario.codigoRol?.toUpperCase() === 'DASHBOARDS') return [];
+  if (usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR') return tecnicosAsignablesAdministrador;
   const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
   if (nombreUsuario === 'tlopez') return tommyAsignable;
   if (nombreUsuario === 'bodegatbm') return kevinAsignable;
@@ -64,6 +69,16 @@ export function resolverTecnicoAsignable(
   usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>,
   usuarioAsignado: string,
 ): TecnicoAsignable {
+  if (usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR') {
+    const tecnico = tecnicosAsignablesAdministrador.find(
+      ({ usuario: codigo }) => codigo === usuarioAsignado,
+    );
+    if (!tecnico) {
+      throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',
+        'El técnico seleccionado no está disponible.');
+    }
+    return tecnico;
+  }
   const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
   if (nombreUsuario === 'tlopez') {
     if (usuarioAsignado !== 'tlopez') throw new ErrorAplicacion(400, 'TECNICO_NO_PERMITIDO',

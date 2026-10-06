@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { throwError } from 'rxjs';
+import { provideRouter, Router } from '@angular/router';
+import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { AutenticacionService } from './autenticacion.service';
 import { LoginComponent } from './login.component';
@@ -36,5 +36,19 @@ describe('LoginComponent', () => {
 
     expect(componente.error()).toBe(mensaje);
     expect(componente.procesando()).toBe(false);
+  });
+
+  it('envía el rol INVENTARIO directamente a su única pantalla', () => {
+    iniciarSesion.mockReturnValue(of({ usuario: {
+      usuarioId: '3', nombreUsuario: 'inventario', nombreVisible: 'Inventario',
+      codigoRol: 'INVENTARIO', codigoAlmacen: null, debeCambiarContrasena: false,
+    } }));
+    const router = TestBed.inject(Router);
+    const navegar = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    const componente = TestBed.createComponent(LoginComponent).componentInstance;
+
+    componente.ingresar();
+
+    expect(navegar).toHaveBeenCalledWith('/inventario');
   });
 });

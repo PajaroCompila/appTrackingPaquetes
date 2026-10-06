@@ -46,6 +46,17 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('.acciones-notificaciones')).not.toBeNull();
   });
 
+  it('INVENTARIO ve únicamente Inventario y no carga controles de pedidos', () => {
+    usuario.update(u => u ? {...u, codigoRol: 'INVENTARIO'} : u);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
+
+    expect(enlaces.map(e => e.getAttribute('href'))).toEqual(['/inventario']);
+    expect(fixture.nativeElement.querySelector('.acciones-notificaciones')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-consulta-inventario-articulo-host')).not.toBeNull();
+  });
+
   it('muestra la identidad de la aplicación', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

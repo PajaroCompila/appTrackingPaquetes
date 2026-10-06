@@ -81,4 +81,21 @@ describe('PedidosNotificacionesGlobalesService', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(obtenerPedidos).toHaveBeenCalledOnce();
   });
+
+  it('no consulta pedidos para el rol exclusivo de Inventario', async () => {
+    const usuario = signal({ usuarioId: '3', codigoRol: 'INVENTARIO' as const });
+    const obtenerPedidos = vi.fn().mockReturnValue(of({ datos: [], paginacion: {} }));
+    TestBed.configureTestingModule({ providers: [
+      PedidosNotificacionesGlobalesService,
+      { provide: AutenticacionService, useValue: { usuario } },
+      { provide: FiltrosGlobalesService, useValue: { obtener: () => ({ codigosAlmacen: [] }) } },
+      { provide: PedidosService, useValue: { obtenerPedidos } },
+      { provide: PedidosNotificacionesService, useValue: { procesarRespuesta: vi.fn() } },
+    ] });
+
+    TestBed.inject(PedidosNotificacionesGlobalesService).iniciar();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(obtenerPedidos).not.toHaveBeenCalled();
+  });
 });

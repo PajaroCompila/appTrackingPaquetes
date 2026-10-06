@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AutenticacionService } from './autenticacion.service';
-import { obtenerPermisosRol } from './permisos-rol';
+import { obtenerPermisosRol, rutaInicialRol } from './permisos-rol';
 
 const destino = (servicio:AutenticacionService,router:Router,permitirCambio=false) => {
   const usuario=servicio.usuario();
@@ -15,13 +15,21 @@ export const sesionGuard=()=>{const s=inject(AutenticacionService),r=inject(Rout
 export const autenticacionGuard=()=>{const s=inject(AutenticacionService),r=inject(Router);const d=destino(s,r);
   return d??s.consultarSesion().pipe(map(()=>destino(s,r)??true),catchError(()=>of(r.createUrlTree(['/login']))));};
 export const administradorGuard=()=>{const s=inject(AutenticacionService),r=inject(Router);
-  const validar=()=>s.usuario()?.codigoRol==='ADMINISTRADOR'?true:r.createUrlTree(['/pedidos']);
+  const validar=()=>s.usuario()?.codigoRol==='ADMINISTRADOR'?true:r.createUrlTree([rutaInicialRol(s.usuario()?.codigoRol)]);
   return s.usuario()?validar():s.consultarSesion().pipe(map(validar),catchError(()=>of(r.createUrlTree(['/login']))));};
+
+export const operacionGuard = () => {
+  const s = inject(AutenticacionService), r = inject(Router);
+  const validar = () => obtenerPermisosRol(s.usuario()?.codigoRol).verOperacion
+    ? true : r.createUrlTree(['/inventario']);
+  return s.usuario() ? validar() : s.consultarSesion().pipe(
+    map(validar), catchError(() => of(r.createUrlTree(['/login']))));
+};
 
 export const dashboardGuard = () => {
   const s = inject(AutenticacionService), r = inject(Router);
   const validar = () => obtenerPermisosRol(s.usuario()?.codigoRol).verDashboard
-    ? true : r.createUrlTree(['/pedidos']);
+    ? true : r.createUrlTree([rutaInicialRol(s.usuario()?.codigoRol)]);
   return s.usuario() ? validar() : s.consultarSesion().pipe(
     map(validar), catchError(() => of(r.createUrlTree(['/login']))));
 };

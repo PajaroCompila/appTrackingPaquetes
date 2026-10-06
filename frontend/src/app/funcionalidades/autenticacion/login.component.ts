@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AutenticacionService } from './autenticacion.service';
+import { rutaInicialRol } from './permisos-rol';
 
 @Component({ selector: 'app-login', imports: [FormsModule], templateUrl: './login.component.html', styleUrl: './login.component.css', changeDetection: ChangeDetectionStrategy.OnPush })
 export class LoginComponent {
@@ -23,7 +24,7 @@ export class LoginComponent {
       .pipe(finalize(() => this.procesando.set(false)))
       .subscribe({
         next: ({ usuario }) => void this.router.navigateByUrl(
-          usuario.debeCambiarContrasena ? '/cambiar-contrasena' : '/pedidos'),
+          usuario.debeCambiarContrasena ? '/cambiar-contrasena' : rutaInicialRol(usuario.codigoRol)),
         error: (error: unknown) => this.error.set(this.mensajeError(error)),
       });
   }

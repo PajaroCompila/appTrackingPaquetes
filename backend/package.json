@@ -24,6 +24,7 @@
     "db:migrate:control-operativo": "tsx scripts/migrarControlOperativo.ts",
     "db:migrate:asignaciones": "tsx scripts/migrarAsignacionesArticulos.ts",
     "db:migrate:acceso-almacenes": "tsx scripts/migrarAccesoAlmacenesUsuarios.ts",
+    "db:migrate:rol-inventario": "tsx scripts/migrarRolInventario.ts",
     "db:migrate:seguimiento-pedidos": "tsx scripts/migrarSeguimientoPedidos.ts",
     "db:migrate:tiempo-historial": "tsx scripts/migrarTiempoHistorial.ts",
     "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",

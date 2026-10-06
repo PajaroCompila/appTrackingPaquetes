@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { PedidosService } from '../pedidos/pedidos.service';
@@ -384,6 +384,37 @@ describe('HistorialComponent', () => {
       codigosAlmacen: ['BSPS04'], clasificacion: 'especial', pagina: 1,
     }));
     fixture.destroy();
+    vi.useRealTimers();
+  });
+
+  it('no superpone rondas automaticas ni conserva el temporizador al salir', async () => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    const buscarArticulos = vi.fn().mockReturnValue(NEVER);
+    await TestBed.configureTestingModule({
+      imports: [HistorialComponent],
+      providers: [
+        { provide: HistorialService, useValue: { buscar: vi.fn(), buscarArticulos,
+          obtener: vi.fn() } },
+        { provide: AlmacenesService, useValue: { obtenerAlmacenes: vi.fn()
+          .mockReturnValue(of({ datos: [] })) } },
+        { provide: PedidosService, useValue: { obtenerInventarioArticulo: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: convertToParamMap({}), queryParamMap: convertToParamMap({}),
+        } } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true),
+          navigateByUrl: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();
+    expect(buscarArticulos).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(buscarArticulos).toHaveBeenCalledTimes(2);
+    fixture.destroy();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(buscarArticulos).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
 

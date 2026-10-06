@@ -31,6 +31,9 @@ try {
     IF NOT EXISTS (SELECT 1 FROM dbo.RolAplicacion WHERE codigo = N'CONSULTA')
       INSERT dbo.RolAplicacion(codigo,nombre,descripcion) VALUES
         (N'CONSULTA',N'Consulta',N'Consulta de pedidos, detalles e inventario.');
+    IF NOT EXISTS (SELECT 1 FROM dbo.RolAplicacion WHERE codigo = N'INVENTARIO')
+      INSERT dbo.RolAplicacion(codigo,nombre,descripcion) VALUES
+        (N'INVENTARIO',N'Inventario',N'Consulta exclusiva del inventario de artículos.');
 
     IF COL_LENGTH(N'dbo.UsuarioAplicacion', N'nombreCompleto') IS NULL
       ALTER TABLE dbo.UsuarioAplicacion ADD nombreCompleto nvarchar(150) NULL;
@@ -54,7 +57,7 @@ try {
       codigoRol = rol.codigo
     FROM dbo.UsuarioAplicacion usuario
     JOIN dbo.RolAplicacion rol ON rol.codigo = CASE
-      WHEN usuario.codigoRol IN (N'ADMINISTRADOR',N'OPERADOR_BODEGA',N'CONSULTA') THEN usuario.codigoRol
+      WHEN usuario.codigoRol IN (N'ADMINISTRADOR',N'OPERADOR_BODEGA',N'CONSULTA',N'INVENTARIO') THEN usuario.codigoRol
       ELSE N'ADMINISTRADOR' END
     WHERE usuario.rolId IS NULL;
 

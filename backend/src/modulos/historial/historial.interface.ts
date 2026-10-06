@@ -5,7 +5,7 @@ export interface PedidoHistorial extends PedidoResumen {
   estadoHistorial?: EstadoEntregaSap | 'CERRADO' | 'CANCELADO';
   entregaSap?: EntregaSapPublica;
   auditoriaSap?: AuditoriaEntregaSap;
-  estadoLocal: 'VALIDADO' | 'DESPACHADO';
+  estadoLocal: 'VALIDADO' | 'DESPACHADO' | 'CERRADO';
   despachadoEn: string | null;
   validadoDetectadoEn: string | null;
   historialIngresadoEn?: string | null;

@@ -6,6 +6,8 @@ describe('permisos por rol', () => {
     expect(obtenerPermisosRol('CONSULTA')).toEqual({
       verDashboard: false,
       administrarUsuarios: false,
+      verOperacion: true,
+      verNotificaciones: true,
       soloConsultaOperativa: false,
       registrarImpresiones: true,
     });
@@ -15,6 +17,8 @@ describe('permisos por rol', () => {
     expect(obtenerPermisosRol('DASHBOARDS')).toEqual({
       verDashboard: true,
       administrarUsuarios: false,
+      verOperacion: true,
+      verNotificaciones: true,
       soloConsultaOperativa: true,
       registrarImpresiones: false,
     });
@@ -24,8 +28,21 @@ describe('permisos por rol', () => {
     expect(obtenerPermisosRol('ADMINISTRADOR')).toEqual({
       verDashboard: true,
       administrarUsuarios: true,
+      verOperacion: true,
+      verNotificaciones: true,
       soloConsultaOperativa: false,
       registrarImpresiones: true,
+    });
+  });
+
+  it('INVENTARIO solo conserva acceso de lectura al inventario', () => {
+    expect(obtenerPermisosRol('INVENTARIO')).toEqual({
+      verDashboard: false,
+      administrarUsuarios: false,
+      verOperacion: false,
+      verNotificaciones: false,
+      soloConsultaOperativa: true,
+      registrarImpresiones: false,
     });
   });
 });

@@ -29,6 +29,7 @@ export interface CierreSapDetectado {
   estadoActual: string;
   tieneEntrega: boolean;
   tieneFacturaDirecta: boolean;
+  tieneFacturaViaEntrega: boolean;
   tipoCierre: TipoCierreSap;
 }
 export interface EstadoR1Detectado {
@@ -83,9 +84,10 @@ export class HistorialRepositorio {
         FROM dbo.CierreSapDevueltos
         WHERE activo=1 AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros))
         UNION ALL
-        SELECT numeroPedido, CONVERT(varchar(10), 'CANCELADO') estado
+        SELECT numeroPedido, CONVERT(varchar(10), 'CERRADO') estado
         FROM dbo.CancelacionSapHistorial
-        WHERE canceled='Y' AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros));`);
+        WHERE canceled='Y' AND activo=1
+          AND numeroPedido IN (SELECT value FROM OPENJSON(@numeros));`);
     return new Map(resultado.recordset.map(f => [f.numeroPedido, f.estado]));
   }
 
@@ -176,6 +178,7 @@ export class HistorialRepositorio {
       estadoActual: string;
       tieneEntrega: number;
       tieneFacturaDirecta: number;
+      tieneFacturaViaEntrega: number;
     }>(`
       SELECT pedido.[DocEntry] AS docEntry, pedido.[DocNum] AS docNum,
         pedido.[DocStatus] AS estadoActual,
@@ -197,9 +200,12 @@ export class HistorialRepositorio {
       if (!fila) return [];
       const tieneEntrega = Boolean(fila.tieneEntrega);
       const tieneFacturaDirecta = Boolean(fila.tieneFacturaDirecta);
+      const tieneFacturaViaEntrega = Boolean(fila.tieneFacturaViaEntrega);
       return [{ idOrigen, sapDocEntry, numeroPedido: fila.docNum,
         estadoActual: fila.estadoActual, tieneEntrega, tieneFacturaDirecta,
-        tipoCierre: clasificarCierreSap(tieneEntrega, tieneFacturaDirecta) }];
+        tieneFacturaViaEntrega,
+        tipoCierre: clasificarCierreSap(tieneEntrega, tieneFacturaDirecta,
+          tieneFacturaViaEntrega) }];
     });
   }
 
@@ -489,17 +495,27 @@ export class HistorialRepositorio {
     filtros.codigosAlmacen.forEach((codigo, indice) =>
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
     const resultado = await solicitud.query(`WITH Cabeceras AS (
-        SELECT pedido.idOrigen, pedido.origenPedido, pedido.creadoEnR1, pedido.sapDocEntry,
-          pedido.folioPedido, pedido.numeroPedido, pedido.nombreVendedor, pedido.fechaHoraPedido,
+        SELECT pedido.idOrigen, pedido.origenPedido, pedido.creadoEnR1,
+          COALESCE(pedido.sapDocEntry, CONVERT(nvarchar(50), evento.docEntry)) sapDocEntry,
+          pedido.folioPedido, COALESCE(evento.numeroPedido, pedido.numeroPedido) numeroPedido,
+          pedido.nombreVendedor, pedido.fechaHoraPedido,
           pedido.despachadoEn, pedido.validadoDetectadoEn, usuario.nombreVisible usuarioDespacho,
           pedido.idPedidoDespachado, CONVERT(bigint, NULL) idPedidoSapHistorial,
           seguimiento.fechaEntradaCola,
-          ISNULL(seguimiento.excluidoSla, 0) esEspecial
+          ISNULL(seguimiento.excluidoSla, 0) esEspecial, pedido.estadoLocal estadoLocalOrigen,
+          CONVERT(nvarchar(max), NULL) snapshotCierre
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-        WHERE pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
-          AND pedido.estadoLocal = 'VALIDADO'
+        OUTER APPLY (SELECT TOP(1) fuente.docEntry, fuente.numeroPedido
+          FROM (SELECT docEntry,numeroPedido,folioPedido FROM dbo.CierreSapDevueltos WHERE activo=1
+            UNION ALL SELECT docEntry,numeroPedido,folioPedido FROM dbo.CancelacionSapHistorial
+              WHERE canceled='Y' AND activo=1) fuente
+          WHERE TRY_CONVERT(int,pedido.sapDocEntry)=fuente.docEntry
+            OR pedido.numeroPedido=fuente.numeroPedido OR pedido.folioPedido=fuente.folioPedido
+          ORDER BY fuente.docEntry DESC) evento
+        WHERE ((pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
+              AND pedido.estadoLocal = 'VALIDADO') OR pedido.estadoLocal = 'CERRADO')
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
           AND ((pedido.fechaHoraPedido >= @fechaDesde
               AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
@@ -519,7 +535,8 @@ export class HistorialRepositorio {
           pedido.numeroPedido, pedido.nombreVendedor, pedido.fechaHoraPedido,
           CONVERT(datetime2(3), NULL), pedido.cerradoDetectadoEn, CONVERT(nvarchar(200), NULL),
           CONVERT(bigint, NULL), pedido.idPedidoSapHistorial, seguimiento.fechaEntradaCola,
-          ISNULL(seguimiento.excluidoSla, 0)
+          ISNULL(seguimiento.excluidoSla, 0), CONVERT(varchar(12), 'VALIDADO'),
+          CONVERT(nvarchar(max), NULL)
         FROM dbo.PedidoSapHistorial pedido
         LEFT JOIN dbo.SeguimientoPedido seguimiento
           ON seguimiento.idOrigen = CONCAT('SAP:', pedido.sapDocEntry)
@@ -534,6 +551,29 @@ export class HistorialRepositorio {
             FROM dbo.PedidoSapHistorialDetalle filtro
             WHERE filtro.idPedidoSapHistorial = pedido.idPedidoSapHistorial
               AND filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')}))` : ''}
+        UNION ALL
+        SELECT CONCAT('SAP:', cancelado.docEntry), 'SAP', CONVERT(bit, 0),
+          CONVERT(nvarchar(50), cancelado.docEntry),
+          COALESCE(cancelado.folioPedido, CONCAT('SAP:', cancelado.docEntry)),
+          cancelado.numeroPedido, JSON_VALUE(cancelado.snapshot, '$.nombreVendedor'),
+          TRY_CONVERT(datetime2(3), JSON_VALUE(cancelado.snapshot, '$.fechaHoraPedido'), 127),
+          CONVERT(datetime2(3), NULL), cancelado.detectadoEn, CONVERT(nvarchar(200), NULL),
+          CONVERT(bigint, NULL), CONVERT(bigint, NULL), seguimiento.fechaEntradaCola,
+          ISNULL(seguimiento.excluidoSla, 0), CONVERT(varchar(12), 'CERRADO'), cancelado.snapshot
+        FROM dbo.CancelacionSapHistorial cancelado
+        LEFT JOIN dbo.SeguimientoPedido seguimiento
+          ON seguimiento.idOrigen = CONCAT('SAP:', cancelado.docEntry)
+        WHERE cancelado.canceled='Y' AND cancelado.activo=1
+          AND (@idOrigen IS NULL OR CONCAT('SAP:', cancelado.docEntry) = @idOrigen)
+          AND cancelado.fechaPedido >= @fechaDesde
+          AND cancelado.fechaPedido < DATEADD(day, 1, @fechaHasta)
+          AND (@numeroPedido IS NULL OR cancelado.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+          AND (@clasificacion IS NULL
+            OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
+            OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
+          ${parametrosAlmacen.length > 0 ? `AND EXISTS (SELECT 1 FROM OPENJSON(cancelado.snapshot, '$.lineas')
+            WITH(codigoAlmacen nvarchar(16) '$.codigoAlmacen') filtro
+            WHERE filtro.codigoAlmacen IN (${parametrosAlmacen.join(', ')}))` : ''}
       ), Pedidos AS (
         SELECT *, COUNT(*) OVER() total FROM Cabeceras
         ORDER BY fechaHoraPedido DESC, idOrigen DESC
@@ -557,6 +597,14 @@ export class HistorialRepositorio {
           CONVERT(datetime2(3), NULL), CONVERT(nvarchar(200), NULL)
         FROM dbo.PedidoSapHistorialDetalle sap
         WHERE sap.idPedidoSapHistorial = pedido.idPedidoSapHistorial
+        UNION ALL
+        SELECT linea.identificadorDetalle, TRY_CONVERT(int, linea.identificadorDetalle),
+          linea.codigoArticulo, linea.descripcion, linea.cantidad, linea.codigoAlmacen,
+          CONVERT(nvarchar(200), NULL), CONVERT(datetime2(3), NULL), CONVERT(nvarchar(200), NULL)
+        FROM OPENJSON(pedido.snapshotCierre, '$.lineas') WITH(
+          identificadorDetalle nvarchar(150) '$.identificadorDetalle',
+          codigoArticulo nvarchar(100) '$.codigoArticulo', descripcion nvarchar(500) '$.descripcion',
+          cantidad decimal(19,6) '$.cantidad', codigoAlmacen nvarchar(16) '$.codigoAlmacen') linea
       ) detalle
       ${parametrosAlmacen.length > 0
         ? `WHERE detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
@@ -575,9 +623,11 @@ export class HistorialRepositorio {
           fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
           esEspecial: Boolean(fila.esEspecial),
           codigoEstadoVenta: 'C', codigoSincronizacion: null, articulos: [],
-          estadoLocal: 'VALIDADO', despachadoEn: fila.despachadoEn?.toISOString() ?? null,
+          estadoLocal: fila.estadoLocalOrigen, despachadoEn: fila.despachadoEn?.toISOString() ?? null,
           validadoDetectadoEn: fila.validadoDetectadoEn?.toISOString() ?? null,
           usuarioDespacho: fila.usuarioDespacho,
+          estadoHistorial: fila.estadoLocalOrigen === 'CERRADO' ? 'CERRADO'
+            : fila.idPedidoSapHistorial === null ? 'Facturado' : undefined,
         });
       }
       mapa.get(fila.idOrigen)!.articulos.push({
@@ -611,19 +661,28 @@ export class HistorialRepositorio {
     filtros.codigosAlmacen.forEach((codigo, indice) =>
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
     const resultado = await solicitud.query(`WITH Articulos AS (
-      SELECT pedido.idOrigen, detalle.identificadorDetalle, pedido.numeroPedido,
+      SELECT pedido.idOrigen, detalle.identificadorDetalle,
+        COALESCE(evento.numeroPedido,pedido.numeroPedido) numeroPedido,
         detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
         detalle.codigoAlmacen, detalle.nombreAlmacen,
         pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
         COALESCE(detalle.transferidoEn, pedido.despachadoEn) despachadoEn,
-        pedido.validadoDetectadoEn,
+        pedido.validadoDetectadoEn, pedido.estadoLocal estadoLocalOrigen,
+        CONVERT(bit, 0) esSnapshotCierre,
         ISNULL(seguimiento.excluidoSla, 0) esEspecial
       FROM dbo.PedidoDespachado pedido
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-      WHERE pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
-        AND pedido.estadoLocal = 'VALIDADO'
+      OUTER APPLY (SELECT TOP(1) fuente.numeroPedido
+        FROM (SELECT docEntry,numeroPedido,folioPedido FROM dbo.CierreSapDevueltos WHERE activo=1
+          UNION ALL SELECT docEntry,numeroPedido,folioPedido FROM dbo.CancelacionSapHistorial
+            WHERE canceled='Y' AND activo=1) fuente
+        WHERE TRY_CONVERT(int,pedido.sapDocEntry)=fuente.docEntry
+          OR pedido.numeroPedido=fuente.numeroPedido OR pedido.folioPedido=fuente.folioPedido
+        ORDER BY fuente.docEntry DESC) evento
+      WHERE ((pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
+            AND pedido.estadoLocal = 'VALIDADO') OR pedido.estadoLocal = 'CERRADO')
         AND ((pedido.fechaHoraPedido >= @fechaDesde
             AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
           OR (pedido.fechaHoraPedido IS NULL AND pedido.despachadoEn >= @fechaDesde
@@ -640,6 +699,8 @@ export class HistorialRepositorio {
         detalle.codigoAlmacen, detalle.nombreAlmacen,
         pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
         CONVERT(datetime2(3), NULL) despachadoEn, pedido.cerradoDetectadoEn validadoDetectadoEn,
+        CONVERT(varchar(12), 'VALIDADO') estadoLocalOrigen,
+        CONVERT(bit, 1) esSnapshotCierre,
         ISNULL(seguimiento.excluidoSla, 0) esEspecial
       FROM dbo.PedidoSapHistorial pedido
       JOIN dbo.PedidoSapHistorialDetalle detalle
@@ -654,6 +715,31 @@ export class HistorialRepositorio {
           OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
         ${parametrosAlmacen.length > 0
           ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
+      UNION ALL
+      SELECT CONCAT('SAP:', cancelado.docEntry), linea.identificadorDetalle,
+        cancelado.numeroPedido, linea.codigoArticulo, linea.descripcion, linea.cantidad,
+        linea.codigoAlmacen, CONVERT(nvarchar(200), NULL),
+        TRY_CONVERT(datetime2(3), JSON_VALUE(cancelado.snapshot, '$.fechaHoraPedido'), 127),
+        JSON_VALUE(cancelado.snapshot, '$.nombreVendedor'), seguimiento.fechaEntradaCola,
+        CONVERT(datetime2(3), NULL), cancelado.detectadoEn,
+        CONVERT(varchar(12), 'CERRADO'), CONVERT(bit, 0),
+        ISNULL(seguimiento.excluidoSla, 0)
+      FROM dbo.CancelacionSapHistorial cancelado
+      CROSS APPLY OPENJSON(cancelado.snapshot, '$.lineas') WITH(
+        identificadorDetalle nvarchar(150) '$.identificadorDetalle',
+        codigoArticulo nvarchar(100) '$.codigoArticulo', descripcion nvarchar(500) '$.descripcion',
+        cantidad decimal(19,6) '$.cantidad', codigoAlmacen nvarchar(16) '$.codigoAlmacen') linea
+      LEFT JOIN dbo.SeguimientoPedido seguimiento
+        ON seguimiento.idOrigen=CONCAT('SAP:',cancelado.docEntry)
+      WHERE cancelado.canceled='Y' AND cancelado.activo=1
+        AND cancelado.fechaPedido >= @fechaDesde
+        AND cancelado.fechaPedido < DATEADD(day, 1, @fechaHasta)
+        AND (@numeroPedido IS NULL OR cancelado.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+        AND (@clasificacion IS NULL
+          OR (@clasificacion='especial' AND ISNULL(seguimiento.excluidoSla,0)=1)
+          OR (@clasificacion='normal' AND ISNULL(seguimiento.excluidoSla,0)=0))
+        ${parametrosAlmacen.length > 0
+          ? `AND linea.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}
     ), Pagina AS (
       SELECT *, COUNT(*) OVER() total FROM Articulos
       ORDER BY fechaHoraPedido DESC, idOrigen DESC,
@@ -677,6 +763,8 @@ export class HistorialRepositorio {
       validadoDetectadoEn: fila.validadoDetectadoEn?.toISOString() ?? null,
       nombreVendedor: fila.nombreVendedor,
       esEspecial: Boolean(fila.esEspecial),
+      estadoHistorial: fila.estadoLocalOrigen === 'CERRADO' ? 'CERRADO'
+        : fila.esSnapshotCierre ? undefined : 'Facturado',
     }));
     const total = Number(resultado.recordset[0]?.total ?? 0);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,

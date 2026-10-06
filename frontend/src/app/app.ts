@@ -110,6 +110,14 @@ export class App {
     return obtenerPermisosRol(this.usuario()?.codigoRol).verDashboard;
   }
 
+  public puedeVerOperacion(): boolean {
+    return obtenerPermisosRol(this.usuario()?.codigoRol).verOperacion;
+  }
+
+  public puedeVerNotificaciones(): boolean {
+    return obtenerPermisosRol(this.usuario()?.codigoRol).verNotificaciones;
+  }
+
   @HostListener('document:click', ['$event'])
   public cerrarPanelNotificaciones(evento: MouseEvent): void {
     if (evento.target instanceof Element

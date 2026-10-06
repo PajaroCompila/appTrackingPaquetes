@@ -16,21 +16,27 @@ const filtros = {codigosAlmacen:[],estado:'todos' as const,vista:'pedido' as con
 beforeEach(() => { query.mockReset().mockResolvedValue({recordset:[]}); });
 
 describe('historial exclusivo de cancelaciones SAP', () => {
-  it('incluye cerrados solamente con evidencia de ausencia de entrega y factura', () => {
-    const cerrado = {...fila,canceled:'N',docStatus:'C',tieneEntrega:0,tieneFacturaDirecta:0};
+  it('incluye cerrados sin factura aunque exista entrega y excluye cualquier factura valida', () => {
+    const cerrado = {...fila,canceled:'N',docStatus:'C',tieneEntrega:0,tieneFacturaDirecta:0,tieneFacturaViaEntrega:0};
     const pedidos = convertirCancelaciones([cerrado,
       {...cerrado,docEntry:2,tieneEntrega:1}, {...cerrado,docEntry:3,tieneFacturaDirecta:1},
-      {...cerrado,docEntry:4,docStatus:'O'}, {...cerrado,docEntry:5,canceled:'C'}]);
-    expect(pedidos).toHaveLength(1);
+      {...cerrado,docEntry:4,tieneFacturaViaEntrega:1},
+      {...cerrado,docEntry:5,docStatus:'O'}, {...cerrado,docEntry:6,canceled:'C'}]);
+    expect(pedidos).toHaveLength(2);
     expect(pedidos[0]).toMatchObject({estado:'CERRADO',fechaCancelacion:null,fueDespachado:false});
+    expect(pedidos[1]).toMatchObject({estado:'CERRADO'});
     expect(pedidos[0]?.lineas[0]?.estado).toBe('CERRADO');
     expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain("o.DocStatus='C'");
-    expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('AND NOT EXISTS (SELECT 1 FROM dbo.DLN1');
     expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('AND NOT EXISTS (SELECT 1 FROM dbo.INV1');
+    expect(CONSULTA_CIERRES_DEVUELTOS_SAP).toContain('JOIN dbo.INV1 l ON l.BaseType=15');
   });
   it('excluye de Devueltos un cierre que R1 confirma como facturado', () => {
     const cerrado = {...fila,canceled:'N',docStatus:'C',tieneEntrega:0,tieneFacturaDirecta:0};
     expect(convertirCancelaciones([cerrado], new Set(['101471323']))).toEqual([]);
+  });
+  it('excluye tambien una cancelacion cuando existe factura valida', () => {
+    expect(convertirCancelaciones([{...fila,tieneFacturaDirecta:1}])).toEqual([]);
+    expect(convertirCancelaciones([{...fila,tieneFacturaViaEntrega:1}])).toEqual([]);
   });
   it('consulta cierres en ambas vistas y permite abrir el detalle', async () => {
     const p=convertirCancelaciones([{...fila,canceled:'N',tieneEntrega:0,tieneFacturaDirecta:0}])[0]!;
@@ -64,7 +70,8 @@ describe('historial exclusivo de cancelaciones SAP', () => {
     expect(sql).not.toMatch(/DELETE|TRUNCATE/);
   });
   it('solo admite Y, no cerrados, abiertos ni documentos de cancelacion C', () => {
-    const pedidos = convertirCancelaciones(['N','C','Y','CANCEL',''].map((canceled,i)=>({...fila,docEntry:i,canceled})));
+    const pedidos = convertirCancelaciones(['N','C','Y','CANCEL',''].map((canceled,i)=>
+      ({...fila,docEntry:i,canceled,docStatus:'O'})));
     expect(pedidos).toHaveLength(1);
     expect(pedidos[0]?.estado).toBe('CANCEL');
     expect(CONSULTA_CANCELACIONES_SAP).toContain("WHERE o.CANCELED='Y'");
@@ -103,7 +110,8 @@ describe('historial exclusivo de cancelaciones SAP', () => {
   });
   it('persiste con identidad unica y sin borrar snapshots anteriores', async () => {
     const fuente=vi.fn().mockResolvedValue({recordset:[fila]});
-    await new CancelacionSapHistorial(fuente as typeof consultarSap).sincronizar();
+    await new CancelacionSapHistorial(fuente as typeof consultarSap,
+      vi.fn().mockResolvedValue(new Set())).sincronizar();
     const insercion=query.mock.calls.map(([q])=>String(q)).find(q=>q.includes('INSERT dbo.CancelacionSapHistorial'))!;
     expect(insercion).toContain('AND NOT EXISTS');expect(insercion).toContain('UPDLOCK,HOLDLOCK');
     expect(insercion).not.toMatch(/DELETE|TRUNCATE/);

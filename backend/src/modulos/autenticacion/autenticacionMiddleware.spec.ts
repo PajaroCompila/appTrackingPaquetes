@@ -21,7 +21,7 @@ describe('requerirRoles', () => {
     expect(siguiente).toHaveBeenCalledWith();
   });
 
-  it.each(['OPERADOR_BODEGA', 'CONSULTA', 'DASHBOARDS'])(
+  it.each(['OPERADOR_BODEGA', 'CONSULTA', 'DASHBOARDS', 'INVENTARIO'])(
     'rechaza con 403 al rol %s',
     (codigoRol) => {
       const siguiente = vi.fn();
@@ -36,6 +36,27 @@ describe('requerirRoles', () => {
       expect(error).toMatchObject({ estadoHttp: 403, codigo: 'PERMISO_REQUERIDO' });
     },
   );
+});
+
+describe('acceso del rol INVENTARIO', () => {
+  it.each(['GET', 'HEAD'])('permite consultar artículos con %s', (method) => {
+    const siguiente = vi.fn();
+    requerirAccesoModulo({ user: { ...identidad, codigoRol: 'INVENTARIO' }, baseUrl: '/api/articulos',
+      method } as Request, {} as Response, siguiente);
+    expect(siguiente).toHaveBeenCalledWith();
+  });
+
+  it.each([
+    ['/api/pedidos', 'GET'],
+    ['/api/historial-validados', 'GET'],
+    ['/api/usuarios', 'GET'],
+    ['/api/articulos', 'POST'],
+  ])('bloquea %s con %s', (baseUrl, method) => {
+    const siguiente = vi.fn();
+    requerirAccesoModulo({ user: { ...identidad, codigoRol: 'INVENTARIO' }, baseUrl,
+      method } as Request, {} as Response, siguiente);
+    expect(siguiente.mock.calls[0]?.[0]).toMatchObject({ estadoHttp: 403, codigo: 'PERMISO_REQUERIDO' });
+  });
 });
 
 describe('acceso del rol DASHBOARDS', () => {

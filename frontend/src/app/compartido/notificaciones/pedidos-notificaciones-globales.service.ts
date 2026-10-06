@@ -7,6 +7,7 @@ import { AutenticacionService } from '../../funcionalidades/autenticacion/autent
 import type { FiltrosPedidos } from '../../funcionalidades/pedidos/pedido.interface';
 import { PedidosService } from '../../funcionalidades/pedidos/pedidos.service';
 import { PedidosNotificacionesService } from './pedidos-notificaciones.service';
+import { obtenerPermisosRol } from '../../funcionalidades/autenticacion/permisos-rol';
 
 const intervaloNotificacionesMs = 5000;
 
@@ -26,7 +27,7 @@ export class PedidosNotificacionesGlobalesService {
 
     this.usuario$.pipe(
       distinctUntilChanged((anterior, actual) => anterior?.usuarioId === actual?.usuarioId && anterior?.codigoRol === actual?.codigoRol),
-      switchMap((usuario) => usuario
+      switchMap((usuario) => usuario && obtenerPermisosRol(usuario.codigoRol).verNotificaciones
         ? timer(0, intervaloNotificacionesMs).pipe(
           exhaustMap(() => this.consultar()),
         )

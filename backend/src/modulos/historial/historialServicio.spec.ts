@@ -3,6 +3,8 @@ import { HistorialServicio } from './historialServicio.js';
 import type { HistorialRepositorio } from './historialRepositorio.js';
 import type { HistorialR1Repositorio } from './historialR1Repositorio.js';
 import type { PedidoHistorial } from './historial.interface.js';
+import type { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
+import type { EntregaSapRepositorio } from './entregaSapRepositorio.js';
 
 const registro = (idOrigen: string, estadoLocal: 'VALIDADO' | 'DESPACHADO', fecha: string): PedidoHistorial => ({
   idOrigen, origenPedido: idOrigen.startsWith('SAP:') ? 'SAP' : 'R1',
@@ -21,7 +23,7 @@ describe('HistorialServicio', () => {
     const facturado = {...registro('SAP:2', 'VALIDADO', '2026-10-02T10:00:00'), numeroPedido:'500313582', estadoHistorial:'Facturado' as const};
     const pagina = {registros:[cerrado,cancelado,facturado],pagina:1,cantidadPorPagina:25,totalRegistros:3,hayMas:false};
     const repo = {obtenerEstadosSinFactura:vi.fn().mockResolvedValue(new Map([
-      ['500313581','CERRADO'],['500313583','CANCELADO'],['500313582','CERRADO'],
+      ['500313581','CERRADO'],['500313583','CERRADO'],['500313582','CERRADO'],
     ])),
       registrarIngresosHistorial:vi.fn().mockImplementation(async (ids: string[]) =>
         new Map(ids.map((id) => [id, '2026-10-02T10:10:00.000Z']))),
@@ -34,7 +36,7 @@ describe('HistorialServicio', () => {
     const filtros = {fechaDesde:'2026-10-02',fechaHasta:'2026-10-02',codigosAlmacen:[],pagina:1,cantidadPorPagina:25};
     const pedidos = await servicio.buscar(filtros);
     expect(pedidos.registros.find(p=>p.numeroPedido==='500313581')?.estadoHistorial).toBe('CERRADO');
-    expect(pedidos.registros.find(p=>p.numeroPedido==='500313583')?.estadoHistorial).toBe('CANCELADO');
+    expect(pedidos.registros.find(p=>p.numeroPedido==='500313583')?.estadoHistorial).toBe('CERRADO');
     expect(pedidos.registros.find(p=>p.numeroPedido==='500313582')?.estadoHistorial).toBe('Facturado');
     expect((await servicio.buscarArticulos(filtros)).registros[0]?.estadoHistorial).toBe('CERRADO');
     expect((await servicio.obtener('SAP:1'))?.estadoHistorial).toBe('CERRADO');
@@ -90,7 +92,7 @@ describe('HistorialServicio', () => {
     expect(repositorio.marcarValidados).toHaveBeenCalledWith([]);
   });
 
-  it('solo valida cierres SAP con entrega o factura y conserva el cierre manual en Entregados', async () => {
+  it('solo valida cierres SAP con factura y conserva entrega sin factura pendiente de recepcion', async () => {
     const repositorio = { obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([]),
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([
@@ -102,10 +104,12 @@ describe('HistorialServicio', () => {
       obtenerCerradosSap: vi.fn().mockResolvedValue([{
         idOrigen: 'SAP:10', sapDocEntry: '10', numeroPedido: 100,
         estadoActual: 'C', tieneEntrega: false, tieneFacturaDirecta: true,
+        tieneFacturaViaEntrega: false,
         tipoCierre: 'CERRADO CON FACTURA DIRECTA',
       }, {
         idOrigen: 'SAP:11', sapDocEntry: '11', numeroPedido: 101,
-        estadoActual: 'C', tieneEntrega: false, tieneFacturaDirecta: false,
+        estadoActual: 'C', tieneEntrega: true, tieneFacturaDirecta: false,
+        tieneFacturaViaEntrega: false,
         tipoCierre: 'CERRADO SIN ENTREGA NI FACTURA',
       }]),
       obtenerFacturadosSapPorNumero: vi.fn().mockResolvedValue(new Set()),
@@ -122,6 +126,31 @@ describe('HistorialServicio', () => {
       { idOrigen: 'SAP:10', codigoSucursal: null },
     ]);
     expect(repositorio.marcarCerrados).toHaveBeenCalledWith(['SAP:11']);
+  });
+
+  it('da prioridad a factura via entrega y no duplica el mismo pedido cerrado', async () => {
+    const local = { ...registro('R1:TSPS01:F1', 'DESPACHADO', '2026-10-06T10:00:00'),
+      numeroPedido: '101', estadoLocal: 'CERRADO' as const, estadoHistorial: 'CERRADO' as const };
+    const snapshot = { ...registro('SAP:10', 'VALIDADO', '2026-10-06T10:00:00'),
+      numeroPedido: '101', estadoHistorial: 'CERRADO' as const };
+    const facturado = { ...registro('R1:TSPS01:F2', 'VALIDADO', '2026-10-06T10:00:00'),
+      numeroPedido: '102', estadoHistorial: 'Facturado' as const };
+    const cerradoDuplicado = { ...registro('SAP:11', 'VALIDADO', '2026-10-06T10:00:00'),
+      numeroPedido: '102', estadoHistorial: 'CERRADO' as const };
+    const pagina = { pagina: 1, cantidadPorPagina: 25, totalRegistros: 2, hayMas: false };
+    const repo = { obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),
+      registrarIngresosHistorial: vi.fn().mockImplementation(async (ids: string[]) =>
+        new Map(ids.map(id => [id, '2026-10-06T10:05:00.000Z']))),
+      buscarHistorial: vi.fn().mockResolvedValue({ ...pagina, registros: [local, snapshot, cerradoDuplicado] }),
+    } as unknown as HistorialRepositorio;
+    const r1 = { buscar: vi.fn().mockResolvedValue({ ...pagina, registros: [facturado] })
+    } as unknown as HistorialR1Repositorio;
+
+    const resultado = await new HistorialServicio(repo, r1).buscar({ fechaDesde: '2026-10-06',
+      fechaHasta: '2026-10-06', codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 });
+
+    expect(resultado.registros.filter(p => p.numeroPedido === '101')).toHaveLength(1);
+    expect(resultado.registros.find(p => p.numeroPedido === '102')?.estadoHistorial).toBe('Facturado');
   });
 
   it('promueve a Facturado un despacho R1 cerrado cuando SAP tiene factura valida', async () => {
@@ -185,7 +214,7 @@ describe('HistorialServicio', () => {
     expect(sap.historialIngresadoEn).toBe('2026-08-15T12:05:00.000Z');
   });
 
-  it('mantiene fija la marca persistida de ingreso despues de refrescar', async () => {
+  it('mantiene fija la marca persistida de ingreso y reutiliza el resultado durante la cache corta', async () => {
     const pedido = { ...registro('R1:TSPS01:F1', 'VALIDADO', '2026-08-15T11:00:00.000Z'),
       despachadoEn: null, validadoDetectadoEn: null };
     const pagina = { registros: [pedido], pagina: 1, cantidadPorPagina: 25,
@@ -206,7 +235,43 @@ describe('HistorialServicio', () => {
 
     expect(primera.registros[0]?.historialIngresadoEn).toBe(ingreso);
     expect(segunda.registros[0]?.historialIngresadoEn).toBe(ingreso);
-    expect(registrarIngresosHistorial).toHaveBeenCalledTimes(2);
+    expect(registrarIngresosHistorial).toHaveBeenCalledOnce();
+  });
+
+  it('deduplica consultas concurrentes identicas y vuelve a consultar al expirar la cache', async () => {
+    let resolverConsulta!: (valor: {
+      registros: []; pagina: number; cantidadPorPagina: number; totalRegistros: number; hayMas: boolean;
+    }) => void;
+    const pendiente = new Promise<{
+      registros: []; pagina: number; cantidadPorPagina: number; totalRegistros: number; hayMas: boolean;
+    }>((resolver) => { resolverConsulta = resolver; });
+    const paginaVacia = { registros: [] as [], pagina: 1, cantidadPorPagina: 25,
+      totalRegistros: 0, hayMas: false };
+    const repositorio = ({
+      buscarArticulosHistorial: vi.fn().mockResolvedValue(paginaVacia),
+    } as unknown as HistorialRepositorio);
+    const repositorioR1 = { buscarArticulos: vi.fn()
+      .mockReturnValueOnce(pendiente).mockResolvedValue(paginaVacia) } as unknown as HistorialR1Repositorio;
+    const entregas = ({
+      buscarArticulos: vi.fn().mockResolvedValue(paginaVacia),
+    } as unknown as EntregaSapRepositorio);
+    let reloj = 1_000;
+    const servicio = new HistorialServicio(repositorio, repositorioR1,
+      {} as AsignacionRepositorio, undefined, entregas, 15_000, () => reloj);
+    const filtros = { fechaDesde: '2026-10-06', fechaHasta: '2026-10-06',
+      codigosAlmacen: ['BSPS04'], pagina: 1, cantidadPorPagina: 25, clasificacion: 'normal' as const };
+
+    const primera = servicio.buscarArticulos(filtros);
+    const segunda = servicio.buscarArticulos({ ...filtros, codigosAlmacen: ['BSPS04'] });
+    await vi.waitFor(() => expect(repositorioR1.buscarArticulos).toHaveBeenCalledOnce());
+    resolverConsulta(paginaVacia);
+    await expect(Promise.all([primera, segunda])).resolves.toHaveLength(2);
+
+    await servicio.buscarArticulos(filtros);
+    expect(repositorioR1.buscarArticulos).toHaveBeenCalledOnce();
+    reloj += 15_001;
+    await servicio.buscarArticulos(filtros);
+    expect(repositorioR1.buscarArticulos).toHaveBeenCalledTimes(2);
   });
 
   it('delega el listado por artículos sin consultar detalles uno por uno', async () => {
