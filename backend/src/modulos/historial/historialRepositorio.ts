@@ -20,7 +20,7 @@ import {
   type TipoCierreSap,
 } from './cierreSap.js';
 
-export interface CandidatoValidacion { idOrigen: string; folioPedido: string }
+export interface CandidatoValidacion { idOrigen: string; folioPedido: string; numeroPedido: string }
 export interface CandidatoSap { idOrigen: string; sapDocEntry: string }
 export interface CierreSapDetectado {
   idOrigen: string;
@@ -98,7 +98,7 @@ export class HistorialRepositorio {
 
   public async obtenerDespachadosPendientes(): Promise<CandidatoValidacion[]> {
     const resultado = await this.proveedorPedidosBodega().request().query<CandidatoValidacion>(`
-      SELECT TOP (1000) idOrigen, folioPedido
+      SELECT TOP (1000) idOrigen, folioPedido, numeroPedido
       FROM dbo.PedidoDespachado
       WHERE estadoLocal IN ('DESPACHADO', 'CERRADO')
         AND origenPedido = 'R1'
@@ -106,6 +106,51 @@ export class HistorialRepositorio {
       ORDER BY despachadoEn, idPedidoDespachado;
     `);
     return resultado.recordset;
+  }
+
+  public async obtenerFacturadosSapPorNumero(candidatos: CandidatoValidacion[]): Promise<Set<string>> {
+    const validos = candidatos.filter(({ numeroPedido }) => {
+      const numero = Number(numeroPedido);
+      return Number.isSafeInteger(numero) && numero > 0;
+    });
+    if (!validos.length) return new Set();
+    const facturados = new Set<number>();
+    for (let inicio = 0; inicio < validos.length; inicio += 500) {
+      const lote = validos.slice(inicio, inicio + 500);
+      const numeros = [...new Set(lote.map(({ numeroPedido }) => Number(numeroPedido)))];
+      const parametros = numeros.map((_, indice) => `@numeroPedido${indice}`);
+      const resultado = await consultarSap<{ numeroPedido: number }>(`
+        SELECT DISTINCT pedido.[DocNum] AS numeroPedido
+        FROM dbo.[ORDR] pedido
+        WHERE pedido.[DocNum] IN (${parametros.join(', ')})
+          AND pedido.[CANCELED] = @noCancelado
+          AND (
+            EXISTS (SELECT 1 FROM dbo.[INV1] lineaFactura
+              INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
+              WHERE lineaFactura.[BaseType] = 17
+                AND lineaFactura.[BaseEntry] = pedido.[DocEntry]
+                AND factura.[CANCELED] = @noCancelado)
+            OR EXISTS (SELECT 1 FROM dbo.[DLN1] lineaEntrega
+              INNER JOIN dbo.[ODLN] entrega ON entrega.[DocEntry] = lineaEntrega.[DocEntry]
+              INNER JOIN dbo.[INV1] lineaFactura
+                ON lineaFactura.[BaseType] = 15
+               AND lineaFactura.[BaseEntry] = entrega.[DocEntry]
+              INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
+              WHERE lineaEntrega.[BaseType] = 17
+                AND lineaEntrega.[BaseEntry] = pedido.[DocEntry]
+                AND entrega.[CANCELED] = @noCancelado
+                AND factura.[CANCELED] = @noCancelado)
+          );
+      `, (solicitud) => {
+        solicitud.input('noCancelado', sql.Char(1), 'N');
+        numeros.forEach((numeroPedido, indice) =>
+          solicitud.input(`numeroPedido${indice}`, sql.Int, numeroPedido));
+        return solicitud;
+      });
+      resultado.recordset.forEach(({ numeroPedido }) => facturados.add(numeroPedido));
+    }
+    return new Set(validos.flatMap(({ idOrigen, numeroPedido }) =>
+      facturados.has(Number(numeroPedido)) ? [idOrigen] : []));
   }
 
   public async obtenerDespachadosSapPendientes(): Promise<CandidatoSap[]> {
@@ -419,7 +464,7 @@ export class HistorialRepositorio {
             validadoDetectadoEn = COALESCE(validadoDetectadoEn, SYSUTCDATETIME()),
             codigoSucursal = COALESCE(codigoSucursal, CASE idOrigen ${sucursales} END),
             actualizadoEn = SYSUTCDATETIME()
-        WHERE estadoLocal = 'DESPACHADO'
+        WHERE estadoLocal IN ('DESPACHADO', 'CERRADO')
           AND idOrigen IN (${parametros.join(', ')});
       `);
       await transaccion.commit();

@@ -42,10 +42,15 @@ export class HistorialServicio {
       this.repositorio.conservarCerradosSapSinDespacho(),
     ]);
     const estados = await this.repositorio.obtenerEstadosR1(candidatos);
-    const cerradosSap = await this.repositorio.obtenerCerradosSap(candidatosSap);
+    const [cerradosSap, facturadosSapR1] = await Promise.all([
+      this.repositorio.obtenerCerradosSap(candidatosSap),
+      this.repositorio.obtenerFacturadosSapPorNumero(candidatos),
+    ]);
     const cerrados = candidatos.filter(({ idOrigen }) =>
-      estados.get(idOrigen)?.codigoEstadoVenta === 'C' && !estados.get(idOrigen)?.facturado);
-    const validados = candidatos.filter(({ idOrigen }) => estados.get(idOrigen)?.facturado);
+      estados.get(idOrigen)?.codigoEstadoVenta === 'C'
+      && !estados.get(idOrigen)?.facturado && !facturadosSapR1.has(idOrigen));
+    const validados = candidatos.filter(({ idOrigen }) =>
+      estados.get(idOrigen)?.facturado || facturadosSapR1.has(idOrigen));
     const cierresSapSinDocumento = cerradosSap.filter(({ tipoCierre }) =>
       tipoCierre === 'CERRADO SIN ENTREGA NI FACTURA');
     const cierresSapComprobados = cerradosSap.filter(({ tipoCierre }) =>

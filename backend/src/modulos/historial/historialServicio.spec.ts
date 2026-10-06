@@ -42,13 +42,14 @@ describe('HistorialServicio', () => {
   it('da prioridad a la factura R1 confirmada sobre el estado cerrado', async () => {
     const repositorio = { obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),
       obtenerDespachadosPendientes: vi.fn().mockResolvedValue([
-        { idOrigen: 'R1:F1', folioPedido: 'F1' },
-        { idOrigen: 'R1:F2', folioPedido: 'F2' },
-        { idOrigen: 'R1:F3', folioPedido: 'F3' },
+        { idOrigen: 'R1:F1', folioPedido: 'F1', numeroPedido: '100' },
+        { idOrigen: 'R1:F2', folioPedido: 'F2', numeroPedido: '101' },
+        { idOrigen: 'R1:F3', folioPedido: 'F3', numeroPedido: '102' },
       ]),
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
       conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerCerradosSap: vi.fn().mockResolvedValue([]),
+      obtenerFacturadosSapPorNumero: vi.fn().mockResolvedValue(new Set()),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map([
         ['R1:F1', { codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: false, facturado: false }],
         ['R1:F2', { codigoSucursal: 'SPS', codigoEstadoVenta: 'A', verificado: true, facturado: true }],
@@ -61,9 +62,9 @@ describe('HistorialServicio', () => {
 
     await expect(servicio.sincronizar()).resolves.toBe(3);
     expect(repositorio.obtenerEstadosR1).toHaveBeenCalledWith([
-      { idOrigen: 'R1:F1', folioPedido: 'F1' },
-      { idOrigen: 'R1:F2', folioPedido: 'F2' },
-      { idOrigen: 'R1:F3', folioPedido: 'F3' },
+      { idOrigen: 'R1:F1', folioPedido: 'F1', numeroPedido: '100' },
+      { idOrigen: 'R1:F2', folioPedido: 'F2', numeroPedido: '101' },
+      { idOrigen: 'R1:F3', folioPedido: 'F3', numeroPedido: '102' },
     ]);
     expect(repositorio.marcarCerrados).toHaveBeenCalledWith(['R1:F1']);
     expect(repositorio.marcarValidados).toHaveBeenCalledWith([
@@ -78,6 +79,7 @@ describe('HistorialServicio', () => {
       obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
       conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
       obtenerCerradosSap: vi.fn().mockResolvedValue([]),
+      obtenerFacturadosSapPorNumero: vi.fn().mockResolvedValue(new Set()),
       obtenerEstadosR1: vi.fn().mockResolvedValue(new Map()),
       marcarCerrados: vi.fn().mockResolvedValue(0),
       marcarValidados: vi.fn().mockResolvedValue(0),
@@ -106,6 +108,7 @@ describe('HistorialServicio', () => {
         estadoActual: 'C', tieneEntrega: false, tieneFacturaDirecta: false,
         tipoCierre: 'CERRADO SIN ENTREGA NI FACTURA',
       }]),
+      obtenerFacturadosSapPorNumero: vi.fn().mockResolvedValue(new Set()),
       marcarCerrados: vi.fn().mockResolvedValue(1),
       marcarValidados: vi.fn().mockResolvedValue(1),
     } as unknown as HistorialRepositorio;
@@ -119,6 +122,29 @@ describe('HistorialServicio', () => {
       { idOrigen: 'SAP:10', codigoSucursal: null },
     ]);
     expect(repositorio.marcarCerrados).toHaveBeenCalledWith(['SAP:11']);
+  });
+
+  it('promueve a Facturado un despacho R1 cerrado cuando SAP tiene factura valida', async () => {
+    const candidato = { idOrigen: 'R1:TSPS01:SPSS27PE388062',
+      folioPedido: 'SPSS27PE388062', numeroPedido: '101478078' };
+    const repositorio = { obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),
+      obtenerDespachadosPendientes: vi.fn().mockResolvedValue([candidato]),
+      obtenerDespachadosSapPendientes: vi.fn().mockResolvedValue([]),
+      conservarCerradosSapSinDespacho: vi.fn().mockResolvedValue(0),
+      obtenerEstadosR1: vi.fn().mockResolvedValue(new Map([[candidato.idOrigen, {
+        codigoSucursal: 'SPS', codigoEstadoVenta: 'C', verificado: false, facturado: false,
+      }]])),
+      obtenerCerradosSap: vi.fn().mockResolvedValue([]),
+      obtenerFacturadosSapPorNumero: vi.fn().mockResolvedValue(new Set([candidato.idOrigen])),
+      marcarCerrados: vi.fn().mockResolvedValue(0),
+      marcarValidados: vi.fn().mockResolvedValue(1),
+    } as unknown as HistorialRepositorio;
+
+    await expect(new HistorialServicio(repositorio).sincronizar()).resolves.toBe(1);
+    expect(repositorio.marcarCerrados).toHaveBeenCalledWith([]);
+    expect(repositorio.marcarValidados).toHaveBeenCalledWith([
+      { idOrigen: candidato.idOrigen, codigoSucursal: 'SPS' },
+    ]);
   });
 
   it('combina el historial validado de R1 con pedidos SAP cerrados conservados localmente', async () => {

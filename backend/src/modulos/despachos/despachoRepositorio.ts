@@ -37,6 +37,15 @@ export interface IDespachoRepositorio {
 export const claveLineaDespachada = (idOrigen: string, identificadorDetalle: string): string =>
   `${idOrigen}\u0000${identificadorDetalle}`;
 
+export const CONDICION_ETAPA_DESPACHADOS = `pedido.estadoLocal IN ('DESPACHADO','CERRADO')
+  AND pedido.validadoDetectadoEn IS NULL
+  AND pedido.entregaDetectadaEn IS NULL
+  AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
+    WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado)
+  AND NOT EXISTS(SELECT 1 FROM dbo.DevolucionPedido devolucion
+    WHERE devolucion.idPedidoDespachado=pedido.idPedidoDespachado
+      AND devolucion.estado=N'DEVUELTO')`;
+
 export class DespachoRepositorio implements IDespachoRepositorio {
   public async identidadesLineas(): Promise<Set<string>> {
     const resultado = await obtenerPoolPedidosBodega().request().query<{
@@ -154,9 +163,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-        WHERE pedido.estadoLocal IN ('DESPACHADO','CERRADO')
-          AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
-            WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado)
+        WHERE ${CONDICION_ETAPA_DESPACHADOS}
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
           AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
           AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
@@ -254,9 +261,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         ON asignacion.idOrigen = detalle.idOrigen
        AND asignacion.identificadorDetalle = detalle.identificadorDetalle
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
-      WHERE pedido.estadoLocal IN ('DESPACHADO','CERRADO')
-        AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
-          WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado)
+      WHERE ${CONDICION_ETAPA_DESPACHADOS}
         AND ${condicionLineaNoFleteSql('detalle.codigoArticulo', 'detalle.descripcion')}
         AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
         AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
@@ -312,9 +317,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
         WHERE pedido.idOrigen = @idOrigen
-          AND pedido.estadoLocal IN ('DESPACHADO','CERRADO')
-          AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
-            WHERE recepcion.idPedidoDespachado=pedido.idPedidoDespachado);`)).recordset[0];
+          AND ${CONDICION_ETAPA_DESPACHADOS};`)).recordset[0];
     if (!cabecera) return null;
 
     const detalles = (await pool.request()
