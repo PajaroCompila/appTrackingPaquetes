@@ -41,6 +41,7 @@ export class PedidosDevueltosComponent implements OnInit {
   public readonly actualizando = signal(false);
   public readonly confirmando = signal(false);
   public readonly error = signal<string | null>(null);
+  public readonly advertencia = signal<string | null>(null);
   public readonly mensaje = signal('');
   public readonly devoluciones = signal<PedidoDevuelto[]>([]);
   public readonly detalle = signal<PedidoDevuelto | null>(null);
@@ -100,24 +101,28 @@ export class PedidosDevueltosComponent implements OnInit {
     this.destruirRef.onDestroy(() => clearInterval(refresco));
     this.consultar.pipe(
       switchMap(() => {
-        this.actualizando.set(true);
+        this.cargando.set(this.primeraCarga);
+        this.actualizando.set(!this.primeraCarga);
         this.error.set(null);
+        this.advertencia.set(null);
         const consulta = this.idOrigen()
           ? this.servicio.obtener(this.idOrigen()!).pipe(map(({datos}) => ({
             datos:[datos],paginacion:{pagina:1,cantidadPorPagina:25,cantidadDevuelta:1,totalRegistros:1,hayMas:false},
+            advertencia:null,
           } satisfies RespuestaPedidosDevueltos)))
           : this.servicio.listar(this.aplicados);
         return consulta.pipe(
           catchError((e: {error?: {mensaje?:string}}) => {
-            if(this.primeraCarga || !this.devoluciones().length) this.error.set(e.error?.mensaje || 'No pudimos cargar los pedidos devueltos.');
+            this.error.set(e.error?.mensaje || 'No pudimos cargar los pedidos devueltos.');
             return EMPTY;
           }),
           finalize(() => {this.cargando.set(false);this.actualizando.set(false);this.primeraCarga=false;}),
         );
       }),
       takeUntilDestroyed(this.destruirRef),
-    ).subscribe(({datos,paginacion}) => {
+    ).subscribe(({datos,paginacion,advertencia}) => {
       this.devoluciones.set(datos);
+      this.advertencia.set(advertencia ?? null);
       this.detalle.set(this.idOrigen() ? datos[0] ?? null : null);
       this.totalRegistros.set(paginacion.totalRegistros);
       this.pagina.set(paginacion.pagina);
@@ -151,13 +156,19 @@ export class PedidosDevueltosComponent implements OnInit {
       });
   }
 
-  public buscar(): void { this.guardarGlobales(); this.actualizarRuta(1); }
+  public buscar(): void {
+    if (this.cargando() || this.actualizando()) return;
+    this.guardarGlobales(); this.actualizarRuta(1);
+  }
   public limpiarFiltros(): void {
+    if (this.cargando() || this.actualizando()) return;
     const fechaActual = obtenerFechaLocalActual();
     Object.assign(this.filtros,{numeroPedido:'',fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:[],estado:'todos'});
     this.buscar();
   }
-  public cambiarVista(vista:'pedido'|'articulos'):void {if(this.vista()!==vista){this.vista.set(vista);this.actualizarRuta(1);}}
+  public cambiarVista(vista:'pedido'|'articulos'):void {
+    if(this.vista()!==vista&&!this.cargando()&&!this.actualizando()){this.vista.set(vista);this.actualizarRuta(1);}
+  }
   public irPagina(pagina:number):void {if(!this.actualizando())this.actualizarRuta(pagina);}
   public estaSeleccionado(codigo:string):boolean {return this.filtros.codigosAlmacen.includes(codigo);}
   public alternarAlmacen(codigo:string,seleccionado:boolean):void {

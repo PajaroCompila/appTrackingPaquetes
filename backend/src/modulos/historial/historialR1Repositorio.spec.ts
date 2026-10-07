@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionBaseDatos.js';
-import { seleccionarSucursalesHistorial } from './historialR1Repositorio.js';
+import { HistorialR1Repositorio, seleccionarSucursalesHistorial } from './historialR1Repositorio.js';
 
 const sucursal = (codigoTienda: string): ConfiguracionSucursalR1 => ({
   codigoTienda,
@@ -36,5 +36,19 @@ describe('seleccionarSucursalesHistorial', () => {
     expect(seleccionarSucursalesHistorial(sucursales, [])).toEqual(sucursales);
     expect(seleccionarSucursalesHistorial(sucursales, ['BODEGA-EXTERNA'])).toEqual(sucursales);
     expect(seleccionarSucursalesHistorial(sucursales, ['BSPS03', 'BXYZ01'])).toEqual(sucursales);
+  });
+
+  it('rechaza la respuesta completa si una sucursal falla en lugar de devolver datos parciales', async () => {
+    const repositorio = new HistorialR1Repositorio(sucursales.slice(0, 2));
+    const interno = repositorio as unknown as {
+      consultarCabeceras: (...argumentos: unknown[]) => Promise<unknown[]>;
+    };
+    vi.spyOn(interno, 'consultarCabeceras')
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('timeout'));
+
+    await expect(repositorio.buscar({ fechaDesde: '2026-10-07', fechaHasta: '2026-10-07',
+      codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 }))
+      .rejects.toThrow('No fue posible confirmar el historial R1');
   });
 });

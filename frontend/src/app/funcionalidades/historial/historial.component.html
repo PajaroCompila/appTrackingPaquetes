@@ -67,24 +67,28 @@
         </select>
       </div>
       <div class="acciones-filtros">
-        <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
-        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
+        <button class="boton boton-primario" type="submit" [disabled]="cargando() || actualizando()">Buscar</button>
+        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando() || actualizando()">Limpiar filtros</button>
       </div>
       </form>
     </div>
 
     <div class="pestanas-vistas" role="tablist" aria-label="Forma de ver el historial">
       <button type="button" role="tab" id="pestana-articulos" [attr.aria-selected]="vista() === 'articulos'"
-        [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+        [class.activa]="vista() === 'articulos'" [disabled]="cargando() || actualizando()"
+        (click)="cambiarVista('articulos')">Artículos</button>
       <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
-        [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+        [class.activa]="vista() === 'pedido'" [disabled]="cargando() || actualizando()"
+        (click)="cambiarVista('pedido')">Pedido</button>
     </div>
 
     @if (cargando()) {
       <div class="estado-interfaz" role="status"><p>Cargando historial…</p></div>
-    } @else if (error(); as mensaje) {
-      <div class="estado-interfaz estado-error" role="alert"><h2>{{ mensaje.titulo }}</h2><p>{{ mensaje.detalle }}</p></div>
     } @else {
+      @if (error(); as mensaje) {
+        <div class="estado-interfaz estado-error" role="alert"><h2>{{ mensaje.titulo }}</h2><p>{{ mensaje.detalle }}</p></div>
+      }
+      @if (!error() || hayDatosVisibles()) {
       @for (grupo of grupos(); track grupo.clave) {
       <section class="grupo-listado-pedidos" [attr.aria-labelledby]="'titulo-historial-' + grupo.clave">
         @if (!modoSoloConsulta()) {
@@ -97,7 +101,9 @@
       <h2 [id]="'titulo-historial-' + grupo.clave">{{ grupo.titulo }}</h2>
       @if ((vista() === 'pedido' && grupo.pedidos.length === 0)
         || (vista() === 'articulos' && grupo.articulos.length === 0)) {
-        <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
+        @if (!advertencia()) {
+          <div class="panel grupo-sin-resultados">No hay pedidos en esta sección.</div>
+        }
       } @else if (vista() === 'pedido') {
       <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
         <table><thead><tr><th>Pedido</th><th>Estado</th><th>Artículos</th><th>Bodegas</th><th>Fecha del pedido</th><th>Vendedor</th><th>Usuario</th><th>Tiempo total</th><th>Modificado por</th><th>Ver detalle</th>@if (!modoSoloConsulta()) {<th class="columna-imprimir columna-accion-masiva"><app-accion-seleccion-detalle
@@ -152,10 +158,11 @@
       </div>
       }
       <app-paginacion [paginaActual]="grupo.pagina" [totalRegistros]="grupo.totalRegistros"
-        [cantidadPorPagina]="filtros.cantidadPorPagina" [deshabilitada]="cargando()"
+        [cantidadPorPagina]="filtros.cantidadPorPagina" [deshabilitada]="cargando() || actualizando()"
         [etiquetaRegistros]="vista() === 'articulos' ? 'partidas' : 'pedidos'"
         (paginaSeleccionada)="irPagina(grupo.clave, $event)" />
       </section>
+      }
       }
     }
   }

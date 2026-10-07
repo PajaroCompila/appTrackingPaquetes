@@ -96,6 +96,7 @@ export class HistorialComponent implements OnInit {
   public readonly cargando = signal(false);
   public readonly actualizando = signal(false);
   public readonly error = signal<MensajeError | null>(null);
+  public readonly advertencia = signal<string | null>(null);
   public readonly lineasSeleccionadasImpresion = signal<ReadonlySet<string>>(new Set());
   public readonly articulosImpresion = signal<readonly ArticuloImpresionPedido[]>([]);
   public readonly fechaHoraImpresion = signal('');
@@ -218,6 +219,7 @@ export class HistorialComponent implements OnInit {
   }
 
   public buscar(): void {
+    if (this.cargando() || this.actualizando()) return;
     this.limpiarSeleccionImpresion();
     this.pagina.set(1);
     this.paginaEspeciales.set(1);
@@ -227,6 +229,7 @@ export class HistorialComponent implements OnInit {
     this.cargar();
   }
   public cambiarCantidadPorPagina(): void {
+    if (this.cargando() || this.actualizando()) return;
     this.limpiarSeleccionImpresion();
     this.pagina.set(1);
     this.paginaEspeciales.set(1);
@@ -236,13 +239,11 @@ export class HistorialComponent implements OnInit {
     this.cargar();
   }
   public cambiarVista(vista: VistaHistorial): void {
-    if (this.vista() === vista) return;
+    if (this.vista() === vista || this.cargando() || this.actualizando()) return;
     this.limpiarSeleccionImpresion();
     this.confirmarFiltrosAplicados();
     this.vista.set(vista); this.pagina.set(1); this.paginaEspeciales.set(1);
     this.haCargado = false; this.hayMas.set(false);
-    if (vista === 'articulos') { this.articulos.set([]); this.articulosEspeciales.set([]); }
-    else { this.registros.set([]); this.registrosEspeciales.set([]); }
     this.guardarFiltros(); this.actualizarUrl(); this.cargar();
   }
   public limpiarFiltros(): void {
@@ -461,7 +462,7 @@ export class HistorialComponent implements OnInit {
     return responsables.length > 0 ? responsables.join(', ') : '—';
   }
   public irPagina(grupo: 'normales' | 'especiales', pagina: number): void {
-    if (this.cargando()) return;
+    if (this.cargando() || this.actualizando()) return;
     this.limpiarSeleccionImpresion();
     this.confirmarFiltrosAplicados();
     if (grupo === 'normales') this.pagina.set(pagina); else this.paginaEspeciales.set(pagina);
@@ -547,13 +548,13 @@ export class HistorialComponent implements OnInit {
 
   private cargar(esAutomatica = false): void {
     if (esAutomatica && (this.cargando() || this.actualizando())) return;
+    const hayDatos = this.hayDatosVisibles();
+    this.error.set(null);
+    this.advertencia.set(null);
     if (!esAutomatica) {
       this.consultaListado?.unsubscribe();
-      this.actualizando.set(false);
-      this.cargando.set(true);
-      this.haCargado = false;
-      this.error.set(null);
-      this.vaciarVistaActual();
+      this.actualizando.set(hayDatos);
+      this.cargando.set(!hayDatos);
     } else if (this.haCargado) {
       this.actualizando.set(true);
     } else {
@@ -574,6 +575,10 @@ export class HistorialComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destruirRef)).subscribe({
         next: ({ normales, especiales }) => {
           if (secuencia !== this.secuenciaConsulta) return;
+          const advertencias = [...new Set([
+            ...(normales.advertencias ?? []), ...(especiales.advertencias ?? []),
+          ])];
+          this.advertencia.set(advertencias.length > 0 ? advertencias.join(' ') : null);
           if (vistaConsulta === 'articulos') {
             this.articulos.set(normales.datos as ArticuloHistorial[]);
             this.articulosEspeciales.set(especiales.datos as ArticuloHistorial[]);
@@ -598,7 +603,7 @@ export class HistorialComponent implements OnInit {
         },
         error: (error: unknown) => {
           if (secuencia !== this.secuenciaConsulta) return;
-          if (!esAutomatica) this.error.set(obtenerMensajeError(error, 'historial'));
+          this.error.set(obtenerMensajeError(error, 'historial'));
           this.finalizarConsulta(vistaConsulta, secuencia);
         },
       });
@@ -611,16 +616,10 @@ export class HistorialComponent implements OnInit {
     if (this.vista() !== vistaConsulta) queueMicrotask(() => this.cargar());
   }
 
-  private vaciarVistaActual(): void {
-    if (this.vista() === 'articulos') {
-      this.articulos.set([]);
-      this.articulosEspeciales.set([]);
-    } else {
-      this.registros.set([]);
-      this.registrosEspeciales.set([]);
-    }
-    this.totalRegistros.set(0);
-    this.totalRegistrosEspeciales.set(0);
+  public hayDatosVisibles(): boolean {
+    return this.vista() === 'articulos'
+      ? this.articulos().length > 0 || this.articulosEspeciales().length > 0
+      : this.registros().length > 0 || this.registrosEspeciales().length > 0;
   }
 
   private confirmarFiltrosAplicados(): void {

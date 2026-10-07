@@ -4,6 +4,7 @@ import { environment } from '../../../environments/environment';
 import type { FiltrosPedidosDevueltos, PedidoDevuelto, SeleccionDevolucion } from './pedidos-devueltos.interface';
 export interface RespuestaPedidosDevueltos {
   datos: PedidoDevuelto[];
+  advertencia?: string | null;
   paginacion: { pagina: number; cantidadPorPagina: number; cantidadDevuelta: number; totalRegistros: number; hayMas: boolean };
 }
 @Injectable({ providedIn: 'root' })

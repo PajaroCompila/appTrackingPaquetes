@@ -68,8 +68,8 @@
         </select>
       </div>
       <div class="acciones-filtros">
-        <button class="boton boton-primario" type="submit" [disabled]="cargando()">Buscar</button>
-        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando()">Limpiar filtros</button>
+        <button class="boton boton-primario" type="submit" [disabled]="cargando() || actualizando()">Buscar</button>
+        <button class="boton boton-secundario" type="button" (click)="limpiarFiltros()" [disabled]="cargando() || actualizando()">Limpiar filtros</button>
       </div>
     </form>
   </div>
@@ -80,23 +80,29 @@
 
   <div class="pestanas-historial" role="tablist" aria-label="Forma de ver devoluciones">
     <button type="button" role="tab" id="pestana-articulos" [attr.aria-selected]="vista() === 'articulos'"
-      [class.activa]="vista() === 'articulos'" (click)="cambiarVista('articulos')">Artículos</button>
+      [class.activa]="vista() === 'articulos'" [disabled]="cargando() || actualizando()"
+      (click)="cambiarVista('articulos')">Artículos</button>
     <button type="button" role="tab" id="pestana-pedido" [attr.aria-selected]="vista() === 'pedido'"
-      [class.activa]="vista() === 'pedido'" (click)="cambiarVista('pedido')">Pedido</button>
+      [class.activa]="vista() === 'pedido'" [disabled]="cargando() || actualizando()"
+      (click)="cambiarVista('pedido')">Pedido</button>
   </div>
 
   @if (mensaje()) {<p class="mensaje-devolucion" role="status">{{ mensaje() }}</p>}
 
   @if (cargando()) {
     <div class="panel estado-interfaz" role="status"><p>Cargando pedidos devueltos…</p></div>
-  } @else if (error()) {
-    <div class="panel estado-interfaz estado-error" role="alert"><h2>Error</h2><p>{{ error() }}</p></div>
-  } @else if (devoluciones().length === 0) {
-    <div class="panel estado-interfaz" role="status">
-      <h2>Sin resultados</h2>
-      <p>No hay pedidos devueltos con los filtros seleccionados.</p>
-    </div>
-  } @else if (vista() === 'pedido') {
+  } @else {
+    @if (error()) {
+      <div class="panel estado-interfaz estado-error" role="alert"><h2>Error</h2><p>{{ error() }}</p></div>
+    }
+    @if (devoluciones().length === 0) {
+      @if (!error() && !advertencia()) {
+        <div class="panel estado-interfaz" role="status">
+          <h2>Sin resultados</h2>
+          <p>No hay pedidos devueltos con los filtros seleccionados.</p>
+        </div>
+      }
+    } @else if (vista() === 'pedido') {
     <div class="panel tabla-contenedor" role="tabpanel" aria-labelledby="pestana-pedido">
       <table class="tabla-pedido-devuelto">
         <thead><tr><th>Pedido</th><th>Artículos</th><th>Bodegas</th><th>Vendedor responsable</th><th>Fecha del pedido</th><th>Estado</th><th>Recibido por</th><th>Ver detalle</th></tr></thead>
@@ -140,6 +146,7 @@
         </tbody>
       </table>
     </div>
+  }
   }
 
   <app-paginacion [paginaActual]="pagina()" [totalRegistros]="totalRegistros()" [cantidadPorPagina]="filtros.cantidadPorPagina" [deshabilitada]="actualizando()" [etiquetaRegistros]="vista() === 'pedido' ? 'pedidos' : 'partidas'" (paginaSeleccionada)="irPagina($event)" />

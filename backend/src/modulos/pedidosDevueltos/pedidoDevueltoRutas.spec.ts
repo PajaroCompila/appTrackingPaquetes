@@ -50,4 +50,11 @@ describe('rutas de devolución',()=>{
     vi.mocked(repo.listar).mockResolvedValue({datos:[],total:0});const r=await request(app()).get('/api/pedidos-devueltos');
     expect(r.body.datos).toEqual([]);expect(r.body.paginacion.totalRegistros).toBe(0);
   });
+  it('informa cuando reutiliza la última respuesta local confirmada',async()=>{
+    vi.mocked(repo.listar).mockResolvedValue({datos:[pedido],total:1,
+      advertencia:'Se muestra la última información confirmada.'});
+    const r=await request(app()).get('/api/pedidos-devueltos');
+    expect(r.body.advertencia).toContain('última información confirmada');
+    expect(r.body.datos).toHaveLength(1);
+  });
 });

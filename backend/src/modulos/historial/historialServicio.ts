@@ -23,6 +23,21 @@ interface ConsultaHistorialCompartida {
   expiraEn: number | null;
 }
 
+async function consultarFuenteHistorial<T>(nombre: string, consulta: () => Promise<T>): Promise<T> {
+  const inicio = Date.now();
+  try {
+    const resultado = await consulta();
+    const duracionMs = Date.now() - inicio;
+    if (duracionMs >= 1_000) {
+      console.info(`[rendimiento:historial] ${nombre} completada en ${duracionMs} ms.`);
+    }
+    return resultado;
+  } catch (error) {
+    console.error(`[rendimiento:historial] ${nombre} falló tras ${Date.now() - inicio} ms.`);
+    throw error;
+  }
+}
+
 function claveFiltrosHistorial(tipo: 'pedidos' | 'articulos', filtros: FiltrosHistorial): string {
   return JSON.stringify({
     tipo,
@@ -144,24 +159,32 @@ export class HistorialServicio {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
     const [resultadoR1, resultadoSap, resultadoEntregas] = await Promise.allSettled([
-      (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscar(filtrosAcumulados),
-      this.repositorio.buscarHistorial(filtrosAcumulados),
-      this.entregasRepositorio.buscar(filtrosAcumulados),
+      consultarFuenteHistorial('R1', () =>
+        (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscar(filtrosAcumulados)),
+      consultarFuenteHistorial('historial local', () =>
+        this.repositorio.buscarHistorial(filtrosAcumulados)),
+      consultarFuenteHistorial('entregas SAP persistidas', () =>
+        this.entregasRepositorio.buscar(filtrosAcumulados)),
     ]);
-    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected'
-      && resultadoEntregas.status === 'rejected') {
-      throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
-        'El historial no está disponible temporalmente.');
-    }
     const r1 = resultadoR1.status === 'fulfilled' ? resultadoR1.value : null;
     const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
     const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
+    const advertenciasFuentes = [
+      ...(r1?.advertenciasFuentes ?? []),
+      ...(resultadoR1.status === 'rejected' ? ['No fue posible consultar R1.'] : []),
+      ...(resultadoSap.status === 'rejected' ? ['No fue posible consultar el historial local.'] : []),
+      ...(resultadoEntregas.status === 'rejected' ? ['No fue posible consultar las entregas SAP persistidas.'] : []),
+    ];
     const combinados = [...(r1?.registros ?? []), ...(sap?.registros ?? []), ...(entregas?.registros ?? [])]
       .flatMap((pedido) => {
         const articulos = pedido.articulos.filter((articulo) =>
           !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
         return pedido.articulos.length > 0 && articulos.length === 0 ? [] : [{ ...pedido, articulos }];
       });
+    if (advertenciasFuentes.length > 0 && combinados.length === 0) {
+      throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
+        'El historial no está disponible temporalmente.');
+    }
     await this.aplicarCierres(combinados);
     const todos = deduplicarPedidosHistorial(combinados)
       .sort((a, b) => (b.entregaSap?.fechaEntrega ?? b.validadoDetectadoEn ?? b.despachadoEn ?? b.fechaHoraPedido ?? '')
@@ -176,7 +199,8 @@ export class HistorialServicio {
     ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
-      hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };
+      hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length),
+      advertenciasFuentes: advertenciasFuentes.length > 0 ? advertenciasFuentes : undefined };
   }
 
   public async obtener(idOrigen: string, rol?: string): Promise<PedidoHistorial | null> {
@@ -221,20 +245,28 @@ export class HistorialServicio {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
     const [resultadoR1, resultadoSap, resultadoEntregas] = await Promise.allSettled([
-      (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscarArticulos(filtrosAcumulados),
-      this.repositorio.buscarArticulosHistorial(filtrosAcumulados),
-      this.entregasRepositorio.buscarArticulos(filtrosAcumulados),
+      consultarFuenteHistorial('R1 (artículos)', () =>
+        (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscarArticulos(filtrosAcumulados)),
+      consultarFuenteHistorial('historial local (artículos)', () =>
+        this.repositorio.buscarArticulosHistorial(filtrosAcumulados)),
+      consultarFuenteHistorial('entregas SAP persistidas (artículos)', () =>
+        this.entregasRepositorio.buscarArticulos(filtrosAcumulados)),
     ]);
-    if (resultadoR1.status === 'rejected' && resultadoSap.status === 'rejected'
-      && resultadoEntregas.status === 'rejected') {
-      throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
-        'El historial no está disponible temporalmente.');
-    }
     const r1 = resultadoR1.status === 'fulfilled' ? resultadoR1.value : null;
     const sap = resultadoSap.status === 'fulfilled' ? resultadoSap.value : null;
     const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
+    const advertenciasFuentes = [
+      ...(r1?.advertenciasFuentes ?? []),
+      ...(resultadoR1.status === 'rejected' ? ['No fue posible consultar R1.'] : []),
+      ...(resultadoSap.status === 'rejected' ? ['No fue posible consultar el historial local.'] : []),
+      ...(resultadoEntregas.status === 'rejected' ? ['No fue posible consultar las entregas SAP persistidas.'] : []),
+    ];
     const combinados = [...(r1?.registros ?? []), ...(sap?.registros ?? []), ...(entregas?.registros ?? [])]
       .filter((articulo) => !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
+    if (advertenciasFuentes.length > 0 && combinados.length === 0) {
+      throw new ErrorAplicacion(503, 'HISTORIAL_NO_DISPONIBLE',
+        'El historial no está disponible temporalmente.');
+    }
     await this.aplicarCierres(combinados);
     const todos = deduplicarArticulosHistorial(combinados)
       .sort((a, b) => (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '')
@@ -249,7 +281,8 @@ export class HistorialServicio {
     ]);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: (r1?.totalRegistros ?? 0) + (sap?.totalRegistros ?? 0) + (entregas?.totalRegistros ?? 0),
-      hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length) };
+      hayMas: Boolean(r1?.hayMas || sap?.hayMas || entregas?.hayMas || todos.length > inicio + registros.length),
+      advertenciasFuentes: advertenciasFuentes.length > 0 ? advertenciasFuentes : undefined };
   }
 
   private compartirConsulta<T extends ResultadoListadoHistorial>(

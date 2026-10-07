@@ -15,6 +15,7 @@ export interface HistorialValidado extends PedidoResumen {
 
 export interface RespuestaHistorial {
   datos: HistorialValidado[];
+  advertencias?: string[];
   paginacion: {
     pagina: number;
     cantidadPorPagina: number;
@@ -49,5 +50,6 @@ export interface ArticuloHistorial {
 
 export interface RespuestaArticulosHistorial {
   datos: ArticuloHistorial[];
+  advertencias?: string[];
   paginacion: RespuestaHistorial['paginacion'];
 }

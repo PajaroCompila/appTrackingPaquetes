@@ -100,6 +100,25 @@ describe('historial exclusivo de cancelaciones SAP', () => {
     expect(r.datos[0]?.numeroPedido).toBe('101471323');
     expect(query.mock.calls.every(([q])=>!/DELETE|TRUNCATE/.test(q))).toBe(true);
   });
+  it('sirve el historial local sin esperar la actualización externa', async () => {
+    const p = convertirCancelaciones([fila])[0]!;
+    let liberar!: (valor:{recordset:FilaCanceladaSap[]})=>void;
+    const externa = new Promise<{recordset:FilaCanceladaSap[]}>((resolver)=>{liberar=resolver;});
+    query.mockImplementation(async (s:string) => s.includes('COUNT(*)') ? {recordset:[{cantidad:1}]}
+      : s.includes('SELECT h.snapshot') ? {recordset:[{snapshot:JSON.stringify(p)}]} : {recordset:[]});
+    const fuente = vi.fn().mockReturnValue(externa);
+    const repo = new CancelacionSapHistorial(fuente as typeof consultarSap,
+      vi.fn().mockResolvedValue(new Set()));
+
+    const resultado = await Promise.race([
+      repo.listar(filtros),
+      new Promise<never>((_,rechazar)=>setTimeout(()=>rechazar(new Error('bloqueada')),100)),
+    ]);
+    expect(resultado.datos[0]?.numeroPedido).toBe('101471323');
+    expect(fuente).toHaveBeenCalledOnce();
+    liberar({recordset:[]});
+    await repo.sincronizar();
+  });
   it('filtra bodegas antes de paginar articulos y excluye cualquier snapshot no CANCEL', async () => {
     const p = convertirCancelaciones([fila,{...fila,linea:1,codigoAlmacen:'BSPS02'}])[0]!;
     query.mockImplementation(async(s:string)=> s.includes('SELECT snapshot') ? {recordset:[

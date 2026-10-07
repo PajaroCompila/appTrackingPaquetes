@@ -22,6 +22,7 @@ historialRutas.get('/', async (solicitud, respuesta, siguiente) => {
     const pagina = await servicio.buscar(filtros);
     respuesta.json({
       datos: pagina.registros,
+      advertencias: pagina.advertenciasFuentes ?? [],
       paginacion: {
         pagina: pagina.pagina,
         cantidadPorPagina: pagina.cantidadPorPagina,
@@ -45,7 +46,7 @@ historialRutas.get('/articulos', async (solicitud, respuesta, siguiente) => {
     const filtros = { ...validacion.data, codigosAlmacen: restringirCodigosAlmacen(
       solicitud.user!, validacion.data.codigosAlmacen) };
     const pagina = await servicio.buscarArticulos(filtros);
-    respuesta.json({ datos: pagina.registros, paginacion: {
+    respuesta.json({ datos: pagina.registros, advertencias: pagina.advertenciasFuentes ?? [], paginacion: {
       pagina: pagina.pagina, cantidadPorPagina: pagina.cantidadPorPagina,
       cantidadDevuelta: pagina.registros.length, totalRegistros: pagina.totalRegistros,
       hayMas: pagina.hayMas,

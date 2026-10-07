@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { NEVER, of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { FiltrosGlobalesService } from '../../compartido/filtros-globales.service';
 import { AlmacenesService } from '../pedidos/almacenes.service';
 import { PedidosService } from '../pedidos/pedidos.service';
@@ -466,5 +466,39 @@ describe('HistorialComponent', () => {
     }));
     fixture.destroy();
     vi.useRealTimers();
+  });
+
+  it('conserva los datos visibles y muestra el error cuando falla un refresco', async () => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    const buscarArticulos = vi.fn((filtros: { clasificacion?: string }) => of({
+      datos: [{ idOrigen:`R1:${filtros.clasificacion}`,identificadorDetalle:'1',
+        numeroPedido:filtros.clasificacion==='especial'?'200':'100',codigoArticulo:'ART',
+        descripcion:'Artículo',cantidad:1,codigoAlmacen:'BSPS01',nombreAlmacen:'Bodega',
+        fechaHoraPedido:'2026-10-07T10:00:00',fechaEntradaCola:'2026-10-07T10:00:00.000Z',
+        despachadoEn:'2026-10-07T10:01:00.000Z',nombreVendedor:'Vendedor',
+        esEspecial:filtros.clasificacion==='especial'}],
+      paginacion:{pagina:1,cantidadPorPagina:25,cantidadDevuelta:1,totalRegistros:1,hayMas:false},
+    }));
+    await TestBed.configureTestingModule({
+      imports:[HistorialComponent],
+      providers:[
+        {provide:HistorialService,useValue:{buscar:vi.fn(),buscarArticulos,obtener:vi.fn()}},
+        {provide:AlmacenesService,useValue:{obtenerAlmacenes:vi.fn().mockReturnValue(of({datos:[]}))}},
+        {provide:PedidosService,useValue:{obtenerInventarioArticulo:vi.fn()}},
+        {provide:ActivatedRoute,useValue:{snapshot:{paramMap:convertToParamMap({}),queryParamMap:convertToParamMap({})}}},
+        {provide:Router,useValue:{navigate:vi.fn().mockResolvedValue(true),navigateByUrl:vi.fn()}},
+      ],
+    }).compileComponents();
+    const fixture=TestBed.createComponent(HistorialComponent);
+    fixture.detectChanges();await fixture.whenStable();fixture.detectChanges();
+    buscarArticulos.mockReturnValue(throwError(()=>({error:{mensaje:'Tiempo de espera agotado'}})));
+    (fixture.componentInstance as unknown as {cargar(automatica:boolean):void}).cargar(false);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('100');
+    expect(fixture.nativeElement.textContent).toContain('200');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('No hay pedidos en esta sección');
+    fixture.destroy();vi.useRealTimers();
   });
 });

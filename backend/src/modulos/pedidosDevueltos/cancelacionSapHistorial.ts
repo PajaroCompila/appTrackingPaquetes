@@ -177,6 +177,8 @@ export class CancelacionSapHistorial {
   private enCurso?: Promise<void>;
   private siguienteRevision = 0;
   private ultimoError: unknown;
+  private sincronizacionConfirmada = false;
+  private hayDatosLocales?: boolean;
 
   constructor(
     private readonly fuente = consultarSap,
@@ -196,7 +198,11 @@ export class CancelacionSapHistorial {
       return;
     }
     this.enCurso = this.importar();
-    try { await this.enCurso; this.ultimoError = undefined; }
+    try {
+      await this.enCurso;
+      this.ultimoError = undefined;
+      this.sincronizacionConfirmada = true;
+    }
     catch (error) { this.ultimoError = error; throw error; }
     finally { this.enCurso = undefined; this.siguienteRevision = Date.now() + 60_000; }
   }
@@ -265,24 +271,48 @@ export class CancelacionSapHistorial {
       );
       DROP TABLE #SnapshotsDevueltos;`);
       await transaccion.commit();
+      this.hayDatosLocales = datos.length > 0;
     } catch (error) {
       await transaccion.rollback();
       throw error;
     }
   }
 
-  private async actualizar(): Promise<void> {
-    await this.preparar();
-    try { await this.sincronizar(); }
-    catch (error) {
-      const r = await obtenerPoolPedidosBodega().request().query('SELECT (SELECT COUNT(*) FROM dbo.CancelacionSapHistorial WHERE activo=1) + (SELECT COUNT(*) FROM dbo.CierreSapDevueltos WHERE activo=1) cantidad');
-      if (!r.recordset[0]?.cantidad) throw error;
-      console.error('SAP no disponible: se conserva el historial de cancelaciones confirmado.');
-    }
+  private async existenDatosLocales(): Promise<boolean> {
+    if (this.hayDatosLocales !== undefined) return this.hayDatosLocales;
+    const resultado = await obtenerPoolPedidosBodega().request().query(`SELECT
+      (SELECT COUNT(*) FROM dbo.CancelacionSapHistorial WHERE activo=1)
+      + (SELECT COUNT(*) FROM dbo.CierreSapDevueltos WHERE activo=1) cantidad;`);
+    this.hayDatosLocales = Number(resultado.recordset[0]?.cantidad ?? 0) > 0;
+    return this.hayDatosLocales;
   }
 
-  public async listar(f: FiltrosDevolucion): Promise<{ datos: PedidoDevuelto[]; total: number }> {
-    await this.actualizar();
+  private iniciarSincronizacionEnSegundoPlano(): void {
+    if (this.enCurso || Date.now() < this.siguienteRevision) return;
+    void this.sincronizar().catch(() => {
+      console.error('No fue posible actualizar las devoluciones; se conserva la última información local confirmada.');
+    });
+  }
+
+  private async actualizar(): Promise<string | null> {
+    await this.preparar();
+    const hayDatosLocales = await this.existenDatosLocales();
+    if (!hayDatosLocales && !this.sincronizacionConfirmada) {
+      await this.sincronizar();
+    } else {
+      this.iniciarSincronizacionEnSegundoPlano();
+    }
+    return this.ultimoError
+      ? 'No fue posible actualizar los pedidos devueltos. Se muestra la última información confirmada.'
+      : this.enCurso
+        ? 'Los pedidos devueltos se están actualizando. Se muestra la última información confirmada.'
+        : null;
+  }
+
+  public async listar(f: FiltrosDevolucion): Promise<{
+    datos: PedidoDevuelto[]; total: number; advertencia?: string | null;
+  }> {
+    const advertencia = await this.actualizar();
     const r = await obtenerPoolPedidosBodega().request()
       .input('numero', sql.NVarChar(100), f.numeroPedido || null)
       .input('desde', sql.VarChar(10), f.fechaDesde || null).input('hasta', sql.VarChar(10), f.fechaHasta || null)
@@ -314,14 +344,16 @@ export class CancelacionSapHistorial {
     }
     // El estado SAP no confirma recepción física de mercadería.
     const inicio = (f.pagina - 1) * f.cantidadPorPagina;
-    if (f.vista === 'pedido') return { datos: pedidos.slice(inicio, inicio + f.cantidadPorPagina), total: pedidos.length };
+    if (f.vista === 'pedido') return {
+      datos: pedidos.slice(inicio, inicio + f.cantidadPorPagina), total: pedidos.length, advertencia,
+    };
     const lineas = pedidos.flatMap(p => p.lineas.map(l => ({ p, l })));
     const pagina = new Map<string, PedidoDevuelto>();
     for (const { p, l } of lineas.slice(inicio, inicio + f.cantidadPorPagina)) {
       if (!pagina.has(p.idClave)) pagina.set(p.idClave, { ...p, lineas: [] });
       pagina.get(p.idClave)!.lineas.push(l);
     }
-    return { datos: [...pagina.values()], total: lineas.length };
+    return { datos: [...pagina.values()], total: lineas.length, advertencia };
   }
 
   public async obtener(id: string): Promise<PedidoDevuelto | null> {

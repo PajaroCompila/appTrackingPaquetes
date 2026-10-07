@@ -16,6 +16,16 @@ const registro = (idOrigen: string, estadoLocal: 'VALIDADO' | 'DESPACHADO', fech
   usuarioDespacho: 'Operador',
 });
 
+const paginaVacia = { registros: [] as [], pagina: 1, cantidadPorPagina: 25,
+  totalRegistros: 0, hayMas: false };
+const entregasVacias = (): EntregaSapRepositorio => ({
+  buscar: vi.fn().mockResolvedValue(paginaVacia),
+  buscarArticulos: vi.fn().mockResolvedValue(paginaVacia),
+} as unknown as EntregaSapRepositorio);
+const servicioListado = (repositorio: HistorialRepositorio, repositorioR1: HistorialR1Repositorio) =>
+  new HistorialServicio(repositorio, repositorioR1, {} as AsignacionRepositorio,
+    undefined, entregasVacias());
+
 describe('HistorialServicio', () => {
   it('identifica el cerrado 500313581 en Pedido, Artículos y Detalle sin cambiar facturados ni entregas', async () => {
     const cerrado = {...registro('SAP:1', 'VALIDADO', '2026-10-02T10:07:00'), numeroPedido:'500313581'};
@@ -33,7 +43,7 @@ describe('HistorialServicio', () => {
       obtenerReceptorDevolucion:vi.fn().mockResolvedValue('Marcos Pérez')} as unknown as HistorialRepositorio;
     const r1 = {buscar:vi.fn().mockResolvedValue({...pagina,registros:[],totalRegistros:0}),
       buscarArticulos:vi.fn().mockResolvedValue({...pagina,registros:[],totalRegistros:0})} as unknown as HistorialR1Repositorio;
-    const servicio = new HistorialServicio(repo,r1);
+    const servicio = servicioListado(repo,r1);
     const filtros = {fechaDesde:'2026-10-02',fechaHasta:'2026-10-02',codigosAlmacen:[],pagina:1,cantidadPorPagina:25};
     const pedidos = await servicio.buscar(filtros);
     expect(pedidos.registros.find(p=>p.numeroPedido==='500313581')?.estadoHistorial).toBe('CERRADO');
@@ -150,7 +160,7 @@ describe('HistorialServicio', () => {
     const r1 = { buscar: vi.fn().mockResolvedValue({ ...pagina, registros: [facturado] })
     } as unknown as HistorialR1Repositorio;
 
-    const resultado = await new HistorialServicio(repo, r1).buscar({ fechaDesde: '2026-10-06',
+    const resultado = await servicioListado(repo, r1).buscar({ fechaDesde: '2026-10-06',
       fechaHasta: '2026-10-06', codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 });
 
     expect(resultado.registros.filter(p => p.numeroPedido === '101')).toHaveLength(1);
@@ -191,7 +201,7 @@ describe('HistorialServicio', () => {
     const repositorioR1 = { buscar: vi.fn().mockResolvedValue({ registros: [r1], pagina: 1,
       cantidadPorPagina: 25, hayMas: false }) } as unknown as HistorialR1Repositorio;
 
-    const resultado = await new HistorialServicio(repositorio, repositorioR1).buscar({
+    const resultado = await servicioListado(repositorio, repositorioR1).buscar({
       fechaDesde: '2026-08-01', fechaHasta: '2026-08-15', codigosAlmacen: [], pagina: 1,
       cantidadPorPagina: 25,
     });
@@ -230,7 +240,7 @@ describe('HistorialServicio', () => {
       buscarHistorial: vi.fn().mockResolvedValue({ ...pagina, registros: [] }),
     } as unknown as HistorialRepositorio;
     const repositorioR1 = { buscar: vi.fn().mockResolvedValue(pagina) } as unknown as HistorialR1Repositorio;
-    const servicio = new HistorialServicio(repositorio, repositorioR1);
+    const servicio = servicioListado(repositorio, repositorioR1);
     const filtros = { fechaDesde: '2026-08-15', fechaHasta: '2026-08-15',
       codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 };
 
@@ -288,10 +298,51 @@ describe('HistorialServicio', () => {
     const filtros = { fechaDesde: '2026-08-01', fechaHasta: '2026-08-28',
       codigosAlmacen: ['BSPS01'], pagina: 1, cantidadPorPagina: 25 };
 
-    await expect(new HistorialServicio(repositorio, repositorioConsulta)
+    await expect(servicioListado(repositorio, repositorioConsulta)
       .buscarArticulos(filtros)).resolves.toMatchObject({ pagina: 1, hayMas: false });
     expect(repositorioConsulta.buscarArticulos).toHaveBeenCalledOnce();
     expect(repositorioConsulta.buscarArticulos).toHaveBeenCalledWith(filtros);
     expect(repositorio.buscarArticulosHistorial).toHaveBeenCalledWith(filtros);
+  });
+
+  it('no convierte una fuente fallida en resultado vacío ni conserva el error en caché', async () => {
+    const repositorio = {
+      buscarArticulosHistorial: vi.fn().mockResolvedValue(paginaVacia),
+    } as unknown as HistorialRepositorio;
+    const buscarArticulos = vi.fn()
+      .mockRejectedValueOnce(new Error('tiempo de espera R1'))
+      .mockResolvedValue(paginaVacia);
+    const repositorioR1 = { buscarArticulos } as unknown as HistorialR1Repositorio;
+    const servicio = servicioListado(repositorio, repositorioR1);
+    const filtros = { fechaDesde: '2026-10-07', fechaHasta: '2026-10-07',
+      codigosAlmacen: [], pagina: 1, cantidadPorPagina: 25 };
+
+    await expect(servicio.buscarArticulos(filtros)).rejects.toMatchObject({
+      estadoHttp: 503, codigo: 'HISTORIAL_NO_DISPONIBLE',
+    });
+    await expect(servicio.buscarArticulos(filtros)).resolves.toMatchObject({
+      registros: [], totalRegistros: 0,
+    });
+    expect(buscarArticulos).toHaveBeenCalledTimes(2);
+  });
+
+  it('conserva filas válidas como resultado parcial e identifica la fuente fallida', async () => {
+    const pedido = registro('SAP:20', 'VALIDADO', '2026-10-07T12:00:00.000Z');
+    const repositorio = {
+      buscarHistorial: vi.fn().mockResolvedValue({ ...paginaVacia, registros:[pedido], totalRegistros:1 }),
+      obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),
+      registrarIngresosHistorial: vi.fn().mockResolvedValue(new Map([[pedido.idOrigen,
+        '2026-10-07T12:01:00.000Z']])),
+    } as unknown as HistorialRepositorio;
+    const repositorioR1 = {
+      buscar: vi.fn().mockRejectedValue(new Error('sucursal inaccesible')),
+    } as unknown as HistorialR1Repositorio;
+
+    await expect(servicioListado(repositorio, repositorioR1).buscar({
+      fechaDesde:'2026-10-07',fechaHasta:'2026-10-07',codigosAlmacen:[],pagina:1,cantidadPorPagina:25,
+    })).resolves.toMatchObject({
+      registros:[expect.objectContaining({idOrigen:'SAP:20'})],
+      advertenciasFuentes:['No fue posible consultar R1.'],
+    });
   });
 });

@@ -24,7 +24,7 @@ export const esquemaConfirmarDevolucion = z.object({ lineas: z.array(z.object({
   idClave: z.string().regex(/^[a-f0-9]{64}$/), identificadorDetalle: z.string().trim().min(1).max(150),
 }).strict()).min(1).max(100) }).strict();
 export interface RepositorioDevolucionRutas {
-  listar(f: FiltrosDevolucion): Promise<{datos: PedidoDevuelto[];total:number}>;
+  listar(f: FiltrosDevolucion): Promise<{datos: PedidoDevuelto[];total:number;advertencia?:string|null}>;
   obtener(id: string): Promise<PedidoDevuelto|null>;
   confirmar(s: SeleccionDevolucion[],u: IdentidadAutenticada): Promise<void>;
 }
@@ -39,8 +39,9 @@ export function crearPedidoDevueltoRutas(repo: RepositorioDevolucionRutas = canc
       const datos = r.datos.map(p => ({...p,lineas:p.lineas.filter(l => !esLineaFlete(l.codigoArticulo, l.descripcion)
         && puedeVerAlmacen(req.user,l.codigoAlmacen)
         && (!codigosAlmacen.length || codigosAlmacen.includes(l.codigoAlmacen?.toUpperCase() ?? '')))})).filter(p => p.lineas.length>0 || (codigosAlmacen.length===0 && p.totalLineas===0));
-      res.json({datos,paginacion:{pagina:f.pagina,cantidadPorPagina:f.cantidadPorPagina,totalRegistros:r.total,
-        cantidadDevuelta:f.vista==='pedido'?datos.length:datos.reduce((n,p)=>n+p.lineas.length,0),hayMas:f.pagina*f.cantidadPorPagina<r.total}});
+      res.json({datos,advertencia:r.advertencia ?? null,
+        paginacion:{pagina:f.pagina,cantidadPorPagina:f.cantidadPorPagina,totalRegistros:r.total,
+          cantidadDevuelta:f.vista==='pedido'?datos.length:datos.reduce((n,p)=>n+p.lineas.length,0),hayMas:f.pagina*f.cantidadPorPagina<r.total}});
     } catch(e) {next(errorDatos(e));}
   });
   rutas.post('/confirmar',requerirRoles('ADMINISTRADOR','OPERADOR_BODEGA'),async(req,res,next) => {

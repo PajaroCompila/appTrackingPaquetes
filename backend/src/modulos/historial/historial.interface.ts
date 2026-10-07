@@ -29,6 +29,7 @@ export interface PaginaHistorial {
   cantidadPorPagina: number;
   totalRegistros: number;
   hayMas: boolean;
+  advertenciasFuentes?: string[];
 }
 
 export interface ArticuloHistorial {
@@ -60,4 +61,5 @@ export interface PaginaArticulosHistorial {
   cantidadPorPagina: number;
   totalRegistros: number;
   hayMas: boolean;
+  advertenciasFuentes?: string[];
 }

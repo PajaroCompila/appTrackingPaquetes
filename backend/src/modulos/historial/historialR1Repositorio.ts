@@ -48,6 +48,24 @@ interface ArticuloR1 extends Omit<ArticuloHistorial, 'idOrigen'> {
 
 const texto = (valor: string | null): string | null => valor?.trim() || null;
 
+async function consultarSucursalHistorial<T>(
+  sucursal: ConfiguracionSucursalR1,
+  consulta: () => Promise<T>,
+): Promise<T> {
+  const inicio = Date.now();
+  try {
+    const resultado = await consulta();
+    const duracionMs = Date.now() - inicio;
+    if (duracionMs >= 1_000) {
+      console.info(`[rendimiento:historial] ${sucursal.codigoTienda} completada en ${duracionMs} ms.`);
+    }
+    return resultado;
+  } catch (error) {
+    console.error(`[rendimiento:historial] ${sucursal.codigoTienda} falló tras ${Date.now() - inicio} ms.`);
+    throw error;
+  }
+}
+
 export function seleccionarSucursalesHistorial(
   sucursales: ConfiguracionSucursalR1[],
   codigosAlmacen: string[],
@@ -77,13 +95,22 @@ export class HistorialR1Repositorio {
     const cantidadConsulta = cantidadAcumulada + 1;
     const sucursales = seleccionarSucursalesHistorial(this.sucursales, filtros.codigosAlmacen);
     const resultados = await Promise.allSettled(sucursales.map(async (sucursal) => ({
-      sucursal, filas: await this.consultarCabeceras(sucursal, filtros, cantidadConsulta),
+      sucursal, filas: await consultarSucursalHistorial(sucursal,
+        () => this.consultarCabeceras(sucursal, filtros, cantidadConsulta)),
     })));
+    const fallidas = resultados.flatMap((resultado, indice) => resultado.status === 'rejected'
+      ? [sucursales[indice]?.codigoTienda ?? `sucursal-${indice + 1}`] : []);
+    if (fallidas.length > 0) {
+      console.error(`[rendimiento:historial] Fallaron sucursales R1: ${fallidas.join(', ')}.`);
+    }
     const disponibles = resultados.filter((resultado) => resultado.status === 'fulfilled');
     if (disponibles.length === 0) throw resultados[0]?.status === 'rejected'
       ? resultados[0].reason : new Error('No hay sucursales R1 disponibles.');
     const todas: CabeceraFuente[] = disponibles.flatMap(({ value }) =>
       value.filas.map((fila) => ({ sucursal: value.sucursal, fila })));
+    if (fallidas.length > 0 && todas.length === 0) {
+      throw new Error(`No fue posible confirmar el historial R1: ${fallidas.join(', ')}.`);
+    }
     todas.sort((a, b) => (b.fila.fechaHoraPedido ?? '').localeCompare(a.fila.fechaHoraPedido ?? '')
       || a.fila.folioPedido.localeCompare(b.fila.folioPedido));
     const inicio = (filtros.pagina - 1) * filtros.cantidadPorPagina;
@@ -98,7 +125,9 @@ export class HistorialR1Repositorio {
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: disponibles.reduce((total, { value }) =>
         total + Number(value.filas[0]?.totalRegistros ?? 0), 0),
-      hayMas: todas.length > inicio + filtros.cantidadPorPagina };
+      hayMas: todas.length > inicio + filtros.cantidadPorPagina,
+      advertenciasFuentes: fallidas.length > 0
+        ? [`No respondieron las sucursales R1: ${fallidas.join(', ')}.`] : undefined };
   }
 
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
@@ -106,14 +135,23 @@ export class HistorialR1Repositorio {
     const cantidadConsulta = cantidadAcumulada + 1;
     const sucursales = seleccionarSucursalesHistorial(this.sucursales, filtros.codigosAlmacen);
     const resultados = await Promise.allSettled(sucursales.map(async (sucursal) => ({
-      sucursal, filas: await this.consultarArticulos(sucursal, filtros, cantidadConsulta),
+      sucursal, filas: await consultarSucursalHistorial(sucursal,
+        () => this.consultarArticulos(sucursal, filtros, cantidadConsulta)),
     })));
+    const fallidas = resultados.flatMap((resultado, indice) => resultado.status === 'rejected'
+      ? [sucursales[indice]?.codigoTienda ?? `sucursal-${indice + 1}`] : []);
+    if (fallidas.length > 0) {
+      console.error(`[rendimiento:historial] Fallaron sucursales R1: ${fallidas.join(', ')}.`);
+    }
     const disponibles = resultados.filter((resultado) => resultado.status === 'fulfilled');
     if (disponibles.length === 0) throw resultados[0]?.status === 'rejected'
       ? resultados[0].reason : new Error('No hay sucursales R1 disponibles.');
     const todos = disponibles.flatMap(({ value }) => value.filas.map((fila) => ({
       ...fila, idOrigen: `R1:${value.sucursal.codigoTienda}:${fila.folioPedido}`,
     })));
+    if (fallidas.length > 0 && todos.length === 0) {
+      throw new Error(`No fue posible confirmar el historial R1: ${fallidas.join(', ')}.`);
+    }
     todos.sort((a, b) => (b.fechaHoraPedido ?? '').localeCompare(a.fechaHoraPedido ?? '')
       || a.numeroPedido.localeCompare(b.numeroPedido)
       || Number(a.identificadorDetalle ?? 0) - Number(b.identificadorDetalle ?? 0));
@@ -130,7 +168,9 @@ export class HistorialR1Repositorio {
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
       totalRegistros: disponibles.reduce((total, { value }) =>
         total + Number(value.filas[0]?.totalRegistros ?? 0), 0),
-      hayMas: todos.length > inicio + filtros.cantidadPorPagina };
+      hayMas: todos.length > inicio + filtros.cantidadPorPagina,
+      advertenciasFuentes: fallidas.length > 0
+        ? [`No respondieron las sucursales R1: ${fallidas.join(', ')}.`] : undefined };
   }
 
   public async obtener(idOrigen: string): Promise<PedidoHistorial | null> {

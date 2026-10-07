@@ -2,7 +2,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { PedidosDevueltosComponent } from './pedidos-devueltos.component';
 import { PedidosDevueltosService } from './pedidos-devueltos.service';
 import { AlmacenesService } from '../pedidos/almacenes.service';
@@ -108,6 +108,33 @@ describe('historial de pedidos CANCEL', () => {
     await crear();expect(fixture.nativeElement.textContent).toContain('SAP no disponible');
     expect(fixture.componentInstance.cargando()).toBe(false);
   });
+  it('no presenta un vacío como definitivo mientras la actualización externa sigue pendiente',async()=>{
+    servicio.listar.mockReturnValue(of({...respuesta([]),
+      advertencia:'Se muestra la última información confirmada.'}));
+    await crear();
+    expect(fixture.nativeElement.textContent).not.toContain('Actualización pendiente');
+    expect(fixture.nativeElement.textContent).not.toContain('Sin resultados');
+  });
+  it('conserva la última respuesta válida cuando falla un refresco',async()=>{
+    await crear();
+    servicio.listar.mockReturnValue(throwError(()=>({error:{mensaje:'Tiempo de espera agotado'}})));
+    fixture.componentInstance.reintentar();fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('101471323');
+    expect(fixture.nativeElement.textContent).toContain('Tiempo de espera agotado');
+    expect(fixture.nativeElement.textContent).not.toContain('Sin resultados');
+  });
+  it('ignora una respuesta anterior cuando ya existe una consulta más reciente',async()=>{
+    const anterior=new Subject<ReturnTypeRespuesta>();
+    const reciente=new Subject<ReturnTypeRespuesta>();
+    servicio.listar.mockReturnValueOnce(anterior).mockReturnValueOnce(reciente);
+    await crear();
+    fixture.componentInstance.reintentar();
+    const nuevo={...pedido,idClave:'b'.repeat(64),numeroPedido:'101478999'};
+    reciente.next(respuesta([nuevo]));fixture.detectChanges();
+    anterior.next(respuesta([pedido]));fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('101478999');
+    expect(fixture.nativeElement.textContent).not.toContain('101471323');
+  });
   it('muestra de forma persistente quien recibió la devolución',async()=>{
     const recibido={...pedido,estado:'DEVUELTO' as const,recibidoPor:'Gregorio Cruz',
       recibidoEn:'2026-10-05T15:00:00Z',lineas:pedido.lineas.map(linea=>({...linea,
@@ -122,3 +149,9 @@ describe('historial de pedidos CANCEL', () => {
     ]));
   });
 });
+
+type ReturnTypeRespuesta = ReturnType<typeof respuesta>;
+function respuesta(datos: PedidoDevuelto[]) {
+  return {datos,paginacion:{pagina:1,cantidadPorPagina:25,totalRegistros:datos.length,
+    cantidadDevuelta:datos.length,hayMas:false}};
+}
