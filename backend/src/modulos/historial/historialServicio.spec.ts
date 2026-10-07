@@ -29,7 +29,8 @@ describe('HistorialServicio', () => {
         new Map(ids.map((id) => [id, '2026-10-02T10:10:00.000Z']))),
       buscarHistorial:vi.fn().mockResolvedValue(pagina),
       buscarArticulosHistorial:vi.fn().mockResolvedValue({...pagina,registros:[{...cerrado,codigoArticulo:'A1',identificadorDetalle:'0'}]}),
-      obtenerHistorial:vi.fn().mockResolvedValue(cerrado)} as unknown as HistorialRepositorio;
+      obtenerHistorial:vi.fn().mockResolvedValue(cerrado),
+      obtenerReceptorDevolucion:vi.fn().mockResolvedValue('Marcos Pérez')} as unknown as HistorialRepositorio;
     const r1 = {buscar:vi.fn().mockResolvedValue({...pagina,registros:[],totalRegistros:0}),
       buscarArticulos:vi.fn().mockResolvedValue({...pagina,registros:[],totalRegistros:0})} as unknown as HistorialR1Repositorio;
     const servicio = new HistorialServicio(repo,r1);
@@ -39,7 +40,10 @@ describe('HistorialServicio', () => {
     expect(pedidos.registros.find(p=>p.numeroPedido==='500313583')?.estadoHistorial).toBe('CERRADO');
     expect(pedidos.registros.find(p=>p.numeroPedido==='500313582')?.estadoHistorial).toBe('Facturado');
     expect((await servicio.buscarArticulos(filtros)).registros[0]?.estadoHistorial).toBe('CERRADO');
-    expect((await servicio.obtener('SAP:1'))?.estadoHistorial).toBe('CERRADO');
+    expect(await servicio.obtener('SAP:1')).toMatchObject({
+      estadoHistorial: 'CERRADO', recibidoPor: 'Marcos Pérez',
+    });
+    expect(repo.obtenerReceptorDevolucion).toHaveBeenCalledWith('SAP:1');
   });
   it('da prioridad a la factura R1 confirmada sobre el estado cerrado', async () => {
     const repositorio = { obtenerEstadosSinFactura: vi.fn().mockResolvedValue(new Map()),

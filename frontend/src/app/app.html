@@ -13,6 +13,9 @@
           <a routerLink="/historial-validados" routerLinkActive="activo" aria-label="Historial"><i class="pi pi-history" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Historial</span></a>
         }
         <a routerLink="/inventario" routerLinkActive="activo" aria-label="Inventario"><i class="pi pi-box" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Inventario</span></a>
+        @if (puedeVerOperacion()) {
+          <a routerLink="/traslados" routerLinkActive="activo" aria-label="Traslados"><i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Traslados</span></a>
+        }
         @if (usuario()?.codigoRol === 'ADMINISTRADOR') {
           <a routerLink="/configuracion/usuarios" routerLinkActive="activo" aria-label="Configuración, Usuarios"><i class="pi pi-cog" aria-hidden="true"></i><span class="etiqueta-nav" aria-hidden="true">Configuración · Usuarios</span></a>
         }

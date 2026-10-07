@@ -1,0 +1,87 @@
+<section class="pagina pagina-traslados" aria-labelledby="titulo-traslados">
+  <header class="encabezado-pagina">
+    <div>
+      <p class="sobrelinea">Operaciones</p>
+      <h1 id="titulo-traslados">Traslados</h1>
+      <p>Módulo de traslados entre bodegas</p>
+    </div>
+  </header>
+
+  <article class="panel tarjeta-construccion" aria-labelledby="titulo-construccion">
+    <div class="ilustracion-construccion" aria-hidden="true">
+      <svg viewBox="0 0 760 380" role="img" focusable="false">
+        <defs>
+          <linearGradient id="cielo-traslados" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#edf5fc" />
+            <stop offset="1" stop-color="#dbe9f6" />
+          </linearGradient>
+          <linearGradient id="suelo-traslados" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#d7e2eb" />
+            <stop offset=".5" stop-color="#c8d7e4" />
+            <stop offset="1" stop-color="#d7e2eb" />
+          </linearGradient>
+        </defs>
+
+        <rect class="fondo-ilustracion" x="12" y="12" width="736" height="356" rx="30" />
+        <circle class="halo-ilustracion" cx="380" cy="172" r="135" />
+        <path class="nube" d="M93 91h92c0-23-18-40-40-40-18 0-33 11-38 27-5-3-11-5-18-5-18 0-33 14-33 32h37" />
+        <path class="nube nube-derecha" d="M585 73h88c0-20-16-36-36-36-16 0-30 10-34 25-6-4-12-6-19-6-16 0-29 13-29 29h30" />
+
+        <g class="bodega-ilustracion bodega-origen">
+          <path d="M56 206l91-55 91 55v120H56z" />
+          <path class="techo-bodega" d="M43 210l104-63 104 63-13 21-91-55-91 55z" />
+          <rect class="puerta-bodega" x="101" y="238" width="92" height="88" rx="5" />
+          <path class="linea-puerta" d="M101 265h92M101 292h92" />
+          <text x="147" y="224">ORIGEN</text>
+        </g>
+        <g class="bodega-ilustracion bodega-destino">
+          <path d="M522 206l91-55 91 55v120H522z" />
+          <path class="techo-bodega" d="M509 210l104-63 104 63-13 21-91-55-91 55z" />
+          <rect class="puerta-bodega" x="567" y="238" width="92" height="88" rx="5" />
+          <path class="linea-puerta" d="M567 265h92M567 292h92" />
+          <text x="613" y="224">DESTINO</text>
+        </g>
+
+        <g class="grua-ilustracion">
+          <path class="estructura-grua" d="M329 302V72M314 302h30M329 72h215M329 94h181M349 72l-20 22 41 0-41 28 41 0-41 28 41 0-41 28 41 0-41 28 41 0-41 28 41 0-41 28 41 0-41 28" />
+          <path class="contrapeso-grua" d="M329 72H247v31h42" />
+          <g class="carga-grua">
+            <path class="cable-grua" d="M492 73v91" />
+            <path class="gancho-grua" d="M492 164v13c0 13-19 13-19 0" />
+            <rect class="caja-grua" x="457" y="185" width="70" height="53" rx="6" />
+            <path class="marca-caja" d="M477 185v53M507 185v53M457 207h70" />
+          </g>
+        </g>
+
+        <g class="tecnico tecnico-izquierdo">
+          <circle class="cabeza-tecnico" cx="263" cy="255" r="14" />
+          <path class="casco-tecnico" d="M247 255c1-14 7-21 16-21s15 7 16 21z" />
+          <path class="cuerpo-tecnico" d="M242 324l7-48c2-12 26-12 29 0l8 48z" />
+          <path class="chaleco-tecnico" d="M254 269l9 19 9-19M263 288v36" />
+          <path class="piernas-tecnico" d="M252 324l-6 31M276 324l7 31" />
+          <rect class="plano-tecnico" x="215" y="282" width="42" height="29" rx="3" />
+          <path class="linea-plano" d="M222 290h27M222 298h18M222 306h23" />
+        </g>
+
+        <g class="vehiculo-ilustracion">
+          <path class="cuerpo-vehiculo" d="M351 286h111l23 28v26H337v-40z" />
+          <path class="cabina-vehiculo" d="M417 286h45l23 28h-68z" />
+          <rect class="luz-maquina" x="476" y="316" width="10" height="8" rx="2" />
+          <circle class="rueda-vehiculo" cx="368" cy="340" r="16" />
+          <circle class="rueda-vehiculo" cx="456" cy="340" r="16" />
+          <circle class="centro-rueda" cx="368" cy="340" r="6" />
+          <circle class="centro-rueda" cx="456" cy="340" r="6" />
+        </g>
+        <path class="suelo-ilustracion" d="M39 356h682" />
+        <path class="ruta-traslado" d="M242 337h86M493 337h25" />
+      </svg>
+    </div>
+
+    <div class="mensaje-construccion">
+      <span class="etiqueta-construccion"><i class="pi pi-wrench" aria-hidden="true"></i> En desarrollo</span>
+      <h2 id="titulo-construccion">Módulo en construcción</h2>
+      <p>Estamos trabajando en esta funcionalidad.</p>
+      <p>Próximamente estará disponible.</p>
+    </div>
+  </article>
+</section>

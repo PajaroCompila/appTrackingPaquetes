@@ -1,0 +1,53 @@
+:host { display: block; }
+.pagina-traslados { display: grid; gap: 1.25rem; overflow-x: clip; }
+.tarjeta-construccion { display: grid; min-height: min(66vh, 42rem); grid-template-columns: minmax(0, 1.25fr) minmax(18rem, .75fr); align-items: center; gap: clamp(1.5rem, 4vw, 4rem); padding: clamp(1.5rem, 4vw, 3.5rem); overflow: hidden; }
+.ilustracion-construccion { width: 100%; max-width: 49rem; min-width: 0; justify-self: center; }
+.ilustracion-construccion svg { display: block; width: 100%; height: auto; overflow: hidden; }
+.fondo-ilustracion { fill: url(#cielo-traslados); }
+.halo-ilustracion { fill: #fff; opacity: .48; }
+.nube { fill: none; stroke: #b8cfe2; stroke-linecap: round; stroke-width: 10; opacity: .68; }
+.nube-derecha { opacity: .48; }
+.bodega-ilustracion > path:first-child { fill: #f8fbfd; stroke: #8aa7be; stroke-width: 3; }
+.techo-bodega { fill: #1d5289; stroke: #163f6a; stroke-linejoin: round; stroke-width: 3; }
+.puerta-bodega { fill: #dbe8f2; stroke: #8aa7be; stroke-width: 3; }
+.linea-puerta { fill: none; stroke: #9cb4c7; stroke-width: 2; }
+.bodega-ilustracion text { fill: #10285b; font-family: var(--fuente-interfaz); font-size: 13px; font-weight: 700; text-anchor: middle; }
+.estructura-grua { fill: none; stroke: #174b7d; stroke-linecap: round; stroke-linejoin: round; stroke-width: 7; }
+.contrapeso-grua { fill: none; stroke: #f1a82c; stroke-linejoin: round; stroke-width: 18; }
+.carga-grua { animation: trabajo-grua 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center top; }
+.cable-grua, .gancho-grua { fill: none; stroke: #667786; stroke-linecap: round; stroke-width: 4; }
+.caja-grua { fill: #f2ae37; stroke: #b87415; stroke-width: 3; }
+.marca-caja { fill: none; stroke: #d28a20; stroke-width: 2; }
+.casco-tecnico { fill: #f2ae37; stroke: #a76b13; stroke-width: 2; }
+.cabeza-tecnico { fill: #d89d72; }
+.cuerpo-tecnico { fill: #1d5289; stroke: #153f69; stroke-width: 2; }
+.chaleco-tecnico { fill: none; stroke: #dcecff; stroke-width: 3; }
+.piernas-tecnico { fill: none; stroke: #243c54; stroke-linecap: round; stroke-width: 7; }
+.plano-tecnico { fill: #f8fbfd; stroke: #7894aa; stroke-width: 2; }
+.linea-plano { fill: none; stroke: #8aa7be; stroke-width: 2; }
+.cuerpo-vehiculo { fill: #1d5289; stroke: #143c65; stroke-linejoin: round; stroke-width: 3; }
+.cabina-vehiculo { fill: #b9d8ed; stroke: #143c65; stroke-width: 3; }
+.rueda-vehiculo { fill: #263746; stroke: #f8fbfd; stroke-width: 3; }
+.centro-rueda { fill: #94a9b9; }
+.luz-maquina { fill: #ffd367; animation: luz-trabajo 1.6s ease-in-out infinite; }
+.suelo-ilustracion { fill: none; stroke: #9fb3c2; stroke-linecap: round; stroke-width: 5; }
+.ruta-traslado { fill: none; stroke: #fff; stroke-dasharray: 13 10; stroke-width: 4; }
+.mensaje-construccion { max-width: 29rem; justify-self: center; text-align: center; }
+.etiqueta-construccion { display: inline-flex; align-items: center; gap: .45rem; margin-bottom: 1rem; padding: .38rem .75rem; border: 1px solid #c4d8e8; border-radius: 999px; background: var(--azul-100); color: var(--azul-700); font-size: .78rem; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
+.mensaje-construccion h2 { margin: 0 0 .75rem; color: var(--azul-900); font-size: clamp(1.45rem, 3vw, 2rem); }
+.mensaje-construccion p { margin: .2rem 0; color: var(--gris-600); font-size: 1rem; }
+@keyframes trabajo-grua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(12px); } }
+@keyframes luz-trabajo { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (max-width: 850px) {
+  .tarjeta-construccion { min-height: auto; grid-template-columns: 1fr; gap: 1rem; }
+  .ilustracion-construccion { max-width: 40rem; }
+  .mensaje-construccion { padding-bottom: .5rem; }
+}
+@media (max-width: 520px) {
+  .tarjeta-construccion { padding: 1rem; }
+  .ilustracion-construccion { width: 112%; margin-inline: -6%; }
+  .mensaje-construccion p { font-size: .92rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .carga-grua, .luz-maquina { animation: none; }
+}

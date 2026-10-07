@@ -61,7 +61,7 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .resumen-dashboard span { display: grid; min-width: 6.5rem; padding: .55rem .7rem; border-radius: .6rem; background: var(--azul-100); color: var(--gris-600); font-size: .75rem; text-align: center; }
 .resumen-dashboard strong { color: var(--azul-900); font-size: 1rem; }
 .bodegas-inventario { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
-.bodegas-inventario li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; padding: .85rem; border: 1px solid #d8e3eb; border-radius: .72rem; background: #f8fafc; transition: border-color 180ms ease, background 180ms ease; }
+.bodegas-inventario li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; padding: .85rem; border: 1px solid #d8e3eb; border-radius: .72rem; background: #f8fafc; }
 .identidad-bodega { display: flex; align-items: center; min-width: 0; gap: .7rem; }
 .icono-bodega { display: grid; flex: 0 0 2.3rem; height: 2.3rem; place-items: center; border-radius: .6rem; background: #dfeaf4; color: var(--azul-700); }
 .identidad-bodega div { display: grid; min-width: 0; gap: .12rem; }
@@ -74,6 +74,7 @@ footer { justify-content: flex-end; border-top: 1px solid #d8e1ea; }
 .bodegas-inventario li.existencia-baja { border-color: #e5b8b4; background: #fff1f0; }
 .existencia-baja .icono-bodega { background: #f7d9d6; color: #a63c34; }
 .existencia-baja .cantidad-bodega strong { color: #a12f29; }
+.sin-existencia { background: #eee; filter: grayscale(1); opacity: .76; }
 .sin-existencias { display: grid; min-height: 8rem; place-items: center; align-content: center; gap: .5rem; border: 1px dashed #b9c8d5; border-radius: .7rem; background: #f8fafc; color: var(--gris-600); text-align: center; }
 .sin-existencias i { font-size: 1.6rem; }
 .sin-existencias p { margin: 0; }

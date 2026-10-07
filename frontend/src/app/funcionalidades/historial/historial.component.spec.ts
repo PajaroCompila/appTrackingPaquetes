@@ -8,6 +8,7 @@ import { AlmacenesService } from '../pedidos/almacenes.service';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { HistorialComponent } from './historial.component';
 import { HistorialService } from './historial.service';
+import type { HistorialValidado } from './historial.interface';
 import { ImpresionesService } from '../../compartido/impresiones/impresiones.service';
 import { DetallePedidoVistaComponent } from '../../compartido/detalle-pedido/detalle-pedido-vista.component';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
@@ -63,14 +64,14 @@ describe('HistorialComponent', () => {
   it('imprime el detalle de historial con el mismo componente POS', async () => {
     vi.useFakeTimers();
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
-    const detallePedido = {
+    const detallePedido: HistorialValidado = {
       idOrigen: 'R1:H1', origenPedido: 'R1', creadoEnR1: true, sapDocEntry: null,
       folioPedido: '300', numeroPedido: '300', codigoVenta: null, codigoVendedor: 1,
       nombreVendedor: 'Vendedor historial', codigosAlmacen: ['BSPS01'], nombresBodega: 'Principal',
       fechaHoraPedido: '2026-09-22T08:00:00-06:00', codigoEstadoVenta: 'C',
       codigoSincronizacion: 'N', estadoLocal: 'VALIDADO', despachadoEn: '2026-09-22T09:00:00-06:00',
       validadoDetectadoEn: '2026-09-22T10:00:00-06:00', usuarioDespacho: 'Gregorio Cruz',
-      estadoHistorial: 'CERRADO',
+      estadoHistorial: 'CERRADO' as const, recibidoPor: 'Marcos Pérez',
       articulos: [{ identificadorDetalle: '1', codigoArticulo: 'A-H1', descripcion: 'Artículo historial',
         cantidad: 1, codigoAlmacen: 'BSPS01', nombreAlmacen: 'Principal', usuarioAsignado: 'Gregorio Cruz' }],
     };
@@ -95,6 +96,15 @@ describe('HistorialComponent', () => {
     const detalle = fixture.debugElement.query(By.directive(DetallePedidoVistaComponent))
       .componentInstance as DetallePedidoVistaComponent;
     expect(fixture.componentInstance.configuracionDetalleVisual().severidadEstado).toBe('peligro');
+    expect(fixture.componentInstance.detalleVisual()?.datosOperativos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ etiqueta: 'Recibido por', valor: 'Marcos Pérez' }),
+    ]));
+    expect(fixture.nativeElement.textContent).toContain('Marcos Pérez');
+    fixture.componentInstance.registros.set([{ ...detallePedido, recibidoPor: null }]);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.detalleVisual()?.datosOperativos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ etiqueta: 'Recibido por', valor: 'Sin registrar' }),
+    ]));
     detalle.seleccionarTodos();
     detalle.imprimirSeleccionados();
     await vi.advanceTimersByTimeAsync(0);
@@ -301,7 +311,7 @@ describe('HistorialComponent', () => {
 
     const titulos = [...fixture.nativeElement.querySelectorAll('.grupo-listado-pedidos > h2')]
       .map((titulo: HTMLElement) => titulo.textContent?.trim());
-    expect(titulos).toEqual(['Pedidos Especiales', 'Pedidos Normales']);
+    expect(titulos).toEqual(['Pedidos Normales', 'Pedidos Especiales']);
     const seccionEspeciales = fixture.nativeElement
       .querySelector('#titulo-historial-especiales')?.parentElement as HTMLElement;
     const seccionNormales = fixture.nativeElement
@@ -321,7 +331,7 @@ describe('HistorialComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('NORMAL');
     expect(fixture.nativeElement.textContent).toContain('ESPECIAL');
     (fixture.nativeElement.querySelector('.codigo-articulo') as HTMLElement).click();
-    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('ESPECIAL', 'BSPS01');
+    expect(obtenerInventarioArticulo).toHaveBeenCalledWith('NORMAL', 'BSPS01');
     const tiempos = [...fixture.nativeElement.querySelectorAll('.tiempo-total-despacho')]
       .map((elemento: HTMLElement) => elemento.textContent?.trim());
     expect(tiempos).toEqual(['16:00', '16:00']);

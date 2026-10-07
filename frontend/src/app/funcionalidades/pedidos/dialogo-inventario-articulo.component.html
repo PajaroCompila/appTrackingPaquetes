@@ -90,7 +90,8 @@
           } @else {
             <ul class="bodegas-inventario" aria-label="Existencias por bodega">
               @for (bodega of inventario.existencias; track bodega.codigoAlmacen) {
-                <li [class.existencia-baja]="existenciaBaja(bodega.existenciaFisica)">
+                <li [class.sin-existencia]="bodega.existenciaFisica === 0"
+                  [class.existencia-baja]="existenciaBaja(bodega.existenciaFisica)">
                   <div class="identidad-bodega">
                     <span class="icono-bodega"><i class="pi pi-warehouse" aria-hidden="true"></i></span>
                     <div>
@@ -100,7 +101,9 @@
                   <div class="cantidad-bodega">
                     <strong>{{ formatearUnidades(bodega.existenciaFisica) }}</strong>
                     <span>unidades</span>
-                    @if (existenciaBaja(bodega.existenciaFisica)) {
+                    @if (bodega.existenciaFisica === 0) {
+                      <small><i class="pi pi-ban" aria-hidden="true"></i> Sin existencia</small>
+                    } @else if (existenciaBaja(bodega.existenciaFisica)) {
                       <small><i class="pi pi-exclamation-circle" aria-hidden="true"></i> Existencia baja</small>
                     }
                   </div>

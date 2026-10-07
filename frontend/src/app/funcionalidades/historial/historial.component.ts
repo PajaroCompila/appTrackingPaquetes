@@ -87,11 +87,11 @@ export class HistorialComponent implements OnInit {
   public readonly totalRegistros = signal(0);
   public readonly totalRegistrosEspeciales = signal(0);
   public readonly grupos = computed(() => [
+    { clave: 'normales' as const, titulo: 'Pedidos Normales', pagina: this.pagina(),
+      totalRegistros: this.totalRegistros(), pedidos: this.registros(), articulos: this.articulos() },
     { clave: 'especiales' as const, titulo: 'Pedidos Especiales', pagina: this.paginaEspeciales(),
       totalRegistros: this.totalRegistrosEspeciales(), pedidos: this.registrosEspeciales(),
       articulos: this.articulosEspeciales() },
-    { clave: 'normales' as const, titulo: 'Pedidos Normales', pagina: this.pagina(),
-      totalRegistros: this.totalRegistros(), pedidos: this.registros(), articulos: this.articulos() },
   ]);
   public readonly cargando = signal(false);
   public readonly actualizando = signal(false);
@@ -117,6 +117,8 @@ export class HistorialComponent implements OnInit {
     if (!this.idOrigen()) return null;
     const pedido = this.registros()[0];
     if (!pedido) return null;
+    const mostrarReceptor = pedido.estadoHistorial === 'CERRADO' || pedido.estadoHistorial === 'DEVUELTO';
+    const estadoTerminal = mostrarReceptor || pedido.estadoHistorial === 'CANCELADO';
     return {
       idOrigen: pedido.idOrigen,
       tipoDocumento: pedido.entregaSap ? 'Entrega SAP' : undefined,
@@ -125,9 +127,11 @@ export class HistorialComponent implements OnInit {
       vendedor: pedido.nombreVendedor,
       fechaPedido: pedido.fechaHoraPedido,
       bodega: pedido.nombresBodega,
-      datosOperativos: pedido.estadoHistorial === 'CERRADO' || pedido.estadoHistorial === 'CANCELADO' ? [
+      datosOperativos: estadoTerminal ? [
         { etiqueta: 'Estado', valor: pedido.estadoHistorial, icono: 'pi pi-info-circle' },
         { etiqueta: 'Bodega', valor: pedido.codigosAlmacen.join(', ') || null, icono: 'pi pi-map-marker' },
+        ...(mostrarReceptor ? [{ etiqueta: 'Recibido por',
+          valor: pedido.recibidoPor?.trim() || 'Sin registrar', icono: 'pi pi-user' }] : []),
       ] : pedido.entregaSap ? [
         { etiqueta: 'Tipo', valor: pedido.entregaSap.tipo, icono: 'pi pi-file' },
         { etiqueta: 'Entrega SAP', valor: pedido.entregaSap.docNum, icono: 'pi pi-file' },
@@ -162,12 +166,16 @@ export class HistorialComponent implements OnInit {
   public readonly configuracionDetalleVisual = computed<ConfiguracionDetallePedido>(() => {
     const pedido = this.registros()[0];
     const configuracion = { ...this.configuracionDetalleBase, permitirImpresion: !this.modoSoloConsulta() };
-    if (pedido?.estadoHistorial === 'CERRADO' || pedido?.estadoHistorial === 'CANCELADO') return { ...configuracion,
-      titulo: pedido.estadoHistorial === 'CANCELADO' ? 'Detalle del pedido cancelado' : 'Detalle del pedido cerrado',
-      descripcion: pedido.estadoHistorial === 'CANCELADO'
-        ? 'Pedido cancelado en SAP' : 'Pedido cerrado sin entrega ni factura en SAP',
+    if (pedido?.estadoHistorial === 'CERRADO' || pedido?.estadoHistorial === 'CANCELADO'
+      || pedido?.estadoHistorial === 'DEVUELTO') return { ...configuracion,
+      titulo: pedido.estadoHistorial === 'CANCELADO' ? 'Detalle del pedido cancelado'
+        : pedido.estadoHistorial === 'DEVUELTO' ? 'Detalle del pedido devuelto' : 'Detalle del pedido cerrado',
+      descripcion: pedido.estadoHistorial === 'CANCELADO' ? 'Pedido cancelado en SAP'
+        : pedido.estadoHistorial === 'DEVUELTO' ? 'Devolución recibida físicamente'
+          : 'Pedido cerrado sin entrega ni factura en SAP',
       etiquetaEstado: pedido.estadoHistorial,
-      severidadEstado: pedido.estadoHistorial === 'CERRADO' ? 'peligro' : 'informacion',
+      severidadEstado: pedido.estadoHistorial === 'CERRADO' || pedido.estadoHistorial === 'DEVUELTO'
+        ? 'peligro' : 'informacion',
       tituloInformacion: 'Datos del pedido', etiquetaArticulos: 'Artículos del pedido' };
     return pedido?.entregaSap ? { ...configuracion, titulo: 'Detalle de la entrega SAP',
       etiquetaEstado: pedido.estadoHistorial || 'Entregado, Sin factura',

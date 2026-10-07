@@ -41,6 +41,10 @@ describe('historial de pedidos CANCEL', () => {
     expect(fixture.nativeElement.textContent).toContain('Detalle del pedido cerrado');
     expect(fixture.nativeElement.textContent).toContain('CERRADO');
     expect(fixture.nativeElement.textContent).not.toContain('CANCELADO');
+    expect(fixture.componentInstance.detalleVisual()?.datosOperativos).toEqual(expect.arrayContaining([
+      expect.objectContaining({etiqueta:'Recibido por',valor:'Sin registrar'}),
+    ]));
+    expect(fixture.nativeElement.textContent).toContain('Sin registrar');
     expect(fixture.componentInstance.puedeConfirmar(cerrado.lineas[0]!)).toBe(false);
   });
   it('consulta por defecto solo los pedidos devueltos del dia actual',async()=>{
@@ -109,8 +113,12 @@ describe('historial de pedidos CANCEL', () => {
       recibidoEn:'2026-10-05T15:00:00Z',lineas:pedido.lineas.map(linea=>({...linea,
         estado:'DEVUELTO' as const,recibidoPor:'Gregorio Cruz',recibidoEn:'2026-10-05T15:00:00Z'}))};
     servicio.listar.mockReturnValue(of({datos:[recibido],paginacion:{pagina:1,cantidadPorPagina:25,totalRegistros:1,hayMas:false}}));
-    await crear();
+    servicio.obtener.mockReturnValue(of({datos:recibido}));
+    await crear(recibido.idClave);
     expect(fixture.nativeElement.textContent).toContain('Gregorio Cruz');
     expect(fixture.nativeElement.textContent).toContain('DEVUELTO');
+    expect(fixture.componentInstance.detalleVisual()?.datosOperativos).toEqual(expect.arrayContaining([
+      expect.objectContaining({etiqueta:'Recibido por',valor:'Gregorio Cruz'}),
+    ]));
   });
 });

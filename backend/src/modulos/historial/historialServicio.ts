@@ -203,8 +203,11 @@ export class HistorialServicio {
         !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
       if (cantidadOriginal > 0 && pedido.articulos.length === 0) return null;
       await this.aplicarCierres([pedido]);
-      await this.agregarResponsablesPedidos([pedido]);
-      await this.agregarIngresosHistorial([pedido]);
+      await Promise.all([
+        this.agregarResponsablesPedidos([pedido]),
+        this.agregarIngresosHistorial([pedido]),
+        this.agregarReceptorDevolucion(pedido),
+      ]);
       if (this.seguimientoRepositorio) await this.seguimientoRepositorio.aplicar([pedido]);
     }
     return pedido;
@@ -302,6 +305,14 @@ export class HistorialServicio {
       const estado = estados.get(pedido.numeroPedido);
       if (estado) pedido.estadoHistorial = estado;
     }
+  }
+
+  private async agregarReceptorDevolucion(pedido: PedidoHistorial): Promise<void> {
+    if (pedido.estadoHistorial !== 'CERRADO' && pedido.estadoHistorial !== 'DEVUELTO') return;
+    const obtenerReceptor = this.repositorio.obtenerReceptorDevolucion;
+    pedido.recibidoPor = typeof obtenerReceptor === 'function'
+      ? await obtenerReceptor.call(this.repositorio, pedido.idOrigen)
+      : null;
   }
 
   private async agregarIngresosHistorial(

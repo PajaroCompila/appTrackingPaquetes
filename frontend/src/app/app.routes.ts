@@ -26,6 +26,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'traslados',
+    canActivate: [autenticacionGuard, operacionGuard],
+    loadComponent: () =>
+      import('./funcionalidades/traslados/traslados.component').then(
+        ({ TrasladosComponent }) => TrasladosComponent,
+      ),
+  },
+  {
     path: 'pedidos-despachados',
     canActivate: [autenticacionGuard, operacionGuard],
     loadComponent: () =>

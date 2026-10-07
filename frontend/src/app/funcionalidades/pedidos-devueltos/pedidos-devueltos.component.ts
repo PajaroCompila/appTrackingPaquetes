@@ -71,12 +71,14 @@ export class PedidosDevueltosComponent implements OnInit {
   }; }
   public readonly detalleVisual = computed<PedidoDetalleVisual | null>(() => {
     const p = this.detalle();
+    const fechaRecepcion = p?.recibidoEn || p?.lineas.find(linea => linea.recibidoEn)?.recibidoEn || null;
     return p ? { idOrigen:p.idOrigen,numeroPedido:p.numeroPedido,tipoDocumento:'Pedido SAP',
       vendedor:p.nombreVendedor ?? null,fechaPedido:p.fechaHoraPedido ?? null,bodega:this.bodegas(p),
       datosOperativos:[{etiqueta:'Estado',valor:this.estadoVisible(p.estado),icono:'pi pi-ban'},
         {etiqueta:'Referencia R1',valor:p.folioPedido || 'No disponible',icono:'pi pi-file'},
-        ...(p.recibidoPor ? [{etiqueta:'Recibido por',valor:p.recibidoPor,icono:'pi pi-user'},
-          {etiqueta:'Fecha de recepción',valor:p.recibidoEn ?? null,icono:'pi pi-calendar',esFecha:true}] : [])],
+        {etiqueta:'Recibido por',valor:this.recibidoPor(p),icono:'pi pi-user'},
+        ...(fechaRecepcion ? [{etiqueta:'Fecha de recepción',valor:fechaRecepcion,
+          icono:'pi pi-calendar',esFecha:true}] : [])],
       articulos:p.lineas.map(l=>({clave:l.identificadorDetalle,identificadorDetalle:l.identificadorDetalle,
         codigo:l.codigoArticulo,descripcion:l.descripcion,cantidad:l.cantidad,codigoAlmacen:l.codigoAlmacen,
         nombreAlmacen:l.codigoAlmacen ? this.nombreAlmacen(l.codigoAlmacen) : null,estadoEntrega:this.estadoVisible(l.estado)})),
@@ -170,7 +172,8 @@ export class PedidosDevueltosComponent implements OnInit {
   public nombreAlmacen(codigo:string):string {return this.almacenes().find(a=>a.codigoAlmacen===codigo)?.nombreAlmacen || codigo;}
   public bodegas(p:PedidoDevuelto):string {return [...new Set(p.lineas.flatMap(l=>l.codigoAlmacen?[l.codigoAlmacen]:[]))].join(', ') || '—';}
   public recibidoPor(p:PedidoDevuelto):string {
-    return p.recibidoPor || p.lineas.find(l=>l.recibidoPor)?.recibidoPor || '—';
+    return p.recibidoPor?.trim() || p.lineas.find(l=>l.recibidoPor?.trim())?.recibidoPor?.trim()
+      || 'Sin registrar';
   }
   public estadoVisible(estado:string | null | undefined):string {return estado === 'CANCEL' ? 'CANCELADO' : estado || '—';}
   public progreso(p:PedidoDevuelto):string {return `${p.lineasRecibidas ?? p.lineas.filter(l=>l.estado==='DEVUELTO').length} / ${p.totalLineas ?? p.lineas.length}`;}

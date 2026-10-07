@@ -41,7 +41,8 @@ describe('App', () => {
     fixture.detectChanges();
     const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
     expect(enlaces.map(e => e.getAttribute('href'))).toEqual([
-      '/dashboard', '/pedidos', '/pedidos-despachados', '/pedidos-devueltos', '/historial-validados', '/inventario']);
+      '/dashboard', '/pedidos', '/pedidos-despachados', '/pedidos-devueltos', '/historial-validados',
+      '/inventario', '/traslados']);
     expect(fixture.nativeElement.querySelector('app-consulta-inventario-articulo-host')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.acciones-notificaciones')).not.toBeNull();
   });
@@ -71,13 +72,14 @@ describe('App', () => {
     fixture.detectChanges();
     const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
 
-    expect(enlaces).toHaveLength(5);
+    expect(enlaces).toHaveLength(6);
     expect(enlaces.map((enlace) => enlace.getAttribute('aria-label'))).toEqual([
       'Pedidos pendientes',
       'Pedidos despachados',
       'Pedidos devueltos',
       'Historial',
       'Inventario',
+      'Traslados',
     ]);
     expect(enlaces.map((enlace) => enlace.getAttribute('href'))).toEqual([
       '/pedidos',
@@ -85,6 +87,7 @@ describe('App', () => {
       '/pedidos-devueltos',
       '/historial-validados',
       '/inventario',
+      '/traslados',
     ]);
     expect(fixture.nativeElement.querySelector('a[href="/dashboard"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/configuracion/usuarios"]')).toBeNull();
@@ -140,6 +143,25 @@ describe('App', () => {
     expect(router.url).toBe('/inventario');
     expect(enlace.classList.contains('activo')).toBe(true);
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Inventario');
+  });
+
+  it('muestra Traslados debajo de Inventario y navega a su pantalla', async () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const router = TestBed.inject(Router);
+    const enlaces = [...fixture.nativeElement.querySelectorAll('.navegacion-principal a')] as HTMLAnchorElement[];
+    const indiceInventario = enlaces.findIndex(enlace => enlace.getAttribute('href') === '/inventario');
+    const enlace = enlaces[indiceInventario + 1];
+
+    expect(enlace?.getAttribute('href')).toBe('/traslados');
+    expect(enlace?.querySelector('.pi-arrow-right-arrow-left')).not.toBeNull();
+    enlace?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(router.url).toBe('/traslados');
+    expect(enlace?.classList.contains('activo')).toBe(true);
+    expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Traslados');
   });
 
   it('mantiene el contador entre rutas y abre el panel sin limpiar las notificaciones', async () => {

@@ -53,6 +53,28 @@ interface FilaCerradaSap {
 interface FilaNumeroCerradoR1 { numeroPedido: number | null }
 
 export class HistorialRepositorio {
+  public async obtenerReceptorDevolucion(idOrigen: string): Promise<string | null> {
+    const resultado = await this.proveedorPedidosBodega().request()
+      .input('idOrigen', sql.NVarChar(150), idOrigen)
+      .query<{ recibidoPor: string }>(`
+        SELECT TOP (1) receptor.recibidoPor
+        FROM (
+          SELECT recepcion.nombreRecibio recibidoPor, recepcion.recibidoEn
+          FROM dbo.RecepcionDevolucionPedido recepcion
+          WHERE recepcion.idOrigen = @idOrigen
+          UNION ALL
+          SELECT usuario.nombreVisible recibidoPor, detalle.recibidoEn
+          FROM dbo.DevolucionPedido devolucion
+          JOIN dbo.DevolucionPedidoDetalle detalle ON detalle.idClave = devolucion.idClave
+          JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = detalle.recibidoPorUsuarioId
+          WHERE devolucion.idOrigen = @idOrigen AND detalle.recibidoEn IS NOT NULL
+        ) receptor
+        WHERE NULLIF(LTRIM(RTRIM(receptor.recibidoPor)), '') IS NOT NULL
+        ORDER BY receptor.recibidoEn DESC;
+      `);
+    return resultado.recordset[0]?.recibidoPor?.trim() || null;
+  }
+
   public async registrarIngresosHistorial(idsOrigen: string[]): Promise<Map<string, string>> {
     const unicos = [...new Set(idsOrigen.map((id) => id.trim()).filter(Boolean))];
     if (unicos.length === 0) return new Map();
