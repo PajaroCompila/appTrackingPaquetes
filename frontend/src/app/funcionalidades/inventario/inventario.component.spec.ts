@@ -67,7 +67,7 @@ describe('InventarioComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('RP-ESM-PASTI-UHF113');
 
     (fixture.nativeElement.querySelector('.resultado-articulo') as HTMLButtonElement).click();
-    expect(abrir).toHaveBeenCalledWith('ESM-MS123', undefined);
+    expect(abrir).toHaveBeenCalledWith('ESM-MS123', undefined, true);
   });
 
   it('abre el modal compartido al seleccionar una coincidencia', async () => {
@@ -76,7 +76,7 @@ describe('InventarioComponent', () => {
     await vi.advanceTimersByTimeAsync(250);
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.resultado-articulo') as HTMLButtonElement).click();
-    expect(abrir).toHaveBeenCalledWith('YAM-MODX7', undefined);
+    expect(abrir).toHaveBeenCalledWith('YAM-MODX7', undefined, true);
     expect(fixture.componentInstance.terminoBusqueda).toBe('YAM-MODX7');
   });
 
@@ -87,7 +87,7 @@ describe('InventarioComponent', () => {
     fixture.componentInstance.manejarTeclado(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     fixture.componentInstance.manejarTeclado(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     fixture.componentInstance.buscar();
-    expect(abrir).toHaveBeenCalledWith('YAM-PSR', undefined);
+    expect(abrir).toHaveBeenCalledWith('YAM-PSR', undefined, true);
   });
 
   it('distingue ausencia de coincidencias de una falla temporal', async () => {

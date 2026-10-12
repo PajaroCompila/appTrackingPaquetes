@@ -7,10 +7,15 @@ import { MIGRACION_CANCELACIONES_SAP } from './cancelacionSapHistorial.js';
 export interface RecepcionDevolucion {
   idOrigen: string;
   estadoOrigen: 'CERRADO' | 'CANCELADO';
-  usuarioRecibio: string;
-  nombreRecibio: string;
+  tipoRecepcion: 'PERSONA' | 'ASIGNADO_OTRO_PEDIDO';
+  usuarioRecibio: string | null;
+  nombreRecibio: string | null;
   recibidoEn: string;
 }
+
+export type RegistroRecepcionDevolucion =
+  | { tipoRecepcion: 'PERSONA'; tecnico: TecnicoAsignable }
+  | { tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO' };
 
 export class RecepcionDevolucionRepositorio {
   private preparada = false;
@@ -23,7 +28,7 @@ export class RecepcionDevolucionRepositorio {
 
   public async registrar(
     idOrigen: string,
-    tecnico: TecnicoAsignable,
+    recepcion: RegistroRecepcionDevolucion,
     usuarioId: string,
   ): Promise<RecepcionDevolucion> {
     await this.preparar();
@@ -32,12 +37,16 @@ export class RecepcionDevolucionRepositorio {
     try {
       const solicitud = new sql.Request(transaccion)
         .input('idOrigen', sql.NVarChar(150), idOrigen)
-        .input('usuarioRecibio', sql.NVarChar(100), tecnico.usuario)
-        .input('nombreRecibio', sql.NVarChar(200), tecnico.nombre)
+        .input('tipoRecepcion', sql.VarChar(30), recepcion.tipoRecepcion)
+        .input('usuarioRecibio', sql.NVarChar(100),
+          recepcion.tipoRecepcion === 'PERSONA' ? recepcion.tecnico.usuario : null)
+        .input('nombreRecibio', sql.NVarChar(200),
+          recepcion.tipoRecepcion === 'PERSONA' ? recepcion.tecnico.nombre : null)
         .input('registradoPor', sql.UniqueIdentifier, usuarioId);
       const resultado = await solicitud.query<{
         idOrigen: string; estadoOrigen: 'CERRADO' | 'CANCELADO';
-        usuarioRecibio: string; nombreRecibio: string; recibidoEn: Date;
+        tipoRecepcion: 'PERSONA' | 'ASIGNADO_OTRO_PEDIDO';
+        usuarioRecibio: string | null; nombreRecibio: string | null; recibidoEn: Date;
       }>(`
         DECLARE @idPedido bigint;
         SELECT @idPedido=idPedidoDespachado
@@ -48,17 +57,21 @@ export class RecepcionDevolucionRepositorio {
         IF EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido WITH(UPDLOCK,HOLDLOCK)
           WHERE idPedidoDespachado=@idPedido)
           THROW 51002, 'La devolución ya fue recibida.', 1;
-        DECLARE @estado varchar(10)=CASE WHEN EXISTS(
+        DECLARE @cancelado bit=CASE WHEN EXISTS(
           SELECT 1 FROM dbo.CancelacionSapHistorial h
           JOIN dbo.PedidoDespachado p ON p.idPedidoDespachado=@idPedido
-          WHERE h.canceled='Y' AND ((p.origenPedido='SAP' AND TRY_CONVERT(int,p.sapDocEntry)=h.docEntry)
+          WHERE h.canceled='Y' AND h.activo=1
+            AND ((p.origenPedido='SAP' AND TRY_CONVERT(int,p.sapDocEntry)=h.docEntry)
             OR (p.origenPedido='R1' AND (p.numeroPedido=h.numeroPedido OR p.folioPedido=h.folioPedido)))
-        ) THEN 'CANCELADO' ELSE 'CERRADO' END;
+        ) THEN 1 ELSE 0 END;
+        IF @tipoRecepcion='ASIGNADO_OTRO_PEDIDO' AND @cancelado=0
+          THROW 51003, 'Solo un pedido cancelado puede asignarse a otro pedido.', 1;
+        DECLARE @estado varchar(10)=CASE WHEN @cancelado=1 THEN 'CANCELADO' ELSE 'CERRADO' END;
         INSERT dbo.RecepcionDevolucionPedido(idPedidoDespachado,idOrigen,estadoOrigen,
-          usuarioRecibio,nombreRecibio,registradoPorUsuarioId)
-        OUTPUT inserted.idOrigen,inserted.estadoOrigen,inserted.usuarioRecibio,
+          tipoRecepcion,usuarioRecibio,nombreRecibio,registradoPorUsuarioId)
+        OUTPUT inserted.idOrigen,inserted.estadoOrigen,inserted.tipoRecepcion,inserted.usuarioRecibio,
           inserted.nombreRecibio,inserted.recibidoEn
-        VALUES(@idPedido,@idOrigen,@estado,@usuarioRecibio,@nombreRecibio,@registradoPor);`);
+        VALUES(@idPedido,@idOrigen,@estado,@tipoRecepcion,@usuarioRecibio,@nombreRecibio,@registradoPor);`);
       await transaccion.commit();
       const fila = resultado.recordset[0]!;
       return { ...fila, recibidoEn: fila.recibidoEn.toISOString() };
@@ -72,6 +85,8 @@ export class RecepcionDevolucionRepositorio {
         throw new ErrorAplicacion(409, 'DEVOLUCION_YA_RECIBIDA',
           'La devolución ya fue registrada por otro usuario.');
       }
+      if (numero === 51003) throw new ErrorAplicacion(409, 'RECEPCION_ESPECIAL_NO_PERMITIDA',
+        'Solo los pedidos cancelados o anulados pueden asignarse a otro pedido.');
       throw error;
     }
   }

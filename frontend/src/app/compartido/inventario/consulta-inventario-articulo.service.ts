@@ -15,19 +15,25 @@ export class ConsultaInventarioArticuloService {
   public readonly abierto = signal(false);
   public readonly estado = signal<EstadoConsultaInventario>('cargando');
   public readonly inventario = signal<InventarioArticulo | null>(null);
+  public readonly contextoInventarioPrincipal = signal(false);
 
-  public abrir(codigoArticuloRecibido: string | null | undefined, codigoAlmacenRecibido: string | null | undefined): void {
+  public abrir(
+    codigoArticuloRecibido: string | null | undefined,
+    codigoAlmacenRecibido: string | null | undefined,
+    contextoInventarioPrincipal = false,
+  ): void {
     const codigoArticulo = codigoArticuloRecibido?.trim();
     const codigoAlmacen = codigoAlmacenRecibido?.trim();
     if (!codigoArticulo) return;
 
-    const clave = `${codigoArticulo}\u0000${codigoAlmacen ?? ''}`;
+    const clave = `${codigoArticulo}\u0000${codigoAlmacen ?? ''}\u0000${contextoInventarioPrincipal}`;
     if (this.claveConsulta === clave && this.consultaActiva) return;
 
     this.consultaActiva?.unsubscribe();
     this.abierto.set(true);
     this.estado.set('cargando');
     this.inventario.set(null);
+    this.contextoInventarioPrincipal.set(contextoInventarioPrincipal);
     this.claveConsulta = clave;
 
     const consulta = this.inyector.get(PedidosService)
@@ -52,6 +58,7 @@ export class ConsultaInventarioArticuloService {
     this.consultaActiva?.unsubscribe();
     this.consultaActiva = null;
     this.claveConsulta = null;
+    this.contextoInventarioPrincipal.set(false);
   }
 
   private finalizarConsulta(clave: string): void {

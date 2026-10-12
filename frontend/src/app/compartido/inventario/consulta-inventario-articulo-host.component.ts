@@ -10,6 +10,7 @@ import { ConsultaInventarioArticuloService } from './consulta-inventario-articul
       <app-dialogo-inventario-articulo
         [estado]="consulta.estado()"
         [inventario]="consulta.inventario()"
+        [contextoInventarioPrincipal]="consulta.contextoInventarioPrincipal()"
         (cerrar)="consulta.cerrar()"
       />
     }

@@ -53,7 +53,7 @@ export class PedidosDevueltosComponent implements OnInit {
   public readonly ultimaActualizacion = signal<Date | null>(null);
   public readonly errorAlmacenes = signal(false);
   public readonly idOrigen = signal<string | null>(null);
-  public readonly vista = signal<'pedido' | 'articulos'>('pedido');
+  public readonly vista = signal<'pedido' | 'articulos'>('articulos');
   public readonly filtros = {
     numeroPedido: '', fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
     codigosAlmacen: [] as string[], estado: 'todos' as FiltrosPedidosDevueltos['estado'], cantidadPorPagina: 25,
@@ -148,7 +148,7 @@ export class PedidosDevueltosComponent implements OnInit {
         this.filtros.cantidadPorPagina=[25,50,100].includes(cantidad)?cantidad:25;
         const pagina=Number(q.get('pagina'));
         this.pagina.set(Number.isInteger(pagina)&&pagina>0?pagina:1);
-        this.vista.set(q.get('vista')==='articulos'?'articulos':'pedido');
+        this.vista.set(q.get('vista')==='pedido'?'pedido':'articulos');
         if (!this.idOrigen()) this.guardarGlobales();
         this.aplicados={...this.filtros,codigosAlmacen:[...this.filtros.codigosAlmacen],pagina:this.pagina(),vista:this.vista()};
         this.seleccion.set(new Map());

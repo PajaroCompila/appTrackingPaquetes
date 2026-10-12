@@ -82,7 +82,7 @@ export class InventarioComponent implements OnInit, AfterViewInit {
   public seleccionar(articulo: CoincidenciaInventarioArticulo): void {
     this.terminoBusqueda = articulo.codigoArticulo;
     this.indiceActivo.set(this.resultados().indexOf(articulo));
-    this.consultaInventario.abrir(articulo.codigoArticulo, undefined);
+    this.consultaInventario.abrir(articulo.codigoArticulo, undefined, true);
   }
 
   public manejarTeclado(evento: KeyboardEvent): void {

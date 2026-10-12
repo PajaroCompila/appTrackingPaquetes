@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { esquemaFiltrosDespachados } from './despachoRutas.js';
+import { esquemaFiltrosDespachados, esquemaRecepcionDevolucion } from './despachoRutas.js';
 
 describe('esquemaFiltrosDespachados', () => {
   it('normaliza filtros múltiples y conserva paginación', () => {
@@ -25,5 +25,18 @@ describe('esquemaFiltrosDespachados', () => {
       .toMatchObject({ clasificacion: 'especial' });
     expect(esquemaFiltrosDespachados.parse({ codigoAlmacen: [], clasificacion: 'normal' }))
       .toMatchObject({ clasificacion: 'normal' });
+  });
+
+  it('diferencia una persona de la asignación especial sin usuario ficticio', () => {
+    expect(esquemaRecepcionDevolucion.parse({ idOrigen: 'SAP:10',
+      tipoRecepcion: 'PERSONA', usuarioRecibio: 'gcruz' })).toEqual({
+      idOrigen: 'SAP:10', tipoRecepcion: 'PERSONA', usuarioRecibio: 'gcruz',
+    });
+    expect(esquemaRecepcionDevolucion.parse({ idOrigen: 'SAP:10',
+      tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO' })).toEqual({
+      idOrigen: 'SAP:10', tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO',
+    });
+    expect(() => esquemaRecepcionDevolucion.parse({ idOrigen: 'SAP:10',
+      tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO', usuarioRecibio: 'usuario-falso' })).toThrow();
   });
 });

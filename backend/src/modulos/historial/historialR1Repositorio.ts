@@ -10,7 +10,7 @@ import type {
   PaginaHistorial,
   PedidoHistorial,
 } from './historial.interface.js';
-import { NOMBRES_VENDEDORES_ESPECIALES } from '../pedidos/pedidoEspecial.js';
+import { esVendedorEspecial, NOMBRES_VENDEDORES_ESPECIALES } from '../pedidos/pedidoEspecial.js';
 
 const coincidenciaVendedorEspecial = `(${NOMBRES_VENDEDORES_ESPECIALES.map((_, indice) =>
   `UPPER(ISNULL(vendedor.[SlpName], '')) LIKE @vendedorEspecial${indice}`).join(' OR ')})`;
@@ -82,10 +82,12 @@ export function seleccionarSucursalesHistorial(
   return seleccionadas.length === codigosSucursal.size ? seleccionadas : sucursales;
 }
 
+export const NUMERO_PEDIDO_HISTORIAL_R1 = `COALESCE(
+        NULLIF(NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]))), ''), '0'),
+        venta.[Name])`;
+
 export const CONDICION_HISTORIAL_R1 = `venta.[U_SO1_TIPO] = 'PE' AND venta.[U_SO1_VERIFICADO] = 'Y'
-        AND venta.[U_SO1_FACTURA] = 'Y'
-        AND venta.[U_SO1_DOCUMENTOSBO] IS NOT NULL
-        AND venta.[U_SO1_DOCUMENTOSBO] <> 0`;
+        AND venta.[U_SO1_FACTURA] = 'Y'`;
 
 export class HistorialR1Repositorio {
   public constructor(private readonly sucursales: ConfiguracionSucursalR1[] = obtenerSucursalesR1()) {}
@@ -163,6 +165,7 @@ export class HistorialR1Repositorio {
       return { ...articulo, fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
         despachadoEn: meta?.despachadoEn?.toISOString() ?? null,
         validadoDetectadoEn: meta?.validadoDetectadoEn?.toISOString() ?? null,
+        esEspecial: esVendedorEspecial(articulo.nombreVendedor),
         estadoHistorial: 'Facturado' as const };
     }),
       pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,
@@ -193,7 +196,7 @@ export class HistorialR1Repositorio {
   ): Promise<ArticuloR1[]> {
     const parametrosAlmacen = filtros.codigosAlmacen.map((_, indice) => `@codigoAlmacen${indice}`);
     const consulta = `SELECT venta.[Name] folioPedido,
-      CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido,
+      ${NUMERO_PEDIDO_HISTORIAL_R1} numeroPedido,
       CONVERT(nvarchar(30), detalle.[U_SO1_NUMPARTIDA]) identificadorDetalle,
       detalle.[U_SO1_NUMEROARTICULO] codigoArticulo,
       detalle.[U_SO1_DESCRIPCION] descripcion,
@@ -215,7 +218,7 @@ export class HistorialR1Repositorio {
         AND venta.[U_SO1_FECHA] >= @fechaDesde
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL
-          OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) LIKE CONCAT('%', @numeroPedido))
+          OR ${NUMERO_PEDIDO_HISTORIAL_R1} LIKE CONCAT('%', @numeroPedido))
         ${filtroClasificacion(filtros.clasificacion)}
         ${parametrosAlmacen.length > 0 ? `AND detalle.[U_SO1_ALMACEN] IN (${parametrosAlmacen.join(', ')})` : ''}
       ORDER BY venta.[U_SO1_FECHA] DESC, venta.[U_SO1_HORA] DESC, venta.[Name], detalle.[U_SO1_NUMPARTIDA]
@@ -235,7 +238,7 @@ export class HistorialR1Repositorio {
   ): Promise<CabeceraR1[]> {
     const parametrosAlmacen = filtros.codigosAlmacen.map((_, indice) => `@codigoAlmacen${indice}`);
     const consulta = `SELECT venta.[Name] folioPedido,
-      CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido,
+      ${NUMERO_PEDIDO_HISTORIAL_R1} numeroPedido,
       venta.[Code] codigoVenta, venta.[U_SO1_VENDEDOR] codigoVendedor,
       vendedor.[SlpName] nombreVendedor, COUNT(*) OVER() totalRegistros,
       CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN NULL ELSE
@@ -249,7 +252,7 @@ export class HistorialR1Repositorio {
         AND venta.[U_SO1_FECHA] >= @fechaDesde
         AND venta.[U_SO1_FECHA] < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL
-          OR CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) LIKE CONCAT('%', @numeroPedido))
+          OR ${NUMERO_PEDIDO_HISTORIAL_R1} LIKE CONCAT('%', @numeroPedido))
         ${filtroClasificacion(filtros.clasificacion)}
         ${parametrosAlmacen.length > 0 ? `AND EXISTS (SELECT 1 FROM [dbo].[@SO1_01VENTADETALLE] detalle
           WHERE detalle.[U_SO1_FOLIO] = venta.[Name]
@@ -270,7 +273,7 @@ export class HistorialR1Repositorio {
 
   private async consultarCabeceraPorFolio(sucursal: ConfiguracionSucursalR1, folio: string): Promise<CabeceraR1 | null> {
     const consulta = `SELECT TOP (1) venta.[Name] folioPedido,
-      CONVERT(nvarchar(20), venta.[U_SO1_DOCUMENTOSBO]) numeroPedido,
+      ${NUMERO_PEDIDO_HISTORIAL_R1} numeroPedido,
       venta.[Code] codigoVenta, venta.[U_SO1_VENDEDOR] codigoVendedor,
       vendedor.[SlpName] nombreVendedor, COUNT(*) OVER() totalRegistros,
       CASE WHEN venta.[U_SO1_FECHA] IS NULL OR venta.[U_SO1_HORA] IS NULL THEN NULL ELSE
@@ -366,6 +369,7 @@ export class HistorialR1Repositorio {
       nombresBodega: [...new Set(articulos.map(({ nombreAlmacen }) => nombreAlmacen)
         .filter((nombre): nombre is string => Boolean(nombre)))].join(', ') || null,
       fechaHoraPedido: fila.fechaHoraPedido, codigoEstadoVenta: texto(fila.codigoEstadoVenta),
+      esEspecial: esVendedorEspecial(texto(fila.nombreVendedor)),
       fechaEntradaCola: meta?.fechaEntradaCola?.toISOString() ?? null,
       codigoSincronizacion: texto(fila.codigoSincronizacion), articulos, estadoLocal: 'VALIDADO',
       estadoHistorial: 'Facturado',

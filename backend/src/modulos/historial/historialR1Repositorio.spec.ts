@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfiguracionSucursalR1 } from '../../configuracion/configuracionBaseDatos.js';
-import { HistorialR1Repositorio, seleccionarSucursalesHistorial } from './historialR1Repositorio.js';
+import {
+  CONDICION_HISTORIAL_R1,
+  HistorialR1Repositorio,
+  NUMERO_PEDIDO_HISTORIAL_R1,
+  seleccionarSucursalesHistorial,
+} from './historialR1Repositorio.js';
 
 const sucursal = (codigoTienda: string): ConfiguracionSucursalR1 => ({
   codigoTienda,
@@ -22,6 +27,14 @@ const sucursales = ['TLCB01', 'TPRO01', 'TCIR01', 'TSPS01', 'TTGU01', 'TTBM01']
   .map(sucursal);
 
 describe('seleccionarSucursalesHistorial', () => {
+  it('incluye facturados R1 aunque todavia esperen el documento SAP', () => {
+    expect(CONDICION_HISTORIAL_R1).toContain("venta.[U_SO1_VERIFICADO] = 'Y'");
+    expect(CONDICION_HISTORIAL_R1).toContain("venta.[U_SO1_FACTURA] = 'Y'");
+    expect(CONDICION_HISTORIAL_R1).not.toContain('U_SO1_DOCUMENTOSBO');
+    expect(NUMERO_PEDIDO_HISTORIAL_R1).toContain('venta.[Name]');
+    expect(NUMERO_PEDIDO_HISTORIAL_R1).toContain("'0'");
+  });
+
   it('consulta solo SPS cuando todas las bodegas seleccionadas pertenecen a SPS', () => {
     expect(seleccionarSucursalesHistorial(sucursales, ['BSPS03', 'BSPS04', 'TSPS01'])
       .map(({ codigoTienda }) => codigoTienda)).toEqual(['TSPS01']);

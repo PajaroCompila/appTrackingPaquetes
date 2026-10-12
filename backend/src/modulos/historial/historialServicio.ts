@@ -6,13 +6,14 @@ import type {
   PedidoHistorial,
 } from './historial.interface.js';
 import { HistorialRepositorio } from './historialRepositorio.js';
-import { HistorialR1Repositorio } from './historialR1Repositorio.js';
 import { AsignacionRepositorio } from '../asignaciones/asignacionRepositorio.js';
 import { claveLineaDespachada } from '../despachos/despachoRepositorio.js';
 import type { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 import { EntregaSapRepositorio } from './entregaSapRepositorio.js';
 import { esIdentidadEntregaSap } from './entregaSap.interface.js';
 import { esLineaFlete } from '../pedidos/lineaFlete.js';
+import { HistorialR1SnapshotRepositorio } from './historialR1SnapshotRepositorio.js';
+import { solicitarSincronizacionHistorialR1 } from './historialR1SnapshotSincronizador.js';
 
 let conciliacionEnCurso: Promise<number> | null = null;
 const duracionCacheHistorialMs = 15_000;
@@ -21,6 +22,12 @@ type ResultadoListadoHistorial = PaginaHistorial | PaginaArticulosHistorial;
 interface ConsultaHistorialCompartida {
   promesa: Promise<ResultadoListadoHistorial>;
   expiraEn: number | null;
+}
+
+interface RepositorioConsultaHistorial {
+  buscar(filtros: FiltrosHistorial): Promise<PaginaHistorial>;
+  buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial>;
+  obtener(idOrigen: string): Promise<PedidoHistorial | null>;
 }
 
 async function consultarFuenteHistorial<T>(nombre: string, consulta: () => Promise<T>): Promise<T> {
@@ -101,7 +108,7 @@ export class HistorialServicio {
 
   public constructor(
     private readonly repositorio = new HistorialRepositorio(),
-    private readonly repositorioConsulta?: HistorialR1Repositorio,
+    private readonly repositorioConsulta: RepositorioConsultaHistorial = new HistorialR1SnapshotRepositorio(),
     private readonly asignacionRepositorio = new AsignacionRepositorio(),
     private readonly seguimientoRepositorio?: SeguimientoPedidoRepositorio,
     private readonly entregasRepositorio = new EntregaSapRepositorio(),
@@ -152,6 +159,7 @@ export class HistorialServicio {
   }
 
   public async buscar(filtros: FiltrosHistorial): Promise<PaginaHistorial> {
+    solicitarSincronizacionHistorialR1(filtros);
     return this.compartirConsulta('pedidos', filtros, () => this.buscarSinCache(filtros));
   }
 
@@ -159,8 +167,8 @@ export class HistorialServicio {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
     const [resultadoR1, resultadoSap, resultadoEntregas] = await Promise.allSettled([
-      consultarFuenteHistorial('R1', () =>
-        (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscar(filtrosAcumulados)),
+      consultarFuenteHistorial('proyección local R1', () =>
+        this.repositorioConsulta.buscar(filtrosAcumulados)),
       consultarFuenteHistorial('historial local', () =>
         this.repositorio.buscarHistorial(filtrosAcumulados)),
       consultarFuenteHistorial('entregas SAP persistidas', () =>
@@ -171,7 +179,7 @@ export class HistorialServicio {
     const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
     const advertenciasFuentes = [
       ...(r1?.advertenciasFuentes ?? []),
-      ...(resultadoR1.status === 'rejected' ? ['No fue posible consultar R1.'] : []),
+      ...(resultadoR1.status === 'rejected' ? ['No fue posible consultar la proyección local de R1.'] : []),
       ...(resultadoSap.status === 'rejected' ? ['No fue posible consultar el historial local.'] : []),
       ...(resultadoEntregas.status === 'rejected' ? ['No fue posible consultar las entregas SAP persistidas.'] : []),
     ];
@@ -218,7 +226,7 @@ export class HistorialServicio {
     if (idOrigen.startsWith('SAP:')) {
       pedido = await this.repositorio.obtenerHistorial(idOrigen);
     } else {
-      pedido = await (this.repositorioConsulta ?? new HistorialR1Repositorio()).obtener(idOrigen);
+      pedido = await this.repositorioConsulta.obtener(idOrigen);
       if (!pedido) pedido = await this.repositorio.obtenerHistorial(idOrigen);
     }
     if (pedido) {
@@ -238,6 +246,7 @@ export class HistorialServicio {
   }
 
   public async buscarArticulos(filtros: FiltrosHistorial): Promise<PaginaArticulosHistorial> {
+    solicitarSincronizacionHistorialR1(filtros);
     return this.compartirConsulta('articulos', filtros, () => this.buscarArticulosSinCache(filtros));
   }
 
@@ -245,8 +254,8 @@ export class HistorialServicio {
     const cantidadAcumulada = filtros.pagina * filtros.cantidadPorPagina;
     const filtrosAcumulados = { ...filtros, pagina: 1, cantidadPorPagina: cantidadAcumulada };
     const [resultadoR1, resultadoSap, resultadoEntregas] = await Promise.allSettled([
-      consultarFuenteHistorial('R1 (artículos)', () =>
-        (this.repositorioConsulta ?? new HistorialR1Repositorio()).buscarArticulos(filtrosAcumulados)),
+      consultarFuenteHistorial('proyección local R1 (artículos)', () =>
+        this.repositorioConsulta.buscarArticulos(filtrosAcumulados)),
       consultarFuenteHistorial('historial local (artículos)', () =>
         this.repositorio.buscarArticulosHistorial(filtrosAcumulados)),
       consultarFuenteHistorial('entregas SAP persistidas (artículos)', () =>
@@ -257,7 +266,7 @@ export class HistorialServicio {
     const entregas = resultadoEntregas.status === 'fulfilled' ? resultadoEntregas.value : null;
     const advertenciasFuentes = [
       ...(r1?.advertenciasFuentes ?? []),
-      ...(resultadoR1.status === 'rejected' ? ['No fue posible consultar R1.'] : []),
+      ...(resultadoR1.status === 'rejected' ? ['No fue posible consultar la proyección local de R1.'] : []),
       ...(resultadoSap.status === 'rejected' ? ['No fue posible consultar el historial local.'] : []),
       ...(resultadoEntregas.status === 'rejected' ? ['No fue posible consultar las entregas SAP persistidas.'] : []),
     ];

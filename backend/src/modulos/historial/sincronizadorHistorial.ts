@@ -4,6 +4,11 @@ import { EntregaSapSincronizador } from './entregaSapSincronizador.js';
 import { ConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
 import { cancelacionesSap, type CancelacionSapHistorial } from '../pedidosDevueltos/cancelacionSapHistorial.js';
 import { ControlOperativoSincronizador } from '../facturadosPendientes/controlOperativoSincronizador.js';
+import {
+  activarSincronizadorHistorialR1,
+  desactivarSincronizadorHistorialR1,
+  type HistorialR1SnapshotSincronizador,
+} from './historialR1SnapshotSincronizador.js';
 
 let temporizador: NodeJS.Timeout | undefined;
 let activo = false;
@@ -12,6 +17,7 @@ let servicio: HistorialServicio | undefined;
 let servicioEntregas: EntregaSapSincronizador | undefined;
 let servicioDevoluciones: CancelacionSapHistorial | undefined;
 let servicioControlOperativo: ControlOperativoSincronizador | undefined;
+let servicioSnapshotR1: HistorialR1SnapshotSincronizador | undefined;
 
 function programarSiguiente(): void {
   if (!activo) return;
@@ -23,10 +29,11 @@ async function ejecutar(): Promise<void> {
   if (!activo || ejecutando) return;
   ejecutando = true;
   try {
-    const [pedidos, entregas] = await Promise.allSettled([
-      servicio!.sincronizar(), servicioEntregas!.sincronizar(),
+    const [pedidos, entregas, snapshotR1] = await Promise.allSettled([
+      servicio!.sincronizar(), servicioEntregas!.sincronizar(), servicioSnapshotR1!.sincronizarHoy(),
     ]);
     if (entregas.status === 'rejected') console.error('No fue posible actualizar las entregas SAP; se conserva el historial local.');
+    if (snapshotR1.status === 'rejected') console.error('No fue posible actualizar la proyección local de Historial R1.');
     try { await servicioDevoluciones?.sincronizar(); }
     catch { console.error('No fue posible revisar las devoluciones; se conserva la información local.'); }
     // No bloquea ni retrasa los sincronizadores existentes.
@@ -51,6 +58,7 @@ export function iniciarSincronizadorHistorial(): void {
   servicioEntregas = new EntregaSapSincronizador(undefined, undefined, new ConciliacionEntregaPedido());
   servicioDevoluciones = cancelacionesSap;
   servicioControlOperativo = new ControlOperativoSincronizador();
+  servicioSnapshotR1 = activarSincronizadorHistorialR1();
   activo = true;
   void ejecutar();
 }
@@ -63,4 +71,6 @@ export function detenerSincronizadorHistorial(): void {
   servicioEntregas = undefined;
   servicioDevoluciones = undefined;
   servicioControlOperativo = undefined;
+  servicioSnapshotR1 = undefined;
+  desactivarSincronizadorHistorialR1();
 }

@@ -26,6 +26,7 @@ describe('DialogoInventarioArticuloComponent', () => {
     fixture = TestBed.createComponent(DialogoInventarioArticuloComponent);
     fixture.componentRef.setInput('estado', 'datos');
     fixture.componentRef.setInput('inventario', inventario);
+    fixture.componentRef.setInput('contextoInventarioPrincipal', true);
     fixture.detectChanges();
   });
 
@@ -39,7 +40,12 @@ describe('DialogoInventarioArticuloComponent', () => {
 
     expect(fixture.componentInstance.estadoImagen).toBe('disponible');
     expect(imagen.classList).toContain('imagen-visible');
-    expect(fixture.nativeElement.textContent).toContain('0 unidades');
+    const totalSuperior = fixture.nativeElement.querySelector('.datos-inventario .existencia') as HTMLElement;
+    expect(totalSuperior.textContent).toContain('Total de unidades en bodegas');
+    expect(totalSuperior.textContent).toContain('19 unidades');
+    expect(totalSuperior.classList).toContain('existencia');
+    expect(fixture.nativeElement.textContent).not.toContain('Almacén consultado');
+    expect(fixture.nativeElement.textContent).not.toContain('Existencia física en SAP');
     expect(fixture.nativeElement.textContent).toContain('Bodega baja');
     expect(fixture.nativeElement.textContent).toContain('19 unidades');
     expect(fixture.nativeElement.querySelectorAll('.bodegas-inventario li')).toHaveLength(3);
@@ -55,6 +61,19 @@ describe('DialogoInventarioArticuloComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('03/10/2026');
     expect(fixture.nativeElement.textContent).toContain('6 unidades');
     expect(fixture.nativeElement.textContent).not.toMatch(/proveedor|CardCode|CardName/i);
+    expect(fixture.nativeElement.textContent).toContain('Movimientos de inventario');
+  });
+
+  it('restaura el resumen anterior y oculta movimientos fuera del Inventario principal', () => {
+    fixture.componentRef.setInput('contextoInventarioPrincipal', false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Almacén consultado');
+    expect(fixture.nativeElement.textContent).toContain('B1 — Bodega');
+    expect(fixture.nativeElement.textContent).toContain('Existencia física en SAP');
+    expect(fixture.nativeElement.textContent).not.toContain('Total de unidades en bodegas');
+    expect(fixture.nativeElement.textContent).not.toContain('Movimientos de inventario');
+    expect(fixture.nativeElement.querySelector('.ultimo-ingreso')).toBeNull();
   });
 
   it('muestra código y descripción juntos en el encabezado de cada bodega', () => {

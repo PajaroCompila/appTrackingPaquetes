@@ -342,7 +342,7 @@ describe('HistorialServicio', () => {
       fechaDesde:'2026-10-07',fechaHasta:'2026-10-07',codigosAlmacen:[],pagina:1,cantidadPorPagina:25,
     })).resolves.toMatchObject({
       registros:[expect.objectContaining({idOrigen:'SAP:20'})],
-      advertenciasFuentes:['No fue posible consultar R1.'],
+      advertenciasFuentes:['No fue posible consultar la proyección local de R1.'],
     });
   });
 });

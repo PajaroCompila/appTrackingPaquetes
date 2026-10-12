@@ -35,8 +35,15 @@
           <dl class="datos-inventario">
             <div><dt>Código</dt><dd class="codigo-articulo-en-linea">{{ inventario.codigoArticulo }}</dd></div>
             <div class="dato-descripcion"><dt>Descripción</dt><dd>{{ inventario.descripcion }}</dd></div>
-            <div><dt>Almacén consultado</dt><dd>{{ inventario.codigoAlmacen }} — {{ inventario.nombreAlmacen }}</dd></div>
-            <div class="existencia"><dt>Existencia física en SAP</dt><dd>{{ formatearUnidades(inventario.existenciaFisica) }} unidades</dd></div>
+            @if (contextoInventarioPrincipal) {
+              <div [class.existencia]="totalUnidades() > 10">
+                <dt>Total de unidades en bodegas</dt>
+                <dd [style.color]="totalUnidades() > 10 ? '#1f6a4d' : null">{{ formatearUnidades(totalUnidades()) }} unidades</dd>
+              </div>
+            } @else {
+              <div><dt>Almacén consultado</dt><dd>{{ inventario.codigoAlmacen }} — {{ inventario.nombreAlmacen }}</dd></div>
+              <div class="existencia"><dt>Existencia física en SAP</dt><dd>{{ formatearUnidades(inventario.existenciaFisica) }} unidades</dd></div>
+            }
           </dl>
 
           <section class="previsualizacion-articulo" aria-labelledby="titulo-imagen-articulo">
@@ -113,24 +120,26 @@
           }
         </section>
 
-        <section class="minidashboard ultimo-ingreso" aria-labelledby="titulo-ultimo-ingreso">
-          <div class="encabezado-dashboard">
-            <div>
-              <p class="sobrelinea-dialogo">Movimientos de inventario</p>
-              <h3 id="titulo-ultimo-ingreso">Último ingreso del producto</h3>
+        @if (contextoInventarioPrincipal) {
+          <section class="minidashboard ultimo-ingreso" aria-labelledby="titulo-ultimo-ingreso">
+            <div class="encabezado-dashboard">
+              <div>
+                <p class="sobrelinea-dialogo">Movimientos de inventario</p>
+                <h3 id="titulo-ultimo-ingreso">Último ingreso del producto</h3>
+              </div>
             </div>
-          </div>
-          <dl class="datos-ultimo-ingreso">
-            <div>
-              <dt>Última fecha de ingreso</dt>
-              <dd>{{ textoFechaUltimoIngreso() }}</dd>
-            </div>
-            <div>
-              <dt>Última cantidad de ingreso</dt>
-              <dd>{{ textoCantidadUltimoIngreso() }}</dd>
-            </div>
-          </dl>
-        </section>
+            <dl class="datos-ultimo-ingreso">
+              <div>
+                <dt>Última fecha de ingreso</dt>
+                <dd>{{ textoFechaUltimoIngreso() }}</dd>
+              </div>
+              <div>
+                <dt>Última cantidad de ingreso</dt>
+                <dd>{{ textoCantidadUltimoIngreso() }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
       }
     </div>
 

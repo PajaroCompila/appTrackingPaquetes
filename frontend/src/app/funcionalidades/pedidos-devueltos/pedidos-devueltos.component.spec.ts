@@ -50,7 +50,14 @@ describe('historial de pedidos CANCEL', () => {
   it('consulta por defecto solo los pedidos devueltos del dia actual',async()=>{
     await crear();
     const fechaActual=obtenerFechaLocalActual();
-    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:fechaActual,fechaHasta:fechaActual,codigosAlmacen:['OTRA']}));
+    expect(fixture.componentInstance.vista()).toBe('articulos');
+    expect(servicio.listar).toHaveBeenCalledWith(expect.objectContaining({fechaDesde:fechaActual,
+      fechaHasta:fechaActual,codigosAlmacen:['OTRA'],vista:'articulos'}));
+    const pestanas=[...fixture.nativeElement.querySelectorAll('[role="tab"]')]
+      .map((elemento:HTMLElement)=>({texto:elemento.textContent?.trim(),
+        seleccionada:elemento.getAttribute('aria-selected')}));
+    expect(pestanas).toEqual([{texto:'Artículos',seleccionada:'true'},
+      {texto:'Pedido',seleccionada:'false'}]);
     expect(fixture.nativeElement.textContent).toContain('101471323');
     expect(fixture.nativeElement.textContent).toContain('CANCELADO');
     expect(fixture.nativeElement.textContent).not.toContain('CANCEL</span>');
@@ -71,9 +78,13 @@ describe('historial de pedidos CANCEL', () => {
     c.alternarLinea(pedido,pedido.lineas[0]!);c.confirmarDevolucion();
     expect(servicio.confirmar).not.toHaveBeenCalled();
   });
-  it('filtra por fecha de pedido y cambia a articulos',async()=>{
+  it('permite cambiar Pedido y volver a Artículos conservando los filtros',async()=>{
     await crear();const c=fixture.componentInstance;
-    c.filtros.fechaDesde='2026-09-10';c.filtros.fechaHasta='2026-09-10';c.cambiarVista('articulos');await Promise.resolve();
+    c.cambiarVista('pedido');await Promise.resolve();
+    expect(c.vista()).toBe('pedido');
+    expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({vista:'pedido'}));
+    c.filtros.fechaDesde='2026-09-10';c.filtros.fechaHasta='2026-09-10';
+    c.cambiarVista('articulos');await Promise.resolve();
     expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({fechaDesde:'2026-09-10',fechaHasta:'2026-09-10',vista:'articulos'}));
     c.limpiarFiltros();await Promise.resolve();
     const fechaActual=obtenerFechaLocalActual();
@@ -92,6 +103,10 @@ describe('historial de pedidos CANCEL', () => {
       queryParams:expect.objectContaining({codigoAlmacen:codigos,pagina:2}),
     }));
 
+    c.cambiarVista('pedido');await Promise.resolve();
+    expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({
+      codigosAlmacen:codigos,vista:'pedido',pagina:1,
+    }));
     c.cambiarVista('articulos');await Promise.resolve();
     expect(servicio.listar).toHaveBeenLastCalledWith(expect.objectContaining({
       codigosAlmacen:codigos,vista:'articulos',pagina:1,

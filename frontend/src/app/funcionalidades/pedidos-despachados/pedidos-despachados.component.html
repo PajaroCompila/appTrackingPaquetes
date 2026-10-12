@@ -151,6 +151,9 @@
                         [attr.aria-label]="'Seleccionar quién recibió el pedido ' + pedido.numeroPedido"
                         (change)="seleccionarReceptor(pedido, $any($event.target).value)">
                         <option value="">Sin asignar</option>
+                        @if (esCancelado(pedido)) {
+                          <option value="ASIGNADO_OTRO_PEDIDO">Asignado a otro pedido</option>
+                        }
                         @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
                           <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
                         }
@@ -202,6 +205,9 @@
                         [attr.aria-label]="'Seleccionar quién recibió el pedido ' + pedido.numeroPedido"
                         (change)="seleccionarReceptor(pedido, $any($event.target).value)">
                         <option value="">Sin asignar</option>
+                        @if (esCancelado(pedido)) {
+                          <option value="ASIGNADO_OTRO_PEDIDO">Asignado a otro pedido</option>
+                        }
                         @for (tecnico of usuariosAsignables(); track tecnico.usuario) {
                           <option [value]="tecnico.usuario">{{ tecnico.nombre }}</option>
                         }

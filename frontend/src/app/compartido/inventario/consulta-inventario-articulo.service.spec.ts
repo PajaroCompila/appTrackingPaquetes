@@ -27,6 +27,7 @@ describe('ConsultaInventarioArticuloService', () => {
     expect(consulta.estado()).toBe('datos');
     expect(consulta.inventario()?.existenciaFisica).toBe(0);
     expect(consulta.abierto()).toBe(true);
+    expect(consulta.contextoInventarioPrincipal()).toBe(false);
   });
 
   it('distingue artículo no encontrado de un error de consulta', () => {
@@ -50,5 +51,19 @@ describe('ConsultaInventarioArticuloService', () => {
     consulta.abrir(null, 'BSPS01');
     expect(obtenerInventarioArticulo).toHaveBeenCalledOnce();
     expect(obtenerInventarioArticulo).toHaveBeenCalledWith('ART-1', undefined);
+  });
+
+  it('conserva el contexto explícito solo durante la consulta abierta', () => {
+    const consulta = TestBed.inject(ConsultaInventarioArticuloService);
+    obtenerInventarioArticulo.mockReturnValue(of({
+      codigoArticulo: 'ART-2', descripcion: 'Artículo', codigoAlmacen: 'BSPS01',
+      nombreAlmacen: 'Bodega', existenciaFisica: 1, existencias: [],
+    }));
+
+    consulta.abrir('ART-2', undefined, true);
+    expect(consulta.contextoInventarioPrincipal()).toBe(true);
+
+    consulta.cerrar();
+    expect(consulta.contextoInventarioPrincipal()).toBe(false);
   });
 });

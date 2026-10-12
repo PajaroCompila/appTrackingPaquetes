@@ -43,10 +43,20 @@ const transferencia = z.object({
     identificadorDetalle: identidadDetalle,
   }).strict()).min(1).max(100),
 }).strict();
-const recepcionDevolucion = z.object({
+export const esquemaRecepcionDevolucion = z.object({
   idOrigen,
-  usuarioRecibio: z.string().trim().min(1).max(100),
-}).strict();
+  tipoRecepcion: z.enum(['PERSONA', 'ASIGNADO_OTRO_PEDIDO']).default('PERSONA'),
+  usuarioRecibio: z.string().trim().min(1).max(100).optional(),
+}).strict().superRefine((datos, contexto) => {
+  if (datos.tipoRecepcion === 'PERSONA' && !datos.usuarioRecibio) {
+    contexto.addIssue({ code: 'custom', path: ['usuarioRecibio'],
+      message: 'Debe seleccionar quién recibió la devolución.' });
+  }
+  if (datos.tipoRecepcion === 'ASIGNADO_OTRO_PEDIDO' && datos.usuarioRecibio) {
+    contexto.addIssue({ code: 'custom', path: ['usuarioRecibio'],
+      message: 'La asignación a otro pedido no utiliza un usuario receptor.' });
+  }
+});
 
 despachoRutas.get('/', async (solicitud, respuesta, siguiente) => {
   try {
@@ -82,7 +92,7 @@ despachoRutas.get('/:idOrigen', async (solicitud, respuesta, siguiente) => {
 despachoRutas.post('/recibir-devolucion',
   requerirRoles('ADMINISTRADOR', 'OPERADOR_BODEGA'), async (solicitud, respuesta, siguiente) => {
     try {
-      const datos = recepcionDevolucion.parse(solicitud.body);
+      const datos = esquemaRecepcionDevolucion.parse(solicitud.body);
       const nombreUsuario = solicitud.user!.nombreUsuario.trim().toLowerCase();
       if (nombreUsuario === 'tlopez' && !datos.idOrigen.toUpperCase().startsWith('R1:TCIR01:')) {
         throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
@@ -92,9 +102,12 @@ despachoRutas.post('/recibir-devolucion',
         throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
           'Solo puede registrar pedidos de TBM.');
       }
-      const tecnico = resolverTecnicoAsignable(solicitud.user!, datos.usuarioRecibio);
+      const recepcion = datos.tipoRecepcion === 'PERSONA'
+        ? { tipoRecepcion: 'PERSONA' as const,
+          tecnico: resolverTecnicoAsignable(solicitud.user!, datos.usuarioRecibio!) }
+        : { tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO' as const };
       const resultado = await recepcionDevolucionRepositorio.registrar(
-        datos.idOrigen, tecnico, solicitud.user!.usuarioId,
+        datos.idOrigen, recepcion, solicitud.user!.usuarioId,
       );
       respuesta.status(201).json({ datos: resultado });
     } catch (error) { siguiente(error); }

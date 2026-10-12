@@ -7,6 +7,7 @@ import { condicionLineaNoFleteSql } from '../pedidos/lineaFlete.js';
 
 export interface PedidoDespachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO' | 'CERRADO';
+  estadoCierre: 'CANCELADO' | 'CERRADO' | null;
   despachadoEn: string;
   usuarioDespacho: string;
 }
@@ -45,6 +46,15 @@ export const CONDICION_ETAPA_DESPACHADOS = `pedido.estadoLocal IN ('DESPACHADO',
   AND NOT EXISTS(SELECT 1 FROM dbo.DevolucionPedido devolucion
     WHERE devolucion.idPedidoDespachado=pedido.idPedidoDespachado
       AND devolucion.estado=N'DEVUELTO')`;
+
+const estadoCierreSql = (alias: string): string => `CASE
+  WHEN ${alias}.estadoLocal<>'CERRADO' THEN NULL
+  WHEN EXISTS(SELECT 1 FROM dbo.CancelacionSapHistorial cancelacion
+    WHERE cancelacion.canceled='Y' AND cancelacion.activo=1 AND (
+      (${alias}.origenPedido='SAP' AND TRY_CONVERT(int,${alias}.sapDocEntry)=cancelacion.docEntry)
+      OR (${alias}.origenPedido='R1' AND (${alias}.numeroPedido=cancelacion.numeroPedido
+        OR ${alias}.folioPedido=cancelacion.folioPedido)))) THEN 'CANCELADO'
+  ELSE 'CERRADO' END`;
 
 export class DespachoRepositorio implements IDespachoRepositorio {
   public async identidadesLineas(): Promise<Set<string>> {
@@ -158,6 +168,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}`;
     const resultado = await solicitud.query(`WITH Pedidos AS (
         SELECT pedido.*, usuario.nombreVisible usuarioDespacho,
+          ${estadoCierreSql('pedido')} estadoCierre,
           seguimiento.fechaEntradaCola,
           ISNULL(seguimiento.excluidoSla, 0) esEspecial, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
@@ -204,7 +215,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
           nombreVendedor: fila.nombreVendedor, codigosAlmacen: [], nombresBodega: fila.nombreAlmacen,
           fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
-          estadoLocal: fila.estadoLocal, despachadoEn: fila.despachadoEn.toISOString(),
+          estadoLocal: fila.estadoLocal, estadoCierre: fila.estadoCierre ?? null,
+          despachadoEn: fila.despachadoEn.toISOString(),
           usuarioDespacho: fila.usuarioDespacho,
           fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
           esEspecial: Boolean(fila.esEspecial),
@@ -246,6 +258,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
     const resultado = await solicitud.query(`WITH Lineas AS (
       SELECT pedido.*, usuarioCabecera.nombreVisible usuarioDespacho,
+        ${estadoCierreSql('pedido')} estadoCierre,
         detalle.identificadorDetalle, detalle.numeroLinea, detalle.codigoArticulo,
         detalle.descripcion, detalle.cantidad, detalle.codigoAlmacen detalleCodigoAlmacen,
         detalle.nombreAlmacen detalleNombreAlmacen, detalle.transferidoEn,
@@ -288,7 +301,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       nombresBodega: fila.detalleNombreAlmacen,
       fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
       codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null,
-      estadoLocal: fila.estadoLocal, despachadoEn: fila.despachadoEn.toISOString(),
+      estadoLocal: fila.estadoLocal, estadoCierre: fila.estadoCierre ?? null,
+      despachadoEn: fila.despachadoEn.toISOString(),
       usuarioDespacho: fila.usuarioDespacho,
       fechaEntradaCola: fila.fechaEntradaCola?.toISOString() ?? null,
       esEspecial: Boolean(fila.esEspecial),
@@ -311,6 +325,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     const cabecera = (await pool.request()
       .input('idOrigen', sql.NVarChar(150), idOrigen)
       .query(`SELECT TOP (1) pedido.*, usuario.nombreVisible usuarioDespacho,
+          ${estadoCierreSql('pedido')} estadoCierre,
           seguimiento.fechaEntradaCola,
           ISNULL(seguimiento.excluidoSla, 0) esEspecial
         FROM dbo.PedidoDespachado pedido
@@ -356,6 +371,7 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       codigoEstadoVenta: 'DESPACHADO',
       codigoSincronizacion: null,
       estadoLocal: cabecera.estadoLocal,
+      estadoCierre: cabecera.estadoCierre ?? null,
       despachadoEn: cabecera.despachadoEn.toISOString(),
       usuarioDespacho: cabecera.usuarioDespacho,
       responsablesAsignados: [...new Set(detalles.map((detalle) => detalle.usuarioAsignado)

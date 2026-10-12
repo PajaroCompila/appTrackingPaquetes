@@ -113,6 +113,7 @@ describe('PedidosDespachadosComponent', () => {
     )).toHaveLength(2);
     expect(texto).toContain('IMPRIMIR TODO');
     expect((fixture.nativeElement.querySelector('.columna-asignado select') as HTMLSelectElement).disabled).toBe(true);
+    expect(texto).not.toContain('Asignado a otro pedido');
   });
 
   it('calcula el tiempo congelado de un pedido especial con la misma regla', () => {
@@ -360,6 +361,7 @@ describe('PedidosDespachadosComponent', () => {
     const selector = fixture.nativeElement.querySelector('.columna-asignado select') as HTMLSelectElement;
     const boton = fixture.nativeElement.querySelector('.columna-asignado .boton-asignar') as HTMLButtonElement;
     expect(selector.disabled).toBe(false);
+    expect([...selector.options].map(opcion => opcion.text)).not.toContain('Asignado a otro pedido');
     expect(boton.disabled).toBe(true);
     selector.value = 'gcruz';
     selector.dispatchEvent(new Event('change'));
@@ -367,12 +369,46 @@ describe('PedidosDespachadosComponent', () => {
     expect(boton.disabled).toBe(false);
     boton.click();
     const solicitud = http.expectOne((peticion) => peticion.url.endsWith('/pedidos-despachados/recibir-devolucion'));
-    expect(solicitud.request.body).toEqual({ idOrigen: 'R1:F1', usuarioRecibio: 'gcruz' });
+    expect(solicitud.request.body).toEqual({ idOrigen: 'R1:F1', tipoRecepcion: 'PERSONA',
+      usuarioRecibio: 'gcruz' });
     solicitud.flush({ datos: { idOrigen: 'R1:F1', estadoOrigen: 'CERRADO',
       usuarioRecibio: 'gcruz', nombreRecibio: 'Gregorio Cruz', recibidoEn: '2026-10-05T15:00:00Z' } });
     fixture.detectChanges();
     expect(fixture.componentInstance.pedidos()).toEqual([]);
     expect(fixture.nativeElement.textContent).toContain('La devolución fue registrada correctamente.');
+    fixture.destroy();
+  });
+
+  it('ofrece asignar a otro pedido solo al cancelado y lo envía sin usuario ficticio', () => {
+    configurar(null);
+    const fixture = TestBed.createComponent(PedidosDespachadosComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((solicitud) => solicitud.url.endsWith('/pedidos/asignaciones/usuarios')).flush({
+      datos: [{ usuario: 'gcruz', nombre: 'Gregorio Cruz' }],
+      puedeAsignar: true, puedeAsignarTodos: true, puedeReasignar: true,
+    });
+    responderListados(http, [{ ...pedido, estadoLocal: 'CERRADO', estadoCierre: 'CANCELADO' }]);
+    fixture.detectChanges();
+
+    const selector = fixture.nativeElement.querySelector('.columna-asignado select') as HTMLSelectElement;
+    expect([...selector.options].map(opcion => opcion.text)).toContain('Asignado a otro pedido');
+    selector.value = 'ASIGNADO_OTRO_PEDIDO';
+    selector.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const boton = fixture.nativeElement.querySelector('.columna-asignado .boton-asignar') as HTMLButtonElement;
+    expect(boton.disabled).toBe(false);
+    boton.click();
+    const solicitud = http.expectOne((peticion) =>
+      peticion.url.endsWith('/pedidos-despachados/recibir-devolucion'));
+    expect(solicitud.request.body).toEqual({ idOrigen: 'R1:F1',
+      tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO' });
+    expect(solicitud.request.body).not.toHaveProperty('usuarioRecibio');
+    solicitud.flush({ datos: { idOrigen: 'R1:F1', estadoOrigen: 'CANCELADO',
+      tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO', usuarioRecibio: null, nombreRecibio: null,
+      recibidoEn: '2026-10-05T15:00:00Z' } });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.pedidos()).toEqual([]);
     fixture.destroy();
   });
 });

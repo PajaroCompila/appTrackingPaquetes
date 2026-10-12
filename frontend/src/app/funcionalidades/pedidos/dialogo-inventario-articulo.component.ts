@@ -16,6 +16,7 @@ export class DialogoInventarioArticuloComponent implements OnChanges, AfterViewI
 
   @Input({ required: true }) public estado!: EstadoConsultaInventario;
   @Input() public inventario: InventarioArticulo | null = null;
+  @Input() public contextoInventarioPrincipal = false;
   @Output() public readonly cerrar = new EventEmitter<void>();
 
   public urlImagen = '';

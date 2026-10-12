@@ -34,6 +34,7 @@ import type { TecnicoAsignable } from '../../compartido/asignaciones/asignacion.
 
 interface Despachado extends PedidoResumen {
   estadoLocal: 'DESPACHADO' | 'CERRADO';
+  estadoCierre: 'CANCELADO' | 'CERRADO' | null;
   despachadoEn: string;
   usuarioDespacho: string;
   esParcial?: boolean | null;
@@ -66,6 +67,7 @@ interface GrupoDespachados {
 const claveFiltrosDespachados = 'pedidosDespachados';
 const intervaloActualizacionDespachadosMs = 15000;
 type VistaDespachados = 'articulos' | 'pedido';
+const recepcionOtroPedido = 'ASIGNADO_OTRO_PEDIDO';
 const filtrosIniciales = (): FiltrosDespachados => ({
   numeroPedido: '', fechaDesde: obtenerFechaLocalActual(), fechaHasta: obtenerFechaLocalActual(),
   codigosAlmacen: [], cantidadPorPagina: 25,
@@ -525,23 +527,33 @@ export class PedidosDespachadosComponent implements OnInit {
     this.mensajeRecepcion.set('');
   }
 
+  public esCancelado(pedido: Despachado): boolean {
+    return pedido.estadoLocal === 'CERRADO' && pedido.estadoCierre === 'CANCELADO';
+  }
+
   public guardandoRecepcion(pedido: Despachado): boolean {
     return this.recepcionesGuardando().has(pedido.idOrigen);
   }
 
   public puedeRegistrarRecepcion(pedido: Despachado): boolean {
+    const seleccion = this.receptorSeleccionado(pedido);
+    const opcionValida = seleccion === recepcionOtroPedido
+      ? this.esCancelado(pedido)
+      : this.usuariosAsignables().some(({ usuario }) => usuario === seleccion);
     return pedido.estadoLocal === 'CERRADO' && this.puedeAsignarDevolucion()
-      && Boolean(this.receptorSeleccionado(pedido)) && !this.guardandoRecepcion(pedido);
+      && opcionValida && !this.guardandoRecepcion(pedido);
   }
 
   public registrarRecepcion(pedido: Despachado): void {
-    const usuarioRecibio = this.receptorSeleccionado(pedido);
-    if (!this.puedeRegistrarRecepcion(pedido) || !usuarioRecibio) return;
+    const seleccion = this.receptorSeleccionado(pedido);
+    if (!this.puedeRegistrarRecepcion(pedido) || !seleccion) return;
     this.recepcionesGuardando.update(actual => new Set(actual).add(pedido.idOrigen));
     this.mensajeRecepcion.set('');
-    this.clienteHttp.post(`${environment.urlApi}/pedidos-despachados/recibir-devolucion`, {
-      idOrigen: pedido.idOrigen, usuarioRecibio,
-    }).pipe(takeUntilDestroyed(this.destruirRef), finalize(() => {
+    const cuerpo = seleccion === recepcionOtroPedido
+      ? { idOrigen: pedido.idOrigen, tipoRecepcion: recepcionOtroPedido }
+      : { idOrigen: pedido.idOrigen, tipoRecepcion: 'PERSONA', usuarioRecibio: seleccion };
+    this.clienteHttp.post(`${environment.urlApi}/pedidos-despachados/recibir-devolucion`, cuerpo)
+      .pipe(takeUntilDestroyed(this.destruirRef), finalize(() => {
       this.recepcionesGuardando.update(actual => {
         const siguiente = new Set(actual); siguiente.delete(pedido.idOrigen); return siguiente;
       });
