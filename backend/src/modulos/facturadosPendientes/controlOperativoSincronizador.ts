@@ -1,10 +1,15 @@
 import { ControlOperativoRepositorio } from './controlOperativoRepositorio.js';
+import type { EstadoFinancieroControl } from './controlOperativoRepositorio.js';
 import { ControlOperativoFinanciero } from './controlOperativoFinanciero.js';
+
+interface FuenteEstadoFinanciero {
+  estados(ids: string[]): Promise<EstadoFinancieroControl[]>;
+}
 
 export class ControlOperativoSincronizador {
   private enCurso=false;
   public constructor(private readonly repo=new ControlOperativoRepositorio(),
-    private readonly financiero=new ControlOperativoFinanciero()) {}
+    private readonly financiero: FuenteEstadoFinanciero=new ControlOperativoFinanciero()) {}
   public async sincronizar(): Promise<void> {
     if (this.enCurso) return;
     this.enCurso=true;

@@ -9,6 +9,11 @@ function traducirError(error: unknown): never {
   if (numero === 2601 || numero === 2627) throw new ErrorAplicacion(409, 'USUARIO_DUPLICADO',
     'El nombre de usuario o correo ya está registrado.');
   if (numero === 51001) throw new ErrorAplicacion(404, 'ROL_NO_ENCONTRADO', 'El rol no existe o está inactivo.');
+  if (numero === 51002) throw new ErrorAplicacion(409, 'ULTIMO_ADMINISTRADOR',
+    'No se puede eliminar el último administrador activo.');
+  if (numero === 51003) throw new ErrorAplicacion(409, 'ASIGNACIONES_ACTIVAS',
+    'El usuario tiene pedidos activos asignados. Reasigná esos pedidos antes de eliminarlo.');
+  if (numero === 51004) throw new ErrorAplicacion(404, 'USUARIO_NO_ENCONTRADO', 'El usuario no existe.');
   throw error;
 }
 
@@ -24,6 +29,9 @@ export class UsuarioServicio {
     if(!activo&&usuario.codigoRol==='ADMINISTRADOR'&&await this.repositorio.contarAdministradoresActivos()<=1)
       throw new ErrorAplicacion(409,'ULTIMO_ADMINISTRADOR','No se puede desactivar el último administrador activo.');
     await this.repositorio.cambiarEstado(id,activo);return this.obtener(id);}
+  public async eliminar(id:string,actual:string):Promise<void>{await this.obtener(id);
+    if(id===actual)throw new ErrorAplicacion(409,'AUTO_ELIMINACION_NO_PERMITIDA','No podés eliminar tu propia cuenta.');
+    try{await this.repositorio.eliminarLogicamente(id);}catch(e){traducirError(e);}}
   public async restablecer(id:string,contrasena:string){const usuario=await this.obtener(id);
     await this.repositorio.restablecer(id,await crearHashContrasena(contrasena,usuario.nombreUsuario));}
   public roles(){return this.repositorio.roles();}

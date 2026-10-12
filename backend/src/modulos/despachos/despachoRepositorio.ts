@@ -167,16 +167,21 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       ${parametrosAlmacen.length > 0
         ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : ''}`;
     const resultado = await solicitud.query(`WITH Pedidos AS (
-        SELECT pedido.*, usuario.nombreVisible usuarioDespacho,
+        SELECT pedido.*,
+          COALESCE(referencia.numeroPedidoSap,pedido.numeroPedido) numeroPedidoMostrado,
+          COALESCE(CONVERT(nvarchar(50),referencia.sapDocEntry),pedido.sapDocEntry) sapDocEntryMostrado,
+          usuario.nombreVisible usuarioDespacho,
           ${estadoCierreSql('pedido')} estadoCierre,
           seguimiento.fechaEntradaCola,
           ISNULL(seguimiento.excluidoSla, 0) esEspecial, COUNT(*) OVER() total
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
+        LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=pedido.idOrigen
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
         WHERE ${CONDICION_ETAPA_DESPACHADOS}
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
-          AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
+          AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido
+            OR pedido.folioPedido = @numeroPedido OR referencia.numeroPedidoSap = @numeroPedido)
           AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
           AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
           AND (@clasificacion IS NULL
@@ -210,8 +215,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       if (!mapa.has(fila.idOrigen)) {
         mapa.set(fila.idOrigen, {
           idOrigen: fila.idOrigen, origenPedido: fila.origenPedido, creadoEnR1: fila.creadoEnR1,
-          sapDocEntry: fila.sapDocEntry, folioPedido: fila.folioPedido ?? '',
-          numeroPedido: fila.numeroPedido, codigoVenta: null, codigoVendedor: null,
+          sapDocEntry: fila.sapDocEntryMostrado, folioPedido: fila.folioPedido ?? '',
+          numeroPedido: fila.numeroPedidoMostrado, codigoVenta: null, codigoVendedor: null,
           nombreVendedor: fila.nombreVendedor, codigosAlmacen: [], nombresBodega: fila.nombreAlmacen,
           fechaHoraPedido: fechaSqlSinZona(fila.fechaHoraPedido),
           codigoEstadoVenta: 'DESPACHADO', codigoSincronizacion: null, articulos: [],
@@ -257,7 +262,10 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     const filtroAlmacenes = parametrosAlmacen.length > 0
       ? `AND detalle.codigoAlmacen IN (${parametrosAlmacen.join(', ')})` : '';
     const resultado = await solicitud.query(`WITH Lineas AS (
-      SELECT pedido.*, usuarioCabecera.nombreVisible usuarioDespacho,
+      SELECT pedido.*,
+        COALESCE(referencia.numeroPedidoSap,pedido.numeroPedido) numeroPedidoMostrado,
+        COALESCE(CONVERT(nvarchar(50),referencia.sapDocEntry),pedido.sapDocEntry) sapDocEntryMostrado,
+        usuarioCabecera.nombreVisible usuarioDespacho,
         ${estadoCierreSql('pedido')} estadoCierre,
         detalle.identificadorDetalle, detalle.numeroLinea, detalle.codigoArticulo,
         detalle.descripcion, detalle.cantidad, detalle.codigoAlmacen detalleCodigoAlmacen,
@@ -270,13 +278,15 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
       JOIN dbo.UsuarioAplicacion usuarioCabecera ON usuarioCabecera.idUsuario = pedido.idUsuario
       JOIN dbo.UsuarioAplicacion usuarioDetalle ON usuarioDetalle.idUsuario = detalle.idUsuario
+      LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=pedido.idOrigen
       LEFT JOIN dbo.AsignacionArticuloPedido asignacion
         ON asignacion.idOrigen = detalle.idOrigen
        AND asignacion.identificadorDetalle = detalle.identificadorDetalle
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
       WHERE ${CONDICION_ETAPA_DESPACHADOS}
         AND ${condicionLineaNoFleteSql('detalle.codigoArticulo', 'detalle.descripcion')}
-        AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido)
+        AND (@numeroPedido IS NULL OR pedido.numeroPedido = @numeroPedido
+          OR pedido.folioPedido = @numeroPedido OR referencia.numeroPedidoSap = @numeroPedido)
         AND (@fechaDesde IS NULL OR pedido.fechaHoraPedido >= @fechaDesde)
         AND (@fechaHasta IS NULL OR pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
         AND (@clasificacion IS NULL
@@ -294,8 +304,8 @@ export class DespachoRepositorio implements IDespachoRepositorio {
         TRY_CONVERT(bigint, identificadorDetalle), identificadorDetalle, numeroLinea;`);
     const pedidos = resultado.recordset.map((fila): PedidoDespachado => ({
       idOrigen: fila.idOrigen, origenPedido: fila.origenPedido, creadoEnR1: fila.creadoEnR1,
-      sapDocEntry: fila.sapDocEntry, folioPedido: fila.folioPedido ?? '',
-      numeroPedido: fila.numeroPedido, codigoVenta: null, codigoVendedor: null,
+      sapDocEntry: fila.sapDocEntryMostrado, folioPedido: fila.folioPedido ?? '',
+      numeroPedido: fila.numeroPedidoMostrado, codigoVenta: null, codigoVendedor: null,
       nombreVendedor: fila.nombreVendedor,
       codigosAlmacen: fila.detalleCodigoAlmacen ? [fila.detalleCodigoAlmacen] : [],
       nombresBodega: fila.detalleNombreAlmacen,
@@ -324,12 +334,16 @@ export class DespachoRepositorio implements IDespachoRepositorio {
     const pool = obtenerPoolPedidosBodega();
     const cabecera = (await pool.request()
       .input('idOrigen', sql.NVarChar(150), idOrigen)
-      .query(`SELECT TOP (1) pedido.*, usuario.nombreVisible usuarioDespacho,
+      .query(`SELECT TOP (1) pedido.*,
+          COALESCE(referencia.numeroPedidoSap,pedido.numeroPedido) numeroPedidoMostrado,
+          COALESCE(CONVERT(nvarchar(50),referencia.sapDocEntry),pedido.sapDocEntry) sapDocEntryMostrado,
+          usuario.nombreVisible usuarioDespacho,
           ${estadoCierreSql('pedido')} estadoCierre,
           seguimiento.fechaEntradaCola,
           ISNULL(seguimiento.excluidoSla, 0) esEspecial
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
+        LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=pedido.idOrigen
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
         WHERE pedido.idOrigen = @idOrigen
           AND ${CONDICION_ETAPA_DESPACHADOS};`)).recordset[0];
@@ -356,9 +370,9 @@ export class DespachoRepositorio implements IDespachoRepositorio {
       idOrigen: cabecera.idOrigen,
       origenPedido: cabecera.origenPedido,
       creadoEnR1: cabecera.creadoEnR1,
-      sapDocEntry: cabecera.sapDocEntry,
+      sapDocEntry: cabecera.sapDocEntryMostrado,
       folioPedido: cabecera.folioPedido ?? '',
-      numeroPedido: cabecera.numeroPedido,
+      numeroPedido: cabecera.numeroPedidoMostrado,
       codigoVenta: null,
       codigoVendedor: null,
       nombreVendedor: cabecera.nombreVendedor,

@@ -18,5 +18,7 @@ usuarioRutas.post('/',async(s,r,n)=>{try{const d=esquemaCrearUsuario.parse(s.bod
 usuarioRutas.patch('/:usuarioId',async(s,r,n)=>{try{r.json({datos:await servicio.editar(esquemaIdUsuario.parse(s.params.usuarioId),esquemaEditarUsuario.parse(s.body))});}catch(e){n(e);}});
 usuarioRutas.put('/:usuarioId/almacenes',async(s,r,n)=>{try{const d=esquemaAlmacenesUsuario.parse(s.body);r.json({datos:await servicio.guardarAlmacenes(esquemaIdUsuario.parse(s.params.usuarioId),d.codigosAlmacen)});}catch(e){n(e);}});
 usuarioRutas.patch('/:usuarioId/estado',async(s,r,n)=>{try{const d=esquemaEstadoUsuario.parse(s.body);r.json({datos:await servicio.cambiarEstado(esquemaIdUsuario.parse(s.params.usuarioId),d.activo,s.user!.usuarioId)});}catch(e){n(e);}});
+usuarioRutas.delete('/:usuarioId',async(s,r,n)=>{try{await servicio.eliminar(esquemaIdUsuario.parse(s.params.usuarioId),s.user!.usuarioId);
+  r.status(204).send();}catch(e){n(e);}});
 usuarioRutas.post('/:usuarioId/restablecer-contrasena',async(s,r,n)=>{try{const d=esquemaRestablecer.parse(s.body);
   await servicio.restablecer(esquemaIdUsuario.parse(s.params.usuarioId),d.contrasena);r.status(204).send();}catch(e){n(e);}});

@@ -518,8 +518,10 @@ export class HistorialRepositorio {
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
     const resultado = await solicitud.query(`WITH Cabeceras AS (
         SELECT pedido.idOrigen, pedido.origenPedido, pedido.creadoEnR1,
-          COALESCE(pedido.sapDocEntry, CONVERT(nvarchar(50), evento.docEntry)) sapDocEntry,
-          pedido.folioPedido, COALESCE(evento.numeroPedido, pedido.numeroPedido) numeroPedido,
+          COALESCE(pedido.sapDocEntry,CONVERT(nvarchar(50),referencia.sapDocEntry),
+            CONVERT(nvarchar(50),evento.docEntry)) sapDocEntry,
+          pedido.folioPedido,
+          COALESCE(evento.numeroPedido,referencia.numeroPedidoSap,pedido.numeroPedido) numeroPedido,
           pedido.nombreVendedor, pedido.fechaHoraPedido,
           pedido.despachadoEn, pedido.validadoDetectadoEn, usuario.nombreVisible usuarioDespacho,
           pedido.idPedidoDespachado, CONVERT(bigint, NULL) idPedidoSapHistorial,
@@ -529,6 +531,7 @@ export class HistorialRepositorio {
         FROM dbo.PedidoDespachado pedido
         JOIN dbo.UsuarioAplicacion usuario ON usuario.idUsuario = pedido.idUsuario
         LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
+        LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=pedido.idOrigen
         OUTER APPLY (SELECT TOP(1) fuente.docEntry, fuente.numeroPedido
           FROM (SELECT docEntry,numeroPedido,folioPedido FROM dbo.CierreSapDevueltos WHERE activo=1
             UNION ALL SELECT docEntry,numeroPedido,folioPedido FROM dbo.CancelacionSapHistorial
@@ -543,7 +546,10 @@ export class HistorialRepositorio {
               AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
             OR (pedido.fechaHoraPedido IS NULL AND pedido.despachadoEn >= @fechaDesde
               AND pedido.despachadoEn < DATEADD(day, 1, @fechaHasta)))
-          AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+          AND (@numeroPedido IS NULL
+            OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%')
+            OR pedido.folioPedido LIKE CONCAT('%', @numeroPedido, '%')
+            OR referencia.numeroPedidoSap LIKE CONCAT('%', @numeroPedido, '%'))
           AND (@clasificacion IS NULL
             OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
             OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))
@@ -684,7 +690,7 @@ export class HistorialRepositorio {
       solicitud.input(`codigoAlmacen${indice}`, sql.NVarChar(16), codigo));
     const resultado = await solicitud.query(`WITH Articulos AS (
       SELECT pedido.idOrigen, detalle.identificadorDetalle,
-        COALESCE(evento.numeroPedido,pedido.numeroPedido) numeroPedido,
+        COALESCE(evento.numeroPedido,referencia.numeroPedidoSap,pedido.numeroPedido) numeroPedido,
         detalle.codigoArticulo, detalle.descripcion, detalle.cantidad,
         detalle.codigoAlmacen, detalle.nombreAlmacen,
         pedido.fechaHoraPedido, pedido.nombreVendedor, seguimiento.fechaEntradaCola,
@@ -696,6 +702,7 @@ export class HistorialRepositorio {
       JOIN dbo.PedidoDespachadoDetalle detalle
         ON detalle.idPedidoDespachado = pedido.idPedidoDespachado
       LEFT JOIN dbo.SeguimientoPedido seguimiento ON seguimiento.idOrigen = pedido.idOrigen
+      LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=pedido.idOrigen
       OUTER APPLY (SELECT TOP(1) fuente.numeroPedido
         FROM (SELECT docEntry,numeroPedido,folioPedido FROM dbo.CierreSapDevueltos WHERE activo=1
           UNION ALL SELECT docEntry,numeroPedido,folioPedido FROM dbo.CancelacionSapHistorial
@@ -709,7 +716,10 @@ export class HistorialRepositorio {
             AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
           OR (pedido.fechaHoraPedido IS NULL AND pedido.despachadoEn >= @fechaDesde
             AND pedido.despachadoEn < DATEADD(day, 1, @fechaHasta)))
-        AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
+        AND (@numeroPedido IS NULL
+          OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%')
+          OR pedido.folioPedido LIKE CONCAT('%', @numeroPedido, '%')
+          OR referencia.numeroPedidoSap LIKE CONCAT('%', @numeroPedido, '%'))
         AND (@clasificacion IS NULL
           OR (@clasificacion = 'especial' AND ISNULL(seguimiento.excluidoSla, 0) = 1)
           OR (@clasificacion = 'normal' AND ISNULL(seguimiento.excluidoSla, 0) = 0))

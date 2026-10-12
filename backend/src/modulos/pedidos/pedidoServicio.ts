@@ -13,6 +13,7 @@ import type { SeguimientoPedidoRepositorio } from './seguimientoPedidoRepositori
 import { aplicarClasificacionEspecialPorVendedor } from './pedidoEspecial.js';
 import type { IConciliacionEntregaPedido } from './conciliacionEntregaPedido.js';
 import { esLineaFlete } from './lineaFlete.js';
+import { ReferenciaPedidoSapR1Repositorio } from '../historial/referenciaPedidoSapR1Repositorio.js';
 
 interface EstadoCacheSap {
   resultado?: PaginaPedidos;
@@ -28,6 +29,7 @@ export class PedidoServicio {
     private readonly despachoRepositorio?: IDespachoRepositorio,
     private readonly seguimientoRepositorio?: SeguimientoPedidoRepositorio,
     private readonly conciliacionEntregas?: IConciliacionEntregaPedido,
+    private readonly referenciasSapR1 = new ReferenciaPedidoSapR1Repositorio(),
   ) {}
 
   public async buscarPedidos(filtros: FiltrosPedidos): Promise<PaginaPedidos> {
@@ -49,9 +51,17 @@ export class PedidoServicio {
         estadoCacheSap,
       );
 
+      let filtrosRetailOne = filtrosAcumulados;
+      if (filtrosAcumulados.numeroPedido) {
+        try {
+          const referencia = await this.referenciasSapR1.buscarPorIdentificador(filtrosAcumulados.numeroPedido);
+          if (referencia) filtrosRetailOne = { ...filtrosAcumulados, numeroPedido: referencia.folioPedido };
+        } catch { /* La consulta de pendientes continÃºa con su identificador original. */ }
+      }
+
       let retailOne: PaginaPedidos | null = null;
       try {
-        retailOne = await this.pedidoRepositorio.buscarPedidos(filtrosAcumulados);
+        retailOne = await this.pedidoRepositorio.buscarPedidos(filtrosRetailOne);
       } catch {
         console.warn('La fuente RetailOne no estuvo disponible durante la consulta.');
       }
@@ -63,7 +73,10 @@ export class PedidoServicio {
       const lineasDespachadas = this.despachoRepositorio
         ? await this.despachoRepositorio.identidadesLineas()
         : new Set<string>();
-      let pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])]
+      let pedidosOrigen = [...(retailOne?.pedidos ?? []), ...(sap?.pedidos ?? [])];
+      try { pedidosOrigen = await this.referenciasSapR1.priorizar(pedidosOrigen); }
+      catch { /* La fuente local no debe impedir mostrar pendientes. */ }
+      pedidosOrigen = pedidosOrigen
         .map((pedido) => ({ ...pedido, articulos: pedido.articulos.filter((articulo) =>
           !esLineaFlete(articulo.codigoArticulo, articulo.descripcion)) }))
         .filter((pedido) => pedido.articulos.length > 0);
@@ -186,6 +199,11 @@ export class PedidoServicio {
       if (!pedido) {
         throw new ErrorAplicacion(404, 'PEDIDO_NO_ENCONTRADO', 'El pedido solicitado no existe.');
       }
+      try {
+        const [cabeceraPriorizada] = await this.referenciasSapR1.priorizar([pedido.cabecera]);
+        if (cabeceraPriorizada) pedido.cabecera = cabeceraPriorizada;
+      }
+      catch { /* Se conserva el folio original si la referencia local no estÃ¡ disponible. */ }
       pedido.cabecera.articulos = pedido.cabecera.articulos.filter((articulo) =>
         !esLineaFlete(articulo.codigoArticulo, articulo.descripcion));
       pedido.partidas = pedido.partidas.filter((partida) =>

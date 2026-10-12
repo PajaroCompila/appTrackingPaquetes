@@ -111,23 +111,48 @@ export function resolverTecnicoAsignable(
     'No tiene permisos para asignar pedidos.');
 }
 
+async function conservarTecnicosActivos(
+  repositorio: AsignacionRepositorio,
+  tecnicos: readonly TecnicoAsignable[],
+): Promise<readonly TecnicoAsignable[]> {
+  if (!repositorio.filtrarUsuariosActivos) return tecnicos;
+  const activos = await repositorio.filtrarUsuariosActivos(tecnicos.map(({ usuario }) => usuario));
+  return tecnicos.filter(({ usuario }) => activos.has(usuario.toLowerCase()));
+}
+
+async function exigirTecnicoActivo(
+  repositorio: AsignacionRepositorio,
+  tecnico: TecnicoAsignable,
+): Promise<void> {
+  if (!repositorio.filtrarUsuariosActivos) return;
+  const activos = await repositorio.filtrarUsuariosActivos([tecnico.usuario]);
+  if (!activos.has(tecnico.usuario.toLowerCase())) {
+    throw new ErrorAplicacion(409, 'TECNICO_INACTIVO',
+      'El usuario seleccionado está inactivo y no puede recibir nuevas asignaciones.');
+  }
+}
+
 export function crearAsignacionRutas(
   repositorio: AsignacionRepositorio = new AsignacionRepositorio(),
 ): Router {
   const rutas = Router();
 
-  rutas.get('/usuarios', (solicitud, respuesta) => {
-    const usuario = solicitud.user!;
-    const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
-    const datos = usuariosAsignablesParaSesion(usuario);
-    const puedeAsignarTodos = usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
-      || nombreUsuario === 'gcruz';
-    respuesta.json({
-      datos,
-      puedeAsignar: datos.length > 0,
-      puedeAsignarTodos,
-      puedeReasignar: puedeReasignarPedidos(usuario.codigoRol, usuario.nombreUsuario),
-    });
+  rutas.get('/usuarios', async (solicitud, respuesta, siguiente) => {
+    try {
+      const usuario = solicitud.user!;
+      const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+      const datos = await conservarTecnicosActivos(repositorio, usuariosAsignablesParaSesion(usuario));
+      const puedeAsignarTodos = usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
+        || nombreUsuario === 'gcruz';
+      respuesta.json({
+        datos,
+        puedeAsignar: datos.length > 0,
+        puedeAsignarTodos,
+        puedeReasignar: puedeReasignarPedidos(usuario.codigoRol, usuario.nombreUsuario),
+      });
+    } catch (error) {
+      siguiente(error);
+    }
   });
 
   rutas.post('/consultar', async (solicitud, respuesta, siguiente) => {
@@ -154,6 +179,7 @@ export function crearAsignacionRutas(
           'Solo puede asignarse pedidos de TBM.');
       }
       const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
+      await exigirTecnicoActivo(repositorio, tecnico);
       const resultado = await repositorio.guardar(datos, tecnico, usuario.usuarioId);
       if (!resultado.confirmada) {
         respuesta.status(409).json({
@@ -197,6 +223,7 @@ export function crearAsignacionRutas(
           'Solo puede asignarse pedidos de TBM.');
       }
       const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
+      await exigirTecnicoActivo(repositorio, tecnico);
       const resultado = await repositorio.reasignar(
         datos,
         tecnico,

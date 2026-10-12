@@ -69,11 +69,14 @@ export class HistorialR1SnapshotRepositorio {
             datos nvarchar(max)
           );
           INSERT @snapshot
-          SELECT idOrigen,
-            CASE WHEN CHARINDEX(':', idOrigen, 4)>0
-              THEN SUBSTRING(idOrigen,4,CHARINDEX(':',idOrigen,4)-4) ELSE '' END,
-            folioPedido, numeroPedido, fechaHoraPedido, nombreVendedor,
-            ISNULL(esEspecial,0), value
+          SELECT entrada.idOrigen,
+            CASE WHEN CHARINDEX(':', entrada.idOrigen, 4)>0
+              THEN SUBSTRING(entrada.idOrigen,4,CHARINDEX(':',entrada.idOrigen,4)-4) ELSE '' END,
+            entrada.folioPedido, COALESCE(referencia.numeroPedidoSap,entrada.numeroPedido),
+            entrada.fechaHoraPedido, entrada.nombreVendedor, ISNULL(entrada.esEspecial,0),
+            CASE WHEN referencia.idOrigen IS NULL THEN entrada.datos ELSE
+              JSON_MODIFY(JSON_MODIFY(entrada.datos,'$.numeroPedido',referencia.numeroPedidoSap),
+                '$.sapDocEntry',CONVERT(nvarchar(50),referencia.sapDocEntry)) END
           FROM OPENJSON(@registros) WITH(
             idOrigen nvarchar(150) '$.idOrigen',
             folioPedido nvarchar(100) '$.folioPedido',
@@ -81,8 +84,9 @@ export class HistorialR1SnapshotRepositorio {
             fechaHoraPedido datetime2(3) '$.fechaHoraPedido',
             nombreVendedor nvarchar(200) '$.nombreVendedor',
             esEspecial bit '$.esEspecial',
-            value nvarchar(max) '$' AS JSON
-          );
+            datos nvarchar(max) '$' AS JSON
+          ) entrada
+          LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=entrada.idOrigen;
 
           MERGE dbo.HistorialR1Snapshot WITH(HOLDLOCK) AS destino
           USING @snapshot AS origen ON origen.idOrigen=destino.idOrigen
@@ -186,7 +190,9 @@ export class HistorialR1SnapshotRepositorio {
       WHERE snapshot.activo=1
         AND snapshot.fechaHoraPedido>=@fechaDesde
         AND snapshot.fechaHoraPedido<DATEADD(day,1,@fechaHasta)
-        AND (@numeroPedido IS NULL OR snapshot.numeroPedido LIKE CONCAT('%',@numeroPedido,'%'))
+        AND (@numeroPedido IS NULL
+          OR snapshot.numeroPedido LIKE CONCAT('%',@numeroPedido,'%')
+          OR snapshot.folioPedido LIKE CONCAT('%',@numeroPedido,'%'))
         AND (@clasificacion IS NULL
           OR (@clasificacion='especial' AND snapshot.esEspecial=1)
           OR (@clasificacion='normal' AND snapshot.esEspecial=0))

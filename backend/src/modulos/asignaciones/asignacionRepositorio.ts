@@ -40,6 +40,19 @@ function agregarLineas(solicitud: sql.Request, lineas: IdentidadArticuloAsignaci
 }
 
 export class AsignacionRepositorio {
+  public async filtrarUsuariosActivos(usuarios: readonly string[]): Promise<Set<string>> {
+    if (usuarios.length === 0) return new Set();
+    const resultado = await obtenerPoolPedidosBodega().request()
+      .input('usuarios', sql.NVarChar(sql.MAX), JSON.stringify(usuarios))
+      .query<{ nombreUsuario: string }>(`
+        SELECT usuario.nombreUsuario
+        FROM dbo.UsuarioAplicacion usuario
+        JOIN OPENJSON(@usuarios) WITH (nombreUsuario nvarchar(100) '$') solicitado
+          ON solicitado.nombreUsuario=usuario.nombreUsuario
+        WHERE usuario.activo=1;`);
+    return new Set(resultado.recordset.map(({ nombreUsuario }) => nombreUsuario.trim().toLowerCase()));
+  }
+
   public async consultar(lineas: IdentidadArticuloAsignacion[]): Promise<AsignacionArticulo[]> {
     const unicas = lineasUnicas(lineas);
     if (unicas.length === 0) return [];

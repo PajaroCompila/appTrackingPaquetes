@@ -3,9 +3,12 @@ import { obtenerPoolPedidosBodega } from '../../infraestructura/sql/conexionPedi
 import { obtenerPoolSucursalR1, obtenerSucursalesR1 } from '../../infraestructura/sql/conexionSucursalesR1.js';
 import { validarConsultaSistemaOrigen } from '../../infraestructura/sql/consultaSistemaOrigen.js';
 import { CONDICION_HISTORIAL_R1 } from '../historial/historialR1Repositorio.js';
+import { ReferenciaPedidoSapR1Repositorio } from '../historial/referenciaPedidoSapR1Repositorio.js';
 import type { EstadoFinancieroControl } from './controlOperativoRepositorio.js';
 
 export class ControlOperativoFinanciero {
+  public constructor(private readonly referenciasSap = new ReferenciaPedidoSapR1Repositorio()) {}
+
   public async estados(ids: string[]): Promise<EstadoFinancieroControl[]> {
     if (!ids.length) return [];
     const locales=await obtenerPoolPedidosBodega().request().input('ids',sql.NVarChar(sql.MAX),JSON.stringify(ids))
@@ -62,6 +65,14 @@ export class ControlOperativoFinanciero {
     for (const resultado of resultados) {
       if (resultado.status==='fulfilled') for (const estado of resultado.value) estados.set(estado.idOrigen,estado);
       // Una sucursal caída no invalida el estado financiero conservado localmente.
+    }
+    const referencias = await this.referenciasSap.obtener(ids).catch(() => new Map());
+    for (const estado of estados.values()) {
+      const referencia = referencias.get(estado.idOrigen);
+      if (estado.cabecera && referencia) {
+        estado.cabecera.numeroPedido = referencia.numeroPedidoSap;
+        estado.cabecera.sapDocEntry = String(referencia.sapDocEntry);
+      }
     }
     return [...estados.values()];
   }

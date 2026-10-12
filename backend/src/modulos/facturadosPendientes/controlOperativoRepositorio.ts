@@ -19,7 +19,8 @@ interface FilaControl {
 }
 export interface EstadoFinancieroControl {
   idOrigen: string; facturado: boolean | null; fuente: string | null;
-  cabecera?: { numeroPedido: string; nombreVendedor: string | null; fechaHoraPedido: string | null };
+  cabecera?: { numeroPedido: string; nombreVendedor: string | null; fechaHoraPedido: string | null;
+    sapDocEntry?: string | null };
 }
 
 export class ControlOperativoRepositorio {

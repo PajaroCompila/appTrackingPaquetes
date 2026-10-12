@@ -65,6 +65,45 @@ export class UsuarioRepositorio {
   public async cambiarEstado(id:string,activo:boolean){await obtenerPoolPedidosBodega().request().input('id',sql.UniqueIdentifier,id)
     .input('activo',sql.Bit,activo).query(`UPDATE dbo.UsuarioAplicacion SET activo=@activo,actualizadoEn=SYSUTCDATETIME() WHERE idUsuario=@id;
       IF @activo=0 UPDATE dbo.SesionAutenticada SET revocadaEn=COALESCE(revocadaEn,SYSUTCDATETIME()) WHERE idUsuario=@id;`);}
+  public async eliminarLogicamente(id:string):Promise<void>{await obtenerPoolPedidosBodega().request()
+    .input('id',sql.UniqueIdentifier,id).query(`
+      SET XACT_ABORT ON;
+      BEGIN TRANSACTION;
+      DECLARE @nombreUsuario nvarchar(100), @codigoRol nvarchar(40), @activo bit;
+      SELECT @nombreUsuario=u.nombreUsuario,@codigoRol=r.codigo,@activo=u.activo
+      FROM dbo.UsuarioAplicacion u WITH (UPDLOCK,HOLDLOCK)
+      JOIN dbo.RolAplicacion r ON r.idRol=u.rolId
+      WHERE u.idUsuario=@id;
+      IF @nombreUsuario IS NULL THROW 51004,'USUARIO_NO_ENCONTRADO',1;
+      IF @activo=1 AND @codigoRol=N'ADMINISTRADOR' AND
+        (SELECT COUNT(*) FROM dbo.UsuarioAplicacion administrador WITH (UPDLOCK,HOLDLOCK)
+          JOIN dbo.RolAplicacion rol ON rol.idRol=administrador.rolId
+          WHERE administrador.activo=1 AND rol.codigo=N'ADMINISTRADOR')<=1
+        THROW 51002,'ULTIMO_ADMINISTRADOR',1;
+      IF @activo=1 AND EXISTS(
+        SELECT 1
+        FROM dbo.AsignacionArticuloPedido asignacion
+        JOIN dbo.SeguimientoPedidoDetalle detalle
+          ON detalle.idOrigen=asignacion.idOrigen
+         AND detalle.identificadorDetalle=asignacion.identificadorDetalle
+         AND detalle.activo=1
+        LEFT JOIN dbo.PedidoDespachado despacho ON despacho.idOrigen=asignacion.idOrigen
+        WHERE asignacion.usuarioAsignado=@nombreUsuario
+          AND (despacho.idPedidoDespachado IS NULL OR (
+            despacho.estadoLocal IN ('DESPACHADO','CERRADO')
+            AND despacho.validadoDetectadoEn IS NULL
+            AND despacho.entregaDetectadaEn IS NULL
+            AND NOT EXISTS(SELECT 1 FROM dbo.RecepcionDevolucionPedido recepcion
+              WHERE recepcion.idPedidoDespachado=despacho.idPedidoDespachado)
+            AND NOT EXISTS(SELECT 1 FROM dbo.DevolucionPedido devolucion
+              WHERE devolucion.idPedidoDespachado=despacho.idPedidoDespachado
+                AND devolucion.estado=N'DEVUELTO')))
+      ) THROW 51003,'ASIGNACIONES_ACTIVAS',1;
+      UPDATE dbo.UsuarioAplicacion SET activo=0,actualizadoEn=SYSUTCDATETIME()
+        WHERE idUsuario=@id AND activo=1;
+      UPDATE dbo.SesionAutenticada SET revocadaEn=COALESCE(revocadaEn,SYSUTCDATETIME())
+        WHERE idUsuario=@id AND revocadaEn IS NULL;
+      COMMIT TRANSACTION;`);}
   public async restablecer(id:string,hash:Buffer){await obtenerPoolPedidosBodega().request().input('id',sql.UniqueIdentifier,id)
     .input('hash',sql.VarBinary(256),hash).query(`UPDATE dbo.UsuarioAplicacion SET hashContrasena=@hash,
       algoritmoContrasena=N'argon2id',debeCambiarContrasena=1,intentosFallidos=0,bloqueadoHasta=NULL,

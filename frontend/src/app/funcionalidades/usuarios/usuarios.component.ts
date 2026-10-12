@@ -6,6 +6,7 @@ import { UsuarioService } from './usuario.service';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import type { Almacen } from '../pedidos/almacen.interface';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
+import { AutenticacionService } from '../autenticacion/autenticacion.service';
 
 const claveFiltrosUsuarios = 'pedidosBodega.usuarios.filtros';
 
@@ -20,13 +21,14 @@ export class UsuariosComponent implements OnInit {
     return formatearFechaHoraHonduras(valor);
   }
   private readonly servicio = inject(UsuarioService);
+  private readonly autenticacion = inject(AutenticacionService);
   public readonly usuarios = signal<UsuarioLocal[]>([]);
   public readonly roles = signal<RolLocal[]>([]);
   public readonly cargando = signal(false);
   public readonly error = signal('');
   public readonly guardando = signal(false);
   public readonly mensaje = signal('');
-  public readonly modal = signal<'crear' | 'editar' | 'restablecer' | 'almacenes' | null>(null);
+  public readonly modal = signal<'crear' | 'editar' | 'restablecer' | 'almacenes' | 'eliminar' | null>(null);
   public readonly seleccionado = signal<UsuarioLocal | null>(null);
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
@@ -34,7 +36,7 @@ export class UsuariosComponent implements OnInit {
   public readonly almacenes = signal<Almacen[]>([]);
   public busqueda = '';
   public rol = '';
-  public activo = '';
+  public activo = 'true';
   public form = { nombreCompleto: '', nombreUsuario: '', correo: '', codigoRol: 'CONSULTA' as CodigoRol,
     contrasena: '', confirmarContrasena: '', activo: true };
   public codigosAlmacenFormulario: string[] = [];
@@ -80,6 +82,32 @@ export class UsuariosComponent implements OnInit {
     this.seleccionado.set(usuario);
     this.codigosAlmacenFormulario = [...usuario.codigosAlmacenVisibles];
     this.modal.set('almacenes');
+  }
+  public puedeEliminar(usuario: UsuarioLocal): boolean {
+    const sesion = this.autenticacion.usuario();
+    return sesion?.codigoRol === 'ADMINISTRADOR' && sesion.usuarioId !== usuario.usuarioId && usuario.activo;
+  }
+  public confirmarEliminacion(usuario: UsuarioLocal): void {
+    if (!this.puedeEliminar(usuario)) return;
+    this.seleccionado.set(usuario);
+    this.error.set('');
+    this.mensaje.set('');
+    this.modal.set('eliminar');
+  }
+  public eliminar(): void {
+    const usuario = this.seleccionado();
+    if (!usuario || !this.puedeEliminar(usuario) || this.guardando()) return;
+    this.error.set('');
+    this.guardando.set(true);
+    this.servicio.eliminar(usuario.usuarioId).pipe(finalize(() => this.guardando.set(false))).subscribe({
+      next: () => {
+        this.cerrar();
+        this.mensaje.set('Usuario eliminado correctamente');
+        this.cargar();
+      },
+      error: (error) => this.error.set(error.error?.mensaje
+        ?? 'No se pudo eliminar el usuario. Intenta nuevamente.'),
+    });
   }
   public alternarAlmacen(codigo: string, seleccionado: boolean): void {
     this.codigosAlmacenFormulario = seleccionado
@@ -142,7 +170,8 @@ export class UsuariosComponent implements OnInit {
       const filtros = JSON.parse(localStorage.getItem(claveFiltrosUsuarios) ?? '{}') as Record<string, unknown>;
       this.busqueda = typeof filtros['busqueda'] === 'string' ? filtros['busqueda'].slice(0, 100) : '';
       this.rol = typeof filtros['rol'] === 'string' ? filtros['rol'].slice(0, 30) : '';
-      this.activo = filtros['activo'] === 'true' || filtros['activo'] === 'false' ? filtros['activo'] : '';
+      this.activo = filtros['activo'] === 'true' || filtros['activo'] === 'false' || filtros['activo'] === ''
+        ? filtros['activo'] as string : 'true';
       const pagina = Number(filtros['pagina']);
       this.pagina.set(Number.isInteger(pagina) && pagina > 0 ? pagina : 1);
     } catch { /* Se utilizan los filtros iniciales. */ }

@@ -3,6 +3,7 @@ import { ControlOperativoFinanciero } from './controlOperativoFinanciero.js';
 import { ControlOperativoSincronizador } from './controlOperativoSincronizador.js';
 import type { ControlOperativoRepositorio } from './controlOperativoRepositorio.js';
 import { CONDICION_HISTORIAL_R1 } from '../historial/historialR1Repositorio.js';
+import type { ReferenciaPedidoSapR1Repositorio } from '../historial/referenciaPedidoSapR1Repositorio.js';
 const mocks=vi.hoisted(()=>({local:vi.fn(),origen:vi.fn(),pool:vi.fn()}));
 vi.mock('../../infraestructura/sql/conexionPedidosBodega.js',()=>({obtenerPoolPedidosBodega:()=>({
   request:()=>({input:vi.fn().mockReturnThis(),query:mocks.local}),
@@ -63,6 +64,17 @@ describe('estado financiero de Historial sin cambiar sus criterios',()=> {
     mocks.origen.mockResolvedValue({recordset:[{folio:'PE1',numeroPedido:'100'},{folio:'PE1',numeroPedido:'200'}]});
     expect(await new ControlOperativoFinanciero().estados(['R1:TSPS01:PE1'])).toEqual([
       {idOrigen:'R1:TSPS01:PE1',facturado:null,fuente:null}]);
+  });
+  it('prioriza el numero SAP persistido sin repetir la consulta externa',async()=> {
+    mocks.origen.mockResolvedValue({recordset:[{folio:'PE1',numeroPedido:null,nombreVendedor:'Vendedor',fechaHoraPedido:'2026-10-12T08:00:00'}]});
+    const referencias={obtener:vi.fn().mockResolvedValue(new Map([['R1:TSPS01:PE1',{
+      idOrigen:'R1:TSPS01:PE1',codigoSucursal:'TSPS01',folioPedido:'PE1',sapDocEntry:968843,
+      numeroPedidoSap:'101478390'}]]))};
+    const r=await new ControlOperativoFinanciero(
+      referencias as unknown as ReferenciaPedidoSapR1Repositorio).estados(['R1:TSPS01:PE1']);
+    expect(r[0]?.cabecera).toMatchObject({numeroPedido:'101478390',sapDocEntry:'968843'});
+    expect(mocks.origen).toHaveBeenCalledOnce();
+    expect(referencias.obtener).toHaveBeenCalledWith(['R1:TSPS01:PE1']);
   });
 });
 describe('sincronizador operativo independiente',()=> {

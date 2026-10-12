@@ -146,9 +146,12 @@ export class PedidoDevueltoRepositorio {
       BEGIN
         INSERT dbo.DevolucionPedido(idClave,idPedidoDespachado,evento,idOrigen,origenPedido,folioPedido,numeroPedido,
           nombreVendedor,fechaDespacho,fechaCancelacion,motivo,evidencia,totalLineas)
-        SELECT @clave,p.idPedidoDespachado,@evento,p.idOrigen,p.origenPedido,p.folioPedido,p.numeroPedido,
+        SELECT @clave,p.idPedidoDespachado,@evento,p.idOrigen,p.origenPedido,p.folioPedido,
+          COALESCE(referencia.numeroPedidoSap,p.numeroPedido),
           p.nombreVendedor,p.despachadoEn,@fecha,@motivo,@evidencia,(SELECT COUNT(*) FROM dbo.PedidoDespachadoDetalle WHERE idPedidoDespachado=@id)
-        FROM dbo.PedidoDespachado p WHERE p.idPedidoDespachado=@id;
+        FROM dbo.PedidoDespachado p
+        LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen=p.idOrigen
+        WHERE p.idPedidoDespachado=@id;
         INSERT dbo.DevolucionPedidoDetalle(idClave,idDetalleDespachado,identificadorDetalle,codigoArticulo,descripcion,cantidad,codigoAlmacen)
         SELECT @clave,idDetalle,identificadorDetalle,codigoArticulo,descripcion,cantidad,codigoAlmacen
         FROM dbo.PedidoDespachadoDetalle WHERE idPedidoDespachado=@id;

@@ -14,6 +14,7 @@ import { esIdentidadEntregaSap } from './entregaSap.interface.js';
 import { esLineaFlete } from '../pedidos/lineaFlete.js';
 import { HistorialR1SnapshotRepositorio } from './historialR1SnapshotRepositorio.js';
 import { solicitarSincronizacionHistorialR1 } from './historialR1SnapshotSincronizador.js';
+import { obtenerVersionProyeccionHistorialR1 } from './historialCacheVersion.js';
 
 let conciliacionEnCurso: Promise<number> | null = null;
 const duracionCacheHistorialMs = 15_000;
@@ -47,6 +48,7 @@ async function consultarFuenteHistorial<T>(nombre: string, consulta: () => Promi
 
 function claveFiltrosHistorial(tipo: 'pedidos' | 'articulos', filtros: FiltrosHistorial): string {
   return JSON.stringify({
+    versionProyeccionR1: obtenerVersionProyeccionHistorialR1(),
     tipo,
     fechaDesde: filtros.fechaDesde,
     fechaHasta: filtros.fechaHasta,

@@ -3,6 +3,7 @@ import type { PedidoHistorial } from './historial.interface.js';
 import type { HistorialR1Repositorio } from './historialR1Repositorio.js';
 import type { HistorialR1SnapshotRepositorio } from './historialR1SnapshotRepositorio.js';
 import { HistorialR1SnapshotSincronizador, fechaActualHonduras } from './historialR1SnapshotSincronizador.js';
+import type { ReferenciaPedidoSapR1Conciliador } from './referenciaPedidoSapR1Conciliador.js';
 
 const pedido = (idOrigen: string): PedidoHistorial => ({
   idOrigen,
@@ -27,6 +28,11 @@ const pedido = (idOrigen: string): PedidoHistorial => ({
   usuarioDespacho: null,
 });
 
+const conciliadorPassthrough = (): ReferenciaPedidoSapR1Conciliador => ({
+  conciliar: vi.fn(async (registros: PedidoHistorial[]) => ({ registros,
+    relacionados: 0, nuevos: 0, ambiguos: [], sapDisponible: true })),
+} as unknown as ReferenciaPedidoSapR1Conciliador);
+
 describe('HistorialR1SnapshotSincronizador', () => {
   it('pagina R1 en segundo plano y reemplaza el rango local solo al completar todas las fuentes', async () => {
     const buscar = vi.fn()
@@ -39,6 +45,7 @@ describe('HistorialR1SnapshotSincronizador', () => {
       { buscar } as unknown as HistorialR1Repositorio,
       { guardarRango } as unknown as HistorialR1SnapshotRepositorio,
       () => Date.parse('2026-10-07T15:00:00Z'),
+      conciliadorPassthrough(),
     );
 
     await sincronizador.sincronizar('2026-10-01', '2026-10-07');
@@ -62,6 +69,7 @@ describe('HistorialR1SnapshotSincronizador', () => {
       { buscar } as unknown as HistorialR1Repositorio,
       { guardarRango } as unknown as HistorialR1SnapshotRepositorio,
       () => ahora,
+      conciliadorPassthrough(),
     );
 
     const primera = sincronizador.sincronizar('2026-10-07', '2026-10-07');
@@ -94,6 +102,7 @@ describe('HistorialR1SnapshotSincronizador', () => {
       { buscar } as unknown as HistorialR1Repositorio,
       { guardarRango } as unknown as HistorialR1SnapshotRepositorio,
       () => ahora,
+      conciliadorPassthrough(),
     );
 
     await sincronizador.sincronizar('2026-10-12', '2026-10-12');

@@ -85,4 +85,20 @@ describe('AutenticacionServicio', () => {
 
     expect(repositorio.revocarSesion).toHaveBeenCalledWith('22222222-2222-2222-2222-222222222222');
   });
+
+  it('impide iniciar sesión a una cuenta eliminada lógicamente', async () => {
+    usuario.activo = false;
+    const servicio = new AutenticacionServicio(repositorio);
+    await expect(servicio.iniciarSesion('operador', 'contrasena-correcta'))
+      .rejects.toMatchObject({ estadoHttp: 401, codigo: 'CREDENCIALES_INVALIDAS' });
+    expect(repositorio.crearSesion).not.toHaveBeenCalled();
+  });
+
+  it('pierde autorización si la sesión deja de estar vigente después de eliminar la cuenta', async () => {
+    const servicio = new AutenticacionServicio(repositorio);
+    const sesion = await servicio.iniciarSesion('operador', 'contrasena-correcta');
+    vi.mocked(repositorio.obtenerIdentidadSesion).mockResolvedValue(null);
+    await expect(servicio.validarToken(sesion.token))
+      .rejects.toMatchObject({ estadoHttp: 401, codigo: 'SESION_INVALIDA' });
+  });
 });

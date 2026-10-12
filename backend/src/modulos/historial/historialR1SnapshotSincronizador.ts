@@ -1,6 +1,8 @@
 import type { FiltrosHistorial, PedidoHistorial } from './historial.interface.js';
 import { HistorialR1Repositorio } from './historialR1Repositorio.js';
 import { HistorialR1SnapshotRepositorio } from './historialR1SnapshotRepositorio.js';
+import { ReferenciaPedidoSapR1Conciliador } from './referenciaPedidoSapR1Conciliador.js';
+import { marcarCambioProyeccionHistorialR1 } from './historialCacheVersion.js';
 
 const cantidadPaginaSincronizacion = 100;
 const vigenciaSincronizacionMs = 45_000;
@@ -17,6 +19,7 @@ export class HistorialR1SnapshotSincronizador {
     private readonly fuente = new HistorialR1Repositorio(),
     private readonly destino = new HistorialR1SnapshotRepositorio(),
     private readonly ahora: () => number = Date.now,
+    private readonly conciliadorSap = new ReferenciaPedidoSapR1Conciliador(),
   ) {}
 
   public sincronizarHoy(): Promise<number> {
@@ -53,7 +56,15 @@ export class HistorialR1SnapshotSincronizador {
       if (!resultado.hayMas) break;
       pagina += 1;
     }
-    await this.destino.guardarRango(fechaDesde, fechaHasta, registros, completo);
+    const conciliacion = await this.conciliadorSap.conciliar(registros);
+    if (conciliacion.ambiguos.length > 0) {
+      console.error(`Folios R1 con relación SAP ambigua: ${conciliacion.ambiguos.join(', ')}.`);
+    }
+    if (conciliacion.nuevos > 0) {
+      console.info(`Conciliación SAP/R1 completada: ${conciliacion.nuevos} referencias nuevas.`);
+    }
+    await this.destino.guardarRango(fechaDesde, fechaHasta, conciliacion.registros, completo);
+    if (conciliacion.nuevos > 0) marcarCambioProyeccionHistorialR1();
     if (completo) this.ultimaSincronizacion.set(`${fechaDesde}\u0000${fechaHasta}`, this.ahora());
     return registros.length;
   }

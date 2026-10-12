@@ -19,4 +19,19 @@ describe('UsuarioServicio',()=>{
     contarAdministradoresActivos:vi.fn().mockResolvedValue(1),cambiarEstado:vi.fn()} as unknown as UsuarioRepositorio;
     await expect(new UsuarioServicio(repositorio).cambiarEstado(administrador.usuarioId,false,'22222222-2222-4222-8222-222222222222'))
       .rejects.toMatchObject({codigo:'ULTIMO_ADMINISTRADOR',estadoHttp:409});expect(repositorio.cambiarEstado).not.toHaveBeenCalled();});
+  it('elimina lógicamente una cuenta permitida',async()=>{const eliminarLogicamente=vi.fn().mockResolvedValue(undefined);
+    const repositorio={obtener:vi.fn().mockResolvedValue({...administrador,usuarioId:'33333333-3333-4333-8333-333333333333',codigoRol:'OPERADOR_BODEGA'}),
+      eliminarLogicamente} as unknown as UsuarioRepositorio;
+    await expect(new UsuarioServicio(repositorio).eliminar('33333333-3333-4333-8333-333333333333',administrador.usuarioId))
+      .resolves.toBeUndefined();expect(eliminarLogicamente).toHaveBeenCalledWith('33333333-3333-4333-8333-333333333333');});
+  it('impide que el administrador elimine su propia cuenta',async()=>{const eliminarLogicamente=vi.fn();
+    const repositorio={obtener:vi.fn().mockResolvedValue(administrador),eliminarLogicamente} as unknown as UsuarioRepositorio;
+    await expect(new UsuarioServicio(repositorio).eliminar(administrador.usuarioId,administrador.usuarioId))
+      .rejects.toMatchObject({codigo:'AUTO_ELIMINACION_NO_PERMITIDA',estadoHttp:409});
+    expect(eliminarLogicamente).not.toHaveBeenCalled();});
+  it.each([[51002,'ULTIMO_ADMINISTRADOR'],[51003,'ASIGNACIONES_ACTIVAS']])(
+    'traduce la protección SQL %s al eliminar',async(numero,codigo)=>{const repositorio={obtener:vi.fn().mockResolvedValue(administrador),
+      eliminarLogicamente:vi.fn().mockRejectedValue({number:numero})} as unknown as UsuarioRepositorio;
+      await expect(new UsuarioServicio(repositorio).eliminar(administrador.usuarioId,'22222222-2222-4222-8222-222222222222'))
+        .rejects.toMatchObject({codigo,estadoHttp:409});});
 });

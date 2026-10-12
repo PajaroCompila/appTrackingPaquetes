@@ -28,6 +28,7 @@
     "db:migrate:seguimiento-pedidos": "tsx scripts/migrarSeguimientoPedidos.ts",
     "db:migrate:tiempo-historial": "tsx scripts/migrarTiempoHistorial.ts",
     "db:migrate:historial-r1-snapshot": "tsx scripts/migrarHistorialR1Snapshot.ts",
+    "db:migrate:referencias-sap-r1": "tsx scripts/migrarReferenciasPedidoSapR1.ts",
     "usuario:crear": "tsx scripts/crearUsuarioInicial.ts",
     "usuario:cambiar-contrasena": "tsx scripts/cambiarContrasenaUsuario.ts",
     "dev": "tsx watch src/servidor.ts",
