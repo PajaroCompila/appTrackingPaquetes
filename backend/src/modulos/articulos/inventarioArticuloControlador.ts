@@ -2,7 +2,12 @@ import type { NextFunction, Request, Response } from 'express';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { CoincidenciaInventarioArticulo, InventarioArticulo } from './inventarioArticulo.interface.js';
 import type { InventarioArticuloRepositorio } from './inventarioArticuloRepositorio.js';
-import { esquemaBusquedaInventario, esquemaCodigoArticulo, esquemaConsultaInventario } from './inventarioArticuloValidacion.js';
+import {
+  esquemaBusquedaInventario,
+  esquemaCodigoArticulo,
+  esquemaConsultaInventario,
+  esquemaConsultaInventarioPorCodigo,
+} from './inventarioArticuloValidacion.js';
 export class InventarioArticuloControlador {
   public constructor(private readonly repositorio: InventarioArticuloRepositorio) {}
 
@@ -39,9 +44,36 @@ export class InventarioArticuloControlador {
       return;
     }
 
+    await this.consultar(articulo.data, consulta.data.codigoAlmacen, respuesta, siguiente);
+  };
+
+  public obtenerPorConsulta = async (
+    solicitud: Request,
+    respuesta: Response<InventarioArticulo>,
+    siguiente: NextFunction,
+  ): Promise<void> => {
+    const consulta = esquemaConsultaInventarioPorCodigo.safeParse(solicitud.query);
+    if (!consulta.success) {
+      siguiente(new ErrorAplicacion(400, 'PARAMETROS_INVENTARIO_INVALIDOS', 'Los parámetros proporcionados no son válidos.'));
+      return;
+    }
+
+    await this.consultar(
+      consulta.data.codigoArticulo,
+      consulta.data.codigoAlmacen,
+      respuesta,
+      siguiente,
+    );
+  };
+
+  private readonly consultar = async (
+    codigoArticulo: string,
+    codigoAlmacen: string | undefined,
+    respuesta: Response<InventarioArticulo>,
+    siguiente: NextFunction,
+  ): Promise<void> => {
     try {
-      const codigoAlmacen = consulta.data.codigoAlmacen;
-      const inventario = await this.repositorio.obtener(articulo.data, codigoAlmacen);
+      const inventario = await this.repositorio.obtener(codigoArticulo, codigoAlmacen);
       if (!inventario) {
         siguiente(new ErrorAplicacion(404, 'INVENTARIO_NO_ENCONTRADO', 'No se encontró inventario para el artículo y almacén indicados.'));
         return;

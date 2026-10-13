@@ -43,7 +43,7 @@ describe('Facturados pendientes: vista operativa aislada',()=> {
   });
   it('consulta inventario con un clic sobre el código',()=> {
     (fixture.nativeElement.querySelector('.codigo-inventario-consultable') as HTMLElement).click();
-    const consulta=TestBed.inject(HttpTestingController).expectOne(peticion=>peticion.url.endsWith('/articulos/ABC/inventario'));
+    const consulta=TestBed.inject(HttpTestingController).expectOne(peticion=>peticion.url.endsWith('/articulos/inventario')&&peticion.params.get('codigoArticulo')==='ABC');
     expect(consulta.request.params.get('codigoAlmacen')).toBe('BSPS04');
     consulta.flush({codigoArticulo:'ABC',descripcion:'Producto',codigoAlmacen:'BSPS04',nombreAlmacen:'Bodega 4',existenciaFisica:1,existencias:[]});
   });

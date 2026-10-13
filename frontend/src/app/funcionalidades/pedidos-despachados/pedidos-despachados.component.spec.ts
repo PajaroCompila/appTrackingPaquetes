@@ -137,7 +137,8 @@ describe('PedidosDespachadosComponent', () => {
     (fixture.nativeElement.querySelector('.codigo-articulo-en-linea') as HTMLElement)
       .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const consulta = http.expectOne((solicitud) =>
-      solicitud.url.endsWith('/articulos/A1/inventario'));
+      solicitud.url.endsWith('/articulos/inventario')
+      && solicitud.params.get('codigoArticulo') === 'A1');
     expect(consulta.request.params.get('codigoAlmacen')).toBe('B1');
     consulta.flush({ codigoArticulo: 'A1', descripcion: 'Artículo uno', codigoAlmacen: 'B1',
       nombreAlmacen: 'Bodega 1', existenciaFisica: 1, existencias: [] });

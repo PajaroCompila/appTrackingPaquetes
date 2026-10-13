@@ -82,4 +82,19 @@ describe('acceso al inventario por almacén', () => {
     expect(buscar).not.toHaveBeenCalled();
   });
 
+  it('consulta por query un código con eñe, espacios y diagonal sin dividir la ruta', async () => {
+    const obtener = vi.fn().mockResolvedValue({
+      ...inventarioCompleto,
+      codigoArticulo: 'ESTAÑO 1/4 ROL',
+    });
+
+    const respuesta = await solicitud(aplicacionInventario('operador', obtener))
+      .get('/api/articulos/inventario')
+      .query({ codigoArticulo: 'ESTAÑO 1/4 ROL', codigoAlmacen: 'BSPS03' })
+      .expect(200);
+
+    expect(respuesta.body.codigoArticulo).toBe('ESTAÑO 1/4 ROL');
+    expect(obtener).toHaveBeenCalledWith('ESTAÑO 1/4 ROL', 'BSPS03');
+  });
+
 });

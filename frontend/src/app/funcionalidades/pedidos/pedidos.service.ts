@@ -65,10 +65,10 @@ export class PedidosService {
     codigoArticulo: string,
     codigoAlmacen?: string,
   ): Observable<InventarioArticulo> {
-    let parametros = new HttpParams();
+    let parametros = new HttpParams().set('codigoArticulo', codigoArticulo.trim());
     if (codigoAlmacen?.trim()) parametros = parametros.set('codigoAlmacen', codigoAlmacen.trim());
     return this.clienteHttp.get<InventarioArticulo>(
-      `${environment.urlApi}/articulos/${encodeURIComponent(codigoArticulo)}/inventario`,
+      `${environment.urlApi}/articulos/inventario`,
       { params: parametros },
     );
   }
@@ -85,7 +85,7 @@ export class PedidosService {
   }
 
   public obtenerUrlImagenArticulo(codigoArticulo: string): string {
-    return `${environment.urlApi}/articulos/${encodeURIComponent(codigoArticulo)}/imagen`;
+    return `${environment.urlApi}/articulos/imagen?codigoArticulo=${encodeURIComponent(codigoArticulo.trim())}`;
   }
 
   public despacharLineas(lineas: { idOrigen: string; identificadorDetalle: string }[]) {

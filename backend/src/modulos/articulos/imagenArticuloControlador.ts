@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { ImagenArticuloRepositorio } from './imagenArticuloRepositorio.js';
-import { esquemaCodigoArticulo } from './inventarioArticuloValidacion.js';
+import { esquemaCodigoArticulo, esquemaConsultaImagenArticulo } from './inventarioArticuloValidacion.js';
 
 export class ImagenArticuloControlador {
   public constructor(private readonly repositorio: ImagenArticuloRepositorio) {}
@@ -18,8 +18,31 @@ export class ImagenArticuloControlador {
       return;
     }
 
+    await this.responder(articulo.data, solicitud, respuesta, siguiente);
+  };
+
+  public obtenerPorConsulta = async (
+    solicitud: Request,
+    respuesta: Response,
+    siguiente: NextFunction,
+  ): Promise<void> => {
+    const consulta = esquemaConsultaImagenArticulo.safeParse(solicitud.query);
+    if (!consulta.success) {
+      siguiente(new ErrorAplicacion(400, 'CODIGO_ARTICULO_INVALIDO', 'El código del artículo no es válido.'));
+      return;
+    }
+
+    await this.responder(consulta.data.codigoArticulo, solicitud, respuesta, siguiente);
+  };
+
+  private readonly responder = async (
+    codigoArticulo: string,
+    solicitud: Request,
+    respuesta: Response,
+    siguiente: NextFunction,
+  ): Promise<void> => {
     try {
-      const imagen = await this.repositorio.obtener(articulo.data);
+      const imagen = await this.repositorio.obtener(codigoArticulo);
       if (!imagen) {
         siguiente(new ErrorAplicacion(404, 'IMAGEN_ARTICULO_NO_DISPONIBLE', 'El artículo no tiene una imagen disponible.'));
         return;

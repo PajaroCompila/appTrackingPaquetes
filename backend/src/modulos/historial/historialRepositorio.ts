@@ -302,6 +302,14 @@ export class HistorialRepositorio {
               AND NOT EXISTS (SELECT 1 FROM dbo.PedidoDespachado WITH (UPDLOCK, HOLDLOCK)
                 WHERE origenPedido = 'SAP'
                   AND TRY_CONVERT(int, sapDocEntry) = @sapDocEntry)
+              AND NOT EXISTS (SELECT 1
+                FROM dbo.PedidoDespachado local WITH (UPDLOCK, HOLDLOCK)
+                LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia
+                  ON referencia.idOrigen=local.idOrigen
+                WHERE local.numeroPedido=@numeroPedido
+                  OR referencia.numeroPedidoSap=@numeroPedido
+                  OR TRY_CONVERT(int,local.sapDocEntry)=@sapDocEntry
+                  OR referencia.sapDocEntry=@sapDocEntry)
               INSERT dbo.PedidoSapHistorial(sapDocEntry, numeroPedido, fechaHoraPedido, nombreVendedor)
                 OUTPUT inserted.idPedidoSapHistorial
                 VALUES(@sapDocEntry, @numeroPedido, @fechaHoraPedido, @nombreVendedor);
@@ -569,6 +577,14 @@ export class HistorialRepositorio {
         LEFT JOIN dbo.SeguimientoPedido seguimiento
           ON seguimiento.idOrigen = CONCAT('SAP:', pedido.sapDocEntry)
         WHERE (@idOrigen IS NULL OR CONCAT('SAP:', pedido.sapDocEntry) = @idOrigen)
+          AND NOT EXISTS (SELECT 1
+            FROM dbo.PedidoDespachado local
+            LEFT JOIN dbo.ReferenciaPedidoSapR1 referenciaLocal
+              ON referenciaLocal.idOrigen=local.idOrigen
+            WHERE local.numeroPedido=pedido.numeroPedido
+              OR referenciaLocal.numeroPedidoSap=pedido.numeroPedido
+              OR TRY_CONVERT(int,local.sapDocEntry)=pedido.sapDocEntry
+              OR referenciaLocal.sapDocEntry=pedido.sapDocEntry)
           AND pedido.fechaHoraPedido >= @fechaDesde
           AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta)
           AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
@@ -655,7 +671,7 @@ export class HistorialRepositorio {
           validadoDetectadoEn: fila.validadoDetectadoEn?.toISOString() ?? null,
           usuarioDespacho: fila.usuarioDespacho,
           estadoHistorial: fila.estadoLocalOrigen === 'CERRADO' ? 'CERRADO'
-            : fila.idPedidoSapHistorial === null ? 'Facturado' : undefined,
+            : fila.idPedidoSapHistorial === null ? 'Facturado' : 'CERRADO',
         });
       }
       mapa.get(fila.idOrigen)!.articulos.push({
@@ -739,7 +755,15 @@ export class HistorialRepositorio {
         ON detalle.idPedidoSapHistorial = pedido.idPedidoSapHistorial
       LEFT JOIN dbo.SeguimientoPedido seguimiento
         ON seguimiento.idOrigen = CONCAT('SAP:', pedido.sapDocEntry)
-      WHERE pedido.fechaHoraPedido >= @fechaDesde
+      WHERE NOT EXISTS (SELECT 1
+          FROM dbo.PedidoDespachado local
+          LEFT JOIN dbo.ReferenciaPedidoSapR1 referenciaLocal
+            ON referenciaLocal.idOrigen=local.idOrigen
+          WHERE local.numeroPedido=pedido.numeroPedido
+            OR referenciaLocal.numeroPedidoSap=pedido.numeroPedido
+            OR TRY_CONVERT(int,local.sapDocEntry)=pedido.sapDocEntry
+            OR referenciaLocal.sapDocEntry=pedido.sapDocEntry)
+        AND pedido.fechaHoraPedido >= @fechaDesde
         AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta)
         AND (@numeroPedido IS NULL OR pedido.numeroPedido LIKE CONCAT('%', @numeroPedido, '%'))
         AND (@clasificacion IS NULL
@@ -796,7 +820,7 @@ export class HistorialRepositorio {
       nombreVendedor: fila.nombreVendedor,
       esEspecial: Boolean(fila.esEspecial),
       estadoHistorial: fila.estadoLocalOrigen === 'CERRADO' ? 'CERRADO'
-        : fila.esSnapshotCierre ? undefined : 'Facturado',
+        : fila.esSnapshotCierre ? 'CERRADO' : 'Facturado',
     }));
     const total = Number(resultado.recordset[0]?.total ?? 0);
     return { registros, pagina: filtros.pagina, cantidadPorPagina: filtros.cantidadPorPagina,

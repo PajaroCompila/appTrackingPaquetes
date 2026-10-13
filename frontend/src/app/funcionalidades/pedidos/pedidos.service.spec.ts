@@ -50,16 +50,17 @@ describe('PedidosService', () => {
   });
 
   it('consulta inventario por código real de artículo y almacén', () => {
-    servicio.obtenerInventarioArticulo('ART/001', 'BSPS03').subscribe();
+    servicio.obtenerInventarioArticulo('ESTAÑO 1/4 ROL', 'BSPS03').subscribe();
 
     const solicitud = controladorHttp.expectOne(
-      (peticion) => peticion.url === '/api/articulos/ART%2F001/inventario',
+      (peticion) => peticion.url === '/api/articulos/inventario',
     );
     expect(solicitud.request.method).toBe('GET');
+    expect(solicitud.request.params.get('codigoArticulo')).toBe('ESTAÑO 1/4 ROL');
     expect(solicitud.request.params.get('codigoAlmacen')).toBe('BSPS03');
     expect(solicitud.request.params.has('descripcion')).toBe(false);
     solicitud.flush({
-      codigoArticulo: 'ART/001', descripcion: 'Artículo', codigoAlmacen: 'BSPS03',
+      codigoArticulo: 'ESTAÑO 1/4 ROL', descripcion: 'Artículo', codigoAlmacen: 'BSPS03',
       nombreAlmacen: 'Bodega', existenciaFisica: 2.5,
       existencias: [
         { codigoAlmacen: 'BSPS03', nombreAlmacen: 'Bodega', existenciaFisica: 2.5 },
@@ -71,9 +72,10 @@ describe('PedidosService', () => {
     servicio.obtenerInventarioArticulo('ART-001').subscribe();
 
     const solicitud = controladorHttp.expectOne(
-      '/api/articulos/ART-001/inventario',
+      (peticion) => peticion.url === '/api/articulos/inventario',
     );
     expect(solicitud.request.method).toBe('GET');
+    expect(solicitud.request.params.get('codigoArticulo')).toBe('ART-001');
     expect(solicitud.request.params.has('codigoAlmacen')).toBe(false);
     solicitud.flush({
       codigoArticulo: 'ART-001', descripcion: 'Artículo', codigoAlmacen: 'BSPS01',
@@ -89,8 +91,8 @@ describe('PedidosService', () => {
   });
 
   it('construye una URL segura para cargar la fotografía en segundo plano', () => {
-    expect(servicio.obtenerUrlImagenArticulo('ART/001 CON ESPACIO')).toBe(
-      '/api/articulos/ART%2F001%20CON%20ESPACIO/imagen',
+    expect(servicio.obtenerUrlImagenArticulo('ESTAÑO 1/4 ROL')).toBe(
+      '/api/articulos/imagen?codigoArticulo=ESTA%C3%91O%201%2F4%20ROL',
     );
   });
 

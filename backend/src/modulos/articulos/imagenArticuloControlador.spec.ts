@@ -50,4 +50,18 @@ describe('GET /api/articulos/:codigoArticulo/imagen', () => {
     expect(invalido.status).toBe(400);
     expect(obtener).toHaveBeenCalledOnce();
   });
+
+  it('consulta por query una imagen cuyo código contiene eñe, espacios y diagonal', async () => {
+    const obtener = vi.fn().mockResolvedValue({
+      contenido: Buffer.from('imagen'), tipoContenido: 'image/jpeg',
+      modificadaEn: new Date('2026-10-13T12:00:00Z'),
+    });
+
+    await solicitud(aplicacionImagen(obtener))
+      .get('/api/articulos/imagen')
+      .query({ codigoArticulo: 'ESTAÑO 1/4 ROL' })
+      .expect(200);
+
+    expect(obtener).toHaveBeenCalledWith('ESTAÑO 1/4 ROL');
+  });
 });

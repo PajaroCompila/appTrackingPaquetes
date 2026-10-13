@@ -26,13 +26,13 @@ describe('HistorialComponent', () => {
     });
   });
 
-  it('DASHBOARDS ve el historial sin controles de impresion', async () => {
+  it('DASHBOARDS ve el historial sin controles de impresion y nunca infiere Facturado sin estado', async () => {
     usuario.set({ ...usuario(), codigoRol: 'DASHBOARDS' });
     const buscarArticulos = vi.fn().mockReturnValue(of({
       datos: [{ idOrigen: 'R1:H1', identificadorDetalle: '1', numeroPedido: '300',
         codigoArticulo: 'A1', descripcion: 'Articulo', cantidad: 1, codigoAlmacen: 'BSPS01',
         nombreAlmacen: 'Bodega', fechaHoraPedido: '2026-09-22T08:00:00-06:00',
-        nombreVendedor: 'Vendedor', esEspecial: false, estadoHistorial: 'CERRADO' }],
+        nombreVendedor: 'Vendedor', esEspecial: false }],
       paginacion: { pagina: 1, cantidadPorPagina: 25, cantidadDevuelta: 1,
         totalRegistros: 1, hayMas: false },
     }));
@@ -56,6 +56,7 @@ describe('HistorialComponent', () => {
     expect(fixture.nativeElement.querySelector('.acciones-impresion-grupo')).toBeNull();
     expect(fixture.nativeElement.querySelector('.columna-imprimir')).toBeNull();
     expect(fixture.nativeElement.querySelector('.etiqueta-estado-cerrado')?.textContent).toContain('CERRADO');
+    expect(fixture.nativeElement.textContent).not.toContain('Facturado');
     fixture.componentInstance.seleccionarTodasImpresiones('normales');
     fixture.componentInstance.imprimirSeleccionados('normales');
     expect(fixture.componentInstance.articulosImpresion()).toEqual([]);
