@@ -8,7 +8,7 @@ import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
 import { puedeVerAlmacen, restringirCodigosAlmacen } from '../usuarios/accesoAlmacenes.js';
 import { SeguimientoPedidoRepositorio } from '../pedidos/seguimientoPedidoRepositorio.js';
 import { ConciliacionEntregaPedido } from '../pedidos/conciliacionEntregaPedido.js';
-import { resolverTecnicoAsignable } from '../asignaciones/asignacionRutas.js';
+import { PersonalAsignableServicio } from '../personalAsignable/personalAsignableServicio.js';
 import { cancelacionesSap } from '../pedidosDevueltos/cancelacionSapHistorial.js';
 import { RecepcionDevolucionRepositorio } from '../pedidosDevueltos/recepcionDevolucionRepositorio.js';
 
@@ -17,6 +17,7 @@ const repositorio = new DespachoRepositorio();
 const servicio = new DespachoServicio(repositorio, new LineaDespachoOrigenRepositorio(), undefined, new ConciliacionEntregaPedido());
 const seguimientoRepositorio = new SeguimientoPedidoRepositorio();
 const recepcionDevolucionRepositorio = new RecepcionDevolucionRepositorio();
+const personalAsignableServicio = new PersonalAsignableServicio();
 const idOrigen = z.string().regex(/^(R1|SAP):.{1,140}$/);
 const identidadDetalle = z.string().regex(/^\d{1,20}$/);
 const codigosAlmacen = z.preprocess((valor) => {
@@ -104,7 +105,8 @@ despachoRutas.post('/recibir-devolucion',
       }
       const recepcion = datos.tipoRecepcion === 'PERSONA'
         ? { tipoRecepcion: 'PERSONA' as const,
-          tecnico: resolverTecnicoAsignable(solicitud.user!, datos.usuarioRecibio!) }
+          tecnico: await personalAsignableServicio.resolverParaSesion(
+            solicitud.user!, datos.usuarioRecibio!) }
         : { tipoRecepcion: 'ASIGNADO_OTRO_PEDIDO' as const };
       const resultado = await recepcionDevolucionRepositorio.registrar(
         datos.idOrigen, recepcion, solicitud.user!.usuarioId,

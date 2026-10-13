@@ -93,3 +93,58 @@ describe('Eliminar usuario', () => {
     fixture.detectChanges();expect(fixture.nativeElement.querySelector('.modal [role="alert"]').textContent).toContain('pedidos activos');
     expect(fixture.componentInstance.usuarios()).toHaveLength(1);http.verify();});
 });
+
+describe('Personal para asignaciones', () => {
+  function preparar() {
+    localStorage.clear();
+    TestBed.configureTestingModule({ imports: [UsuariosComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const autenticacion = TestBed.inject(AutenticacionService);
+    autenticacion.usuario.set({ usuarioId: '11111111-1111-4111-8111-111111111111', nombreUsuario: 'sistemas',
+      nombreVisible: 'Sistemas', codigoRol: 'ADMINISTRADOR', codigoAlmacen: null,
+      codigosAlmacenVisibles: [], debeCambiarContrasena: false });
+    const fixture = TestBed.createComponent(UsuariosComponent);
+    const http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    http.match(r => r.method === 'GET').forEach(r => r.flush(r.request.url.endsWith('/roles')
+      || r.request.url.endsWith('/almacenes-disponibles') || r.request.url.endsWith('/personal-asignable')
+      ? { datos: [] } : { datos: [], paginacion: { hayMas: false, totalRegistros: 0 } }));
+    fixture.detectChanges();
+    return { fixture, http };
+  }
+
+  it('abre el modal corporativo con únicamente nombre y apellido y los exige', () => {
+    const { fixture, http } = preparar();
+    (fixture.nativeElement.querySelector('.personal-asignable .boton-primario') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#personalNombre')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('#personalApellido')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('#formUsuario')).toBeNull();
+    fixture.componentInstance.guardarPersonalAsignable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.modal [role="alert"]').textContent)
+      .toContain('Nombre y apellido son obligatorios');
+    http.expectNone(r => r.method === 'POST');
+    http.verify();
+  });
+
+  it('guarda y refresca únicamente el catálogo para mostrar la persona inmediatamente', () => {
+    const { fixture, http } = preparar();
+    fixture.componentInstance.nuevoAsignado();
+    fixture.componentInstance.formPersonal = { nombre: 'Ángel', apellido: 'Zelaya' };
+    fixture.componentInstance.guardarPersonalAsignable();
+    const persona = { idPersonal: '33333333-3333-4333-8333-333333333333',
+      codigoAsignacion: 'PERSONAL:333', nombre: 'Ángel', apellido: 'Zelaya',
+      nombreCompleto: 'Ángel Zelaya', ambito: 'GENERAL', activo: true,
+      fechaCreacion: '2026-10-13T12:00:00.000Z' };
+    const guardar = http.expectOne(r => r.method === 'POST' && r.url.endsWith('/personal-asignable'));
+    expect(guardar.request.body).toEqual({ nombre: 'Ángel', apellido: 'Zelaya' });
+    guardar.flush({ datos: persona });
+    http.expectOne(r => r.method === 'GET' && r.url.endsWith('/personal-asignable'))
+      .flush({ datos: [persona] });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.persona-asignable strong').textContent)
+      .toContain('Ángel Zelaya');
+    http.verify();
+  });
+});

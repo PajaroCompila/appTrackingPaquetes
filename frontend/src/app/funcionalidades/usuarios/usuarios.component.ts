@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { finalize } from 'rxjs';
 import { FormsModule } from '@angular/forms';
-import type { CodigoRol, RolLocal, UsuarioLocal } from './usuario.interface';
+import type { CodigoRol, PersonalAsignableLocal, RolLocal, UsuarioLocal } from './usuario.interface';
 import { UsuarioService } from './usuario.service';
 import { formatearFechaHoraHonduras } from '../../compartido/fechas/fecha-honduras';
 import type { Almacen } from '../pedidos/almacen.interface';
@@ -23,12 +23,13 @@ export class UsuariosComponent implements OnInit {
   private readonly servicio = inject(UsuarioService);
   private readonly autenticacion = inject(AutenticacionService);
   public readonly usuarios = signal<UsuarioLocal[]>([]);
+  public readonly personalAsignable = signal<PersonalAsignableLocal[]>([]);
   public readonly roles = signal<RolLocal[]>([]);
   public readonly cargando = signal(false);
   public readonly error = signal('');
   public readonly guardando = signal(false);
   public readonly mensaje = signal('');
-  public readonly modal = signal<'crear' | 'editar' | 'restablecer' | 'almacenes' | 'eliminar' | null>(null);
+  public readonly modal = signal<'crear' | 'editar' | 'restablecer' | 'almacenes' | 'eliminar' | 'personal' | null>(null);
   public readonly seleccionado = signal<UsuarioLocal | null>(null);
   public readonly pagina = signal(1);
   public readonly hayMas = signal(false);
@@ -39,6 +40,7 @@ export class UsuariosComponent implements OnInit {
   public activo = 'true';
   public form = { nombreCompleto: '', nombreUsuario: '', correo: '', codigoRol: 'CONSULTA' as CodigoRol,
     contrasena: '', confirmarContrasena: '', activo: true };
+  public formPersonal = { nombre: '', apellido: '' };
   public codigosAlmacenFormulario: string[] = [];
 
   public ngOnInit(): void {
@@ -46,7 +48,14 @@ export class UsuariosComponent implements OnInit {
     this.servicio.roles().subscribe(({ datos }) => this.roles.set(datos));
     this.servicio.almacenes().subscribe({ next: ({ datos }) => this.almacenes.set(datos),
       error: () => this.error.set('No pudimos cargar las bodegas.') });
+    this.cargarPersonalAsignable();
     this.cargar();
+  }
+  public cargarPersonalAsignable(): void {
+    this.servicio.listarPersonalAsignable().subscribe({
+      next: ({ datos }) => this.personalAsignable.set(datos),
+      error: () => this.error.set('No pudimos cargar el personal para asignaciones.'),
+    });
   }
   public cargar(): void {
     this.cargando.set(true);
@@ -66,6 +75,31 @@ export class UsuariosComponent implements OnInit {
     this.form = { nombreCompleto: '', nombreUsuario: '', correo: '', codigoRol: 'CONSULTA',
       contrasena: '', confirmarContrasena: '', activo: true };
     this.modal.set('crear');
+  }
+  public nuevoAsignado(): void {
+    this.formPersonal = { nombre: '', apellido: '' };
+    this.error.set('');
+    this.mensaje.set('');
+    this.modal.set('personal');
+  }
+  public guardarPersonalAsignable(): void {
+    if (this.guardando()) return;
+    const datos = { nombre: this.formPersonal.nombre.trim(), apellido: this.formPersonal.apellido.trim() };
+    if (!datos.nombre || !datos.apellido) {
+      this.error.set('Nombre y apellido son obligatorios.');
+      return;
+    }
+    this.error.set('');
+    this.guardando.set(true);
+    this.servicio.crearPersonalAsignable(datos).pipe(finalize(() => this.guardando.set(false))).subscribe({
+      next: () => {
+        this.cerrar();
+        this.mensaje.set('Personal para asignaciones guardado correctamente.');
+        this.cargarPersonalAsignable();
+      },
+      error: (error) => this.error.set(error.error?.mensaje
+        ?? 'No se pudo guardar el personal para asignaciones.'),
+    });
   }
   public editar(usuario: UsuarioLocal): void {
     this.seleccionado.set(usuario);

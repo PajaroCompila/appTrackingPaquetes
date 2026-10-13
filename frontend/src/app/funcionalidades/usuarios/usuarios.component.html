@@ -10,14 +10,39 @@
   @if(mensaje()){<p role="status">{{mensaje()}}</p>}
   <div class="panel tabla-contenedor"><table><thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Bodegas visibles</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>@for(u of usuarios();track u.usuarioId){<tr><td>{{u.nombreCompleto}}</td><td>{{u.nombreUsuario}}</td><td>{{u.nombreRol}}</td><td>{{u.codigosAlmacenVisibles.length?u.codigosAlmacenVisibles.join(', '):'Todas'}}</td><td>{{u.activo?'Activo':'Inactivo'}}</td><td>{{fecha(u.ultimoAcceso)}}</td><td class="acciones"><button (click)="editar(u)">Editar</button><button (click)="configurarAlmacenes(u)">Bodegas</button><button (click)="cambiarEstado(u)">{{u.activo?'Desactivar':'Activar'}}</button><button (click)="restablecer(u)">Restablecer contraseña</button>@if(puedeEliminar(u)){<button type="button" class="accion-eliminar" title="Eliminar usuario" aria-label="Eliminar usuario" (click)="confirmarEliminacion(u)"><i class="pi pi-trash" aria-hidden="true"></i><span class="solo-lectores">Eliminar usuario</span></button>}</td></tr>}</tbody></table></div>
   <app-paginacion [paginaActual]="pagina()" [totalRegistros]="totalRegistros()" [cantidadPorPagina]="25" [deshabilitada]="cargando()" etiquetaRegistros="usuarios" (paginaSeleccionada)="irPagina($event)" />
+  <section class="panel personal-asignable" aria-labelledby="titulo-personal-asignable">
+    <div class="encabezado-personal">
+      <div>
+        <p class="sobrelinea">Asignaciones</p>
+        <h2 id="titulo-personal-asignable">Personal para asignaciones</h2>
+        <p>Personas disponibles en el campo ASIGNADO A. No son usuarios de inicio de sesión.</p>
+      </div>
+      <button type="button" class="boton boton-primario" (click)="nuevoAsignado()">+ Nuevo asignado</button>
+    </div>
+    <div class="lista-personal">
+      @for(persona of personalAsignable();track persona.idPersonal){
+        <div class="persona-asignable">
+          <span class="avatar-personal" aria-hidden="true"><i class="pi pi-user"></i></span>
+          <div><strong>{{persona.nombreCompleto}}</strong><small>Disponible para asignaciones</small></div>
+        </div>
+      } @empty {
+        <p class="sin-personal">No hay personal registrado.</p>
+      }
+    </div>
+  </section>
   @if(modal()){
     <div class="fondo-modal">
-      <form class="panel modal" (ngSubmit)="modal()==='restablecer'?guardarContrasena():modal()==='almacenes'?guardarAlmacenes():modal()==='eliminar'?eliminar():guardar()">
-        <h2>{{modal()==='crear'?'Crear usuario':modal()==='editar'?'Editar usuario':modal()==='almacenes'?'Bodegas de '+seleccionado()?.nombreCompleto:modal()==='eliminar'?'Eliminar usuario':'Restablecer contraseña'}}</h2>
-        @if(modal()!=='restablecer'&&modal()!=='almacenes'&&modal()!=='eliminar'){
+      <form class="panel modal" (ngSubmit)="modal()==='restablecer'?guardarContrasena():modal()==='almacenes'?guardarAlmacenes():modal()==='eliminar'?eliminar():modal()==='personal'?guardarPersonalAsignable():guardar()">
+        <h2>{{modal()==='crear'?'Crear usuario':modal()==='editar'?'Editar usuario':modal()==='almacenes'?'Bodegas de '+seleccionado()?.nombreCompleto:modal()==='eliminar'?'Eliminar usuario':modal()==='personal'?'Nuevo asignado':'Restablecer contraseña'}}</h2>
+        @if(modal()!=='restablecer'&&modal()!=='almacenes'&&modal()!=='eliminar'&&modal()!=='personal'){
           <div class="campo"><label for="formNombre">Nombre completo</label><input id="formNombre" name="nombreCompleto" required [(ngModel)]="form.nombreCompleto"></div>
           <div class="campo"><label for="formUsuario">Usuario</label><input id="formUsuario" name="nombreUsuario" required [(ngModel)]="form.nombreUsuario"></div>
           <div class="campo"><label for="formRol">Rol</label><select id="formRol" name="codigoRol" [(ngModel)]="form.codigoRol">@for(r of roles();track r.rolId){<option [value]="r.codigo">{{r.nombre}}</option>}</select></div>
+        }
+        @if(modal()==='personal'){
+          <p class="ayuda-personal">Registrá únicamente a la persona que podrá recibir asignaciones.</p>
+          <div class="campo"><label for="personalNombre">Nombre</label><input id="personalNombre" name="personalNombre" required maxlength="100" autocomplete="off" [(ngModel)]="formPersonal.nombre"></div>
+          <div class="campo"><label for="personalApellido">Apellido</label><input id="personalApellido" name="personalApellido" required maxlength="100" autocomplete="off" [(ngModel)]="formPersonal.apellido"></div>
         }
         @if(modal()==='crear'||modal()==='restablecer'){
           <div class="campo"><label for="formContrasena">Contraseña</label><input id="formContrasena" name="contrasena" type="password" maxlength="128" required [(ngModel)]="form.contrasena"></div>

@@ -44,6 +44,19 @@
 .confirmacion-eliminar dt { color: var(--gris-600); font-size: .75rem; font-weight: 600; text-transform: uppercase; }
 .confirmacion-eliminar dd { margin: .2rem 0 0; color: var(--gris-900); font-weight: 600; overflow-wrap: anywhere; }
 .ayuda-almacenes { margin: 0; color: var(--gris-600); }
+.personal-asignable { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.encabezado-personal { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.encabezado-personal h2 { margin: .15rem 0; }
+.encabezado-personal p { margin: 0; color: var(--gris-600); }
+.lista-personal { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .65rem; }
+.persona-asignable { display: flex; align-items: center; gap: .7rem; min-width: 0; padding: .7rem;
+  border: 1px solid var(--gris-300); border-radius: .55rem; background: #f8fafc; }
+.persona-asignable > div { display: grid; min-width: 0; gap: .1rem; }
+.persona-asignable strong { overflow-wrap: anywhere; }
+.persona-asignable small, .sin-personal, .ayuda-personal { color: var(--gris-600); }
+.avatar-personal { display: grid; flex: 0 0 2rem; width: 2rem; height: 2rem; place-items: center;
+  border-radius: .45rem; background: var(--azul-100); color: var(--azul-700); }
+.sin-personal, .ayuda-personal { margin: 0; }
 .lista-almacenes { display: grid; gap: .4rem; max-height: 20rem; margin: 0; padding: .5rem; overflow-y: auto; border: 1px solid var(--gris-300); border-radius: .5rem; }
 .lista-almacenes label { display: flex; align-items: center; gap: .7rem; padding: .55rem; border-radius: .4rem; cursor: pointer; }
 .lista-almacenes label:hover { background: var(--azul-100); }
@@ -51,7 +64,7 @@
 .lista-almacenes small { color: var(--gris-600); }
 @keyframes aparecer-fondo { from { opacity: 0; } }
 @keyframes aparecer-modal { from { opacity: 0; transform: translateY(5px); } }
-@media (max-width: 700px) { .filtros { grid-template-columns: 1fr; } .acciones { display: grid; } .modal { width: 100%; } .confirmacion-eliminar dl { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .filtros { grid-template-columns: 1fr; } .acciones { display: grid; } .modal { width: 100%; } .confirmacion-eliminar dl { grid-template-columns: 1fr; } .encabezado-personal { align-items: stretch; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) {
   .acciones button { transition: none; }
   .acciones button:active { transform: none; }

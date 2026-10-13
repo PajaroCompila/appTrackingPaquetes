@@ -4,6 +4,7 @@ import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import type { IdentidadAutenticada } from '../autenticacion/autenticacion.interface.js';
 import type { TecnicoAsignable } from './asignacion.interface.js';
 import { AsignacionRepositorio } from './asignacionRepositorio.js';
+import { PersonalAsignableServicio } from '../personalAsignable/personalAsignableServicio.js';
 
 export const tecnicosAsignables = [
   { usuario: 'mperez', nombre: 'Marcos Perez' },
@@ -39,6 +40,12 @@ export const esquemaGuardarAsignacion = identidad.extend({
 export const esquemaReasignar = esquemaGuardarAsignacion.extend({
   actualizadoEn: z.iso.datetime({ offset: true }),
 }).strict();
+
+type IdentidadAsignador = Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario' | 'nombreVisible'>;
+interface CatalogoPersonalAsignable {
+  listarParaSesion(usuario: IdentidadAsignador): Promise<readonly TecnicoAsignable[]>;
+  resolverParaSesion(usuario: IdentidadAsignador, codigoAsignacion: string): Promise<TecnicoAsignable>;
+}
 
 export function puedeAsignarPedidos(codigoRol: string | null, nombreUsuario: string): boolean {
   if (codigoRol?.toUpperCase() === 'DASHBOARDS') return false;
@@ -134,6 +141,15 @@ async function exigirTecnicoActivo(
 
 export function crearAsignacionRutas(
   repositorio: AsignacionRepositorio = new AsignacionRepositorio(),
+  personalAsignableServicio: CatalogoPersonalAsignable = {
+      listarParaSesion: async (usuario) => conservarTecnicosActivos(
+        repositorio, usuariosAsignablesParaSesion(usuario)),
+      resolverParaSesion: async (usuario, codigoAsignacion) => {
+        const tecnico = resolverTecnicoAsignable(usuario, codigoAsignacion);
+        await exigirTecnicoActivo(repositorio, tecnico);
+        return tecnico;
+      },
+    },
 ): Router {
   const rutas = Router();
 
@@ -141,7 +157,7 @@ export function crearAsignacionRutas(
     try {
       const usuario = solicitud.user!;
       const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
-      const datos = await conservarTecnicosActivos(repositorio, usuariosAsignablesParaSesion(usuario));
+      const datos = await personalAsignableServicio.listarParaSesion(usuario);
       const puedeAsignarTodos = usuario.codigoRol?.toUpperCase() === 'ADMINISTRADOR'
         || nombreUsuario === 'gcruz';
       respuesta.json({
@@ -178,8 +194,7 @@ export function crearAsignacionRutas(
         throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
           'Solo puede asignarse pedidos de TBM.');
       }
-      const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
-      await exigirTecnicoActivo(repositorio, tecnico);
+      const tecnico = await personalAsignableServicio.resolverParaSesion(usuario, datos.usuarioAsignado);
       const resultado = await repositorio.guardar(datos, tecnico, usuario.usuarioId);
       if (!resultado.confirmada) {
         respuesta.status(409).json({
@@ -222,8 +237,7 @@ export function crearAsignacionRutas(
         throw new ErrorAplicacion(403, 'ALMACEN_NO_PERMITIDO',
           'Solo puede asignarse pedidos de TBM.');
       }
-      const tecnico = resolverTecnicoAsignable(usuario, datos.usuarioAsignado);
-      await exigirTecnicoActivo(repositorio, tecnico);
+      const tecnico = await personalAsignableServicio.resolverParaSesion(usuario, datos.usuarioAsignado);
       const resultado = await repositorio.reasignar(
         datos,
         tecnico,
@@ -247,4 +261,5 @@ export function crearAsignacionRutas(
   return rutas;
 }
 
-export const asignacionRutas = crearAsignacionRutas();
+export const asignacionRutas = crearAsignacionRutas(
+  new AsignacionRepositorio(), new PersonalAsignableServicio());

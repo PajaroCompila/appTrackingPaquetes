@@ -58,6 +58,12 @@ describe('DialogoInventarioArticuloComponent', () => {
       .toContain('unidades');
     expect(fixture.nativeElement.querySelector('.existencia-baja')?.textContent).toContain('Existencia baja');
     expect(fixture.nativeElement.querySelector('.sin-existencia.existencia-baja')).toBeNull();
+    const disponible = fixture.nativeElement.querySelectorAll('.bodegas-inventario li')[2] as HTMLElement;
+    expect(disponible.textContent).toContain('B3 - Bodega disponible');
+    expect(disponible.classList).not.toContain('sin-existencia');
+    expect(disponible.classList).not.toContain('existencia-baja');
+    expect(getComputedStyle(disponible).backgroundColor)
+      .toBe(getComputedStyle(totalSuperior).backgroundColor);
     expect(fixture.nativeElement.textContent).toContain('03/10/2026');
     expect(fixture.nativeElement.textContent).toContain('6 unidades');
     expect(fixture.nativeElement.textContent).not.toMatch(/proveedor|CardCode|CardName/i);

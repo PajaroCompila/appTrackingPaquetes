@@ -23,3 +23,7 @@ export const esquemaRestablecer = z.object({ contrasena: z.string().min(1).max(1
 export const esquemaIdUsuario = z.string().uuid();
 export const esquemaAlmacenesUsuario = z.object({ codigosAlmacen: z.array(z.string().trim().min(1).max(16)
   .regex(/^[A-Za-z0-9_-]+$/)).max(100).transform((codigos) => [...new Set(codigos)]) }).strict();
+export const esquemaCrearPersonalAsignable = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio.').max(100),
+  apellido: z.string().trim().min(1, 'El apellido es obligatorio.').max(100),
+}).strict();

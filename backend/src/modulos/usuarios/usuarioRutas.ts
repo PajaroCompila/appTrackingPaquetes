@@ -1,14 +1,27 @@
 import { Router } from 'express';
+import { ZodError } from 'zod';
 import { requerirRoles } from '../autenticacion/autenticacionMiddleware.js';
+import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
 import { UsuarioServicio } from './usuarioServicio.js';
 import { esquemaCrearUsuario, esquemaEditarUsuario, esquemaEstadoUsuario, esquemaIdUsuario,
-  esquemaListadoUsuarios, esquemaRestablecer, esquemaAlmacenesUsuario } from './usuarioValidacion.js';
+  esquemaListadoUsuarios, esquemaRestablecer, esquemaAlmacenesUsuario,
+  esquemaCrearPersonalAsignable } from './usuarioValidacion.js';
+import { PersonalAsignableServicio } from '../personalAsignable/personalAsignableServicio.js';
 
 export const usuarioRutas=Router();
 const servicio=new UsuarioServicio();
+const personalAsignableServicio=new PersonalAsignableServicio();
 usuarioRutas.use(requerirRoles('ADMINISTRADOR'));
 usuarioRutas.get('/roles',async(_s,r,n)=>{try{r.json({datos:await servicio.roles()});}catch(e){n(e);}});
 usuarioRutas.get('/almacenes-disponibles',async(_s,r,n)=>{try{r.json({datos:await servicio.almacenesDisponibles()});}catch(e){n(e);}});
+usuarioRutas.get('/personal-asignable',async(_s,r,n)=>{try{
+  r.json({datos:await personalAsignableServicio.listarAdministracion()});
+}catch(e){n(e);}});
+usuarioRutas.post('/personal-asignable',async(s,r,n)=>{try{
+  const datos=esquemaCrearPersonalAsignable.parse(s.body);
+  r.status(201).json({datos:await personalAsignableServicio.crear(datos,s.user!.usuarioId)});
+}catch(e){n(e instanceof ZodError
+  ? new ErrorAplicacion(400,'PERSONAL_INVALIDO','Nombre y apellido son obligatorios.') : e);}});
 usuarioRutas.get('/',async(s,r,n)=>{try{const f=esquemaListadoUsuarios.parse(s.query);const x=await servicio.listar(f);
   r.json({datos:x.usuarios,paginacion:{pagina:f.pagina,cantidadPorPagina:f.cantidadPorPagina,totalRegistros:x.total,
     hayMas:f.pagina*f.cantidadPorPagina<x.total}});}catch(e){n(e);}});
