@@ -4,6 +4,7 @@ import type { TecnicoAsignable } from '../asignaciones/asignacion.interface.js';
 import type { AmbitoPersonalAsignable, NuevoPersonalAsignable,
   PersonalAsignable } from './personalAsignable.interface.js';
 import { PersonalAsignableRepositorio } from './personalAsignableRepositorio.js';
+import { esUsuarioBod } from '../asignaciones/asignacionPermisos.js';
 
 export function ambitosParaSesion(
   usuario: Pick<IdentidadAutenticada, 'codigoRol' | 'nombreUsuario'>,
@@ -13,8 +14,8 @@ export function ambitosParaSesion(
     return ['GENERAL', 'ACALIX_JLARA', 'TCIR01', 'TTBM01'];
   }
   const nombreUsuario = usuario.nombreUsuario.trim().toLowerCase();
+  if (esUsuarioBod(nombreUsuario)) return ['GENERAL', 'ACALIX_JLARA', 'TCIR01', 'TTBM01'];
   if (nombreUsuario === 'tlopez') return ['TCIR01'];
-  if (nombreUsuario === 'bodegatbm') return ['TTBM01'];
   if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') return ['ACALIX_JLARA'];
   if (nombreUsuario === 'gcruz') return ['GENERAL'];
   return [];

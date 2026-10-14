@@ -13,6 +13,7 @@ import type { DetallePedido } from './pedido.interface';
 import { PedidosService } from './pedidos.service';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
 import { claveArticuloAsignado, type AsignacionArticulo } from '../../compartido/asignaciones/asignacion.interface';
+import { esUsuarioBod } from '../../compartido/asignaciones/asignacion-permisos';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { obtenerPermisosRol } from '../autenticacion/permisos-rol';
 import { duracionPedidoMs, formatearDuracionPedido } from '../../compartido/tiempo-pedido';
@@ -293,6 +294,7 @@ export class DetallePedidoComponent implements OnInit {
     const usuario = this.autenticacion.usuario();
     const nombreUsuario = usuario?.nombreUsuario.trim().toLowerCase();
     return usuario?.codigoRol === 'ADMINISTRADOR' || nombreUsuario === 'gcruz'
+      || esUsuarioBod(nombreUsuario)
       || nombreUsuario === asignado;
   }
 

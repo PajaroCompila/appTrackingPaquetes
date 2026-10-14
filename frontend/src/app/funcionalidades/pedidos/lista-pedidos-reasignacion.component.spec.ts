@@ -40,9 +40,10 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     Object.values(servicio).forEach(mock => mock.mockReset());
     servicio.obtenerUsuarios.mockImplementation(() => {
       const nombre = usuario().nombreUsuario;
-      const todos = usuario().codigoRol === 'ADMINISTRADOR' || nombre === 'gcruz';
+      const todos = usuario().codigoRol === 'ADMINISTRADOR' || nombre === 'gcruz'
+        || nombre.toLowerCase().includes('bod');
       const permitidos = todos ? tecnicos
-        : nombre === 'tlopez' || nombre === 'bodegatbm' ? [nombre] : ['jlara', 'acalix'];
+        : nombre === 'tlopez' ? [nombre] : ['jlara', 'acalix'];
       return of({ datos: permitidos.map(usuario => ({ usuario, nombre: usuario })),
         puedeAsignar: true, puedeAsignarTodos: todos, puedeReasignar: true });
     });
@@ -91,7 +92,7 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     ['sistemas', 'ADMINISTRADOR', tecnicos], ['gcruz', 'OPERADOR_BODEGA', tecnicos],
     ['jlara', 'OPERADOR_BODEGA', ['jlara', 'acalix']], ['acalix', 'OPERADOR_BODEGA', ['jlara', 'acalix']],
     ['tlopez', 'OPERADOR_BODEGA', ['tlopez']],
-    ['bodegatbm', 'OPERADOR_BODEGA', ['bodegatbm']],
+    ['bodegatbm', 'OPERADOR_BODEGA', tecnicos],
   ] as const)('muestra ambos botones y el catálogo vigente de %s', (nombreUsuario, codigoRol, lista) => {
     usuario.set({ ...usuario(), nombreUsuario, codigoRol }); iniciar();
     expect(fila().querySelectorAll('button')).toHaveLength(2);
@@ -141,6 +142,14 @@ describe('ListaPedidos: restauración puntual de Reasignar', () => {
     fila().querySelector<HTMLButtonElement>('.boton-reasignar')!.click(); fixture.detectChanges();
     expect(servidor.get('1')?.usuarioAsignado).toBe(destino);
     expect(fixture.componentInstance.puedeOperarArticulo(pedido, pedido.articulos[0]!)).toBe(true);
+  });
+
+  it('un usuario BOD puede reasignar una partida de cualquier responsable', () => {
+    usuario.set({ ...usuario(), nombreUsuario: 'bod03', codigoRol: 'OPERADOR_BODEGA' });
+    servidor.set('1', asignado('mperez')); iniciar(); editar('gcruz');
+    expect(fixture.componentInstance.puedeOperarArticulo(pedido, pedido.articulos[0]!)).toBe(true);
+    fila().querySelector<HTMLButtonElement>('.boton-reasignar')!.click(); fixture.detectChanges();
+    expect(servidor.get('1')?.usuarioAsignado).toBe('gcruz');
   });
 
   it('Tommy puede tomar una asignación CIR eligiendo su única opción y confirmando', () => {

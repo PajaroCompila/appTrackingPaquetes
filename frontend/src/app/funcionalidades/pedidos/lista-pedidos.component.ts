@@ -22,6 +22,7 @@ import {
   type TecnicoAsignable,
 } from '../../compartido/asignaciones/asignacion.interface';
 import { AsignacionesService } from '../../compartido/asignaciones/asignaciones.service';
+import { esUsuarioBod } from '../../compartido/asignaciones/asignacion-permisos';
 import { AutenticacionService } from '../autenticacion/autenticacion.service';
 import { PedidosNotificacionesService } from '../../compartido/notificaciones/pedidos-notificaciones.service';
 import { PaginacionComponent } from '../../compartido/paginacion/paginacion.component';
@@ -289,7 +290,8 @@ export class ListaPedidosComponent implements OnInit {
     const usuario = this.autenticacion.usuario();
     if (obtenerPermisosRol(usuario?.codigoRol).soloConsultaOperativa) return false;
     return usuario?.codigoRol === 'ADMINISTRADOR'
-      || ['gcruz', 'acalix', 'jlara', 'tlopez', 'bodegatbm'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
+      || esUsuarioBod(usuario?.nombreUsuario)
+      || ['gcruz', 'acalix', 'jlara', 'tlopez'].includes(usuario?.nombreUsuario.trim().toLowerCase() ?? '');
   }
 
   public modoSoloConsulta(): boolean {
@@ -347,7 +349,8 @@ export class ListaPedidosComponent implements OnInit {
     if (!asignado) return true;
     const usuario = this.autenticacion.usuario();
     const nombreUsuario = usuario?.nombreUsuario.trim().toLowerCase();
-    if (usuario?.codigoRol === 'ADMINISTRADOR' || nombreUsuario === 'gcruz') return true;
+    if (usuario?.codigoRol === 'ADMINISTRADOR' || nombreUsuario === 'gcruz'
+      || esUsuarioBod(nombreUsuario)) return true;
     if (nombreUsuario === 'acalix' || nombreUsuario === 'jlara') {
       return asignado === 'acalix' || asignado === 'jlara';
     }
@@ -1348,12 +1351,13 @@ export class ListaPedidosComponent implements OnInit {
         next: ({ datos, puedeAsignar, puedeAsignarTodos, puedeReasignar }) => {
           const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
           const asignaTodos = puedeAsignarTodos
-            && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR' || usuarioActual === 'gcruz');
+            && (this.autenticacion.usuario()?.codigoRol === 'ADMINISTRADOR'
+              || usuarioActual === 'gcruz' || esUsuarioBod(usuarioActual));
           const visibles = asignaTodos
             ? datos
             : usuarioActual === 'acalix' || usuarioActual === 'jlara'
-              || usuarioActual === 'tlopez' || usuarioActual === 'bodegatbm'
-              ? datos.filter(({ usuario }) => usuarioActual === 'tlopez' || usuarioActual === 'bodegatbm'
+              || usuarioActual === 'tlopez'
+              ? datos.filter(({ usuario }) => usuarioActual === 'tlopez'
                 ? usuario.trim().toLowerCase() === usuarioActual
                 : ['jlara', 'acalix'].includes(usuario.trim().toLowerCase()))
               : [];
@@ -1457,14 +1461,14 @@ export class ListaPedidosComponent implements OnInit {
 
   private usuarioAsignableExclusivo(idOrigen?: string): string {
     const usuarioActual = this.autenticacion.usuario()?.nombreUsuario.trim().toLowerCase();
-    const unico = usuarioActual === 'tlopez' || usuarioActual === 'bodegatbm'
+    const unico = usuarioActual === 'tlopez'
       ? usuarioActual
       : this.usuariosAsignables().length === 1
         ? this.usuariosAsignables()[0]?.usuario.trim().toLowerCase() ?? ''
         : '';
-    if (unico !== 'tlopez' && unico !== 'bodegatbm') return '';
+    if (unico !== 'tlopez') return '';
     if (!idOrigen) return unico;
-    const prefijoPermitido = unico === 'tlopez' ? 'R1:TCIR01:' : 'R1:TTBM01:';
+    const prefijoPermitido = 'R1:TCIR01:';
     return idOrigen.toUpperCase().startsWith(prefijoPermitido) ? unico : '';
   }
 

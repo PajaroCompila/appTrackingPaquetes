@@ -15,7 +15,9 @@ describe('catálogo de personal asignable', () => {
     expect(ambitosParaSesion({ codigoRol: 'OPERADOR_BODEGA', nombreUsuario: 'tlopez' }))
       .toEqual(['TCIR01']);
     expect(ambitosParaSesion({ codigoRol: 'OPERADOR_BODEGA', nombreUsuario: 'bodegatbm' }))
-      .toEqual(['TTBM01']);
+      .toEqual(['GENERAL', 'ACALIX_JLARA', 'TCIR01', 'TTBM01']);
+    expect(ambitosParaSesion({ codigoRol: 'OPERADOR_BODEGA', nombreUsuario: 'BOD03' }))
+      .toEqual(['GENERAL', 'ACALIX_JLARA', 'TCIR01', 'TTBM01']);
     expect(ambitosParaSesion({ codigoRol: 'CONSULTA', nombreUsuario: 'otro' })).toEqual([]);
   });
 

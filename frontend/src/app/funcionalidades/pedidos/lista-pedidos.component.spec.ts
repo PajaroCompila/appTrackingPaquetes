@@ -742,7 +742,7 @@ describe('ListaPedidosComponent', () => {
     expect(asignacionesService.guardar).not.toHaveBeenCalled();
   });
 
-  it('muestra únicamente a Kevin Carranza para pedidos de TBM y no guarda sin pulsar Asignar', () => {
+  it('un usuario BOD ve todo el catálogo y no guarda sin pulsar Asignar', () => {
     usuarioSesion.set({
       usuarioId: '9C2A096F-1B58-49A1-8490-A3A2265312C8', nombreUsuario: 'bodegatbm',
       nombreVisible: 'Bodega TBM', codigoRol: 'OPERADOR_BODEGA', codigoAlmacen: null,
@@ -750,8 +750,12 @@ describe('ListaPedidosComponent', () => {
     });
     asignacionesService.obtenerUsuarios.mockReturnValue(of({
       puedeAsignar: true,
-      puedeAsignarTodos: false,
-      datos: [{ usuario: 'bodegatbm', nombre: 'Kevin Carranza' }],
+      puedeAsignarTodos: true,
+      datos: [
+        { usuario: 'acalix', nombre: 'Ana Calix' },
+        { usuario: 'gcruz', nombre: 'Gregorio Cruz' },
+        { usuario: 'bodegatbm', nombre: 'Kevin Carranza' },
+      ],
     }));
     pedidosService.obtenerPedidos.mockReturnValue(of({
       ...respuestaLista,
@@ -767,11 +771,12 @@ describe('ListaPedidosComponent', () => {
     const selector = fixture.nativeElement.querySelector('.selector-asignacion') as HTMLSelectElement;
     expect([...selector.options].map(({ value, text }) => ({ value, text }))).toEqual([
       { value: '', text: 'Sin asignar' },
+      { value: 'acalix', text: 'Ana Calix' },
+      { value: 'gcruz', text: 'Gregorio Cruz' },
       { value: 'bodegatbm', text: 'Kevin Carranza' },
     ]);
-    expect(selector.value).toBe('bodegatbm');
-    expect(fixture.nativeElement.textContent).not.toContain('Gregorio Cruz');
-    expect(fixture.nativeElement.textContent).not.toContain('Marcos Perez');
+    expect(selector.value).toBe('');
+    expect(componente.puedeAsignarTodos()).toBe(true);
     expect(asignacionesService.consultar).toHaveBeenCalledWith(
       [{ idOrigen: 'R1:TTBM01:F1', identificadorDetalle: '1' }],
     );
