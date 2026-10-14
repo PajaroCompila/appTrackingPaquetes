@@ -122,12 +122,15 @@ export class HistorialRepositorio {
 
   public async obtenerDespachadosPendientes(): Promise<CandidatoValidacion[]> {
     const resultado = await this.proveedorPedidosBodega().request().query<CandidatoValidacion>(`
-      SELECT TOP (1000) idOrigen, folioPedido, numeroPedido
-      FROM dbo.PedidoDespachado
-      WHERE estadoLocal IN ('DESPACHADO', 'CERRADO')
-        AND origenPedido = 'R1'
-        AND NULLIF(LTRIM(RTRIM(folioPedido)), '') IS NOT NULL
-      ORDER BY despachadoEn, idPedidoDespachado;
+      SELECT TOP (1000) pedido.idOrigen, pedido.folioPedido,
+        COALESCE(NULLIF(LTRIM(RTRIM(referencia.numeroPedidoSap)), ''),
+          pedido.numeroPedido) numeroPedido
+      FROM dbo.PedidoDespachado pedido
+      LEFT JOIN dbo.ReferenciaPedidoSapR1 referencia ON referencia.idOrigen = pedido.idOrigen
+      WHERE pedido.estadoLocal IN ('DESPACHADO', 'CERRADO')
+        AND pedido.origenPedido = 'R1'
+        AND NULLIF(LTRIM(RTRIM(pedido.folioPedido)), '') IS NOT NULL
+      ORDER BY pedido.despachadoEn, pedido.idPedidoDespachado;
     `);
     return resultado.recordset;
   }
@@ -146,25 +149,28 @@ export class HistorialRepositorio {
       const resultado = await consultarSap<{ numeroPedido: number }>(`
         SELECT DISTINCT pedido.[DocNum] AS numeroPedido
         FROM dbo.[ORDR] pedido
+        INNER JOIN dbo.[INV1] lineaFactura
+          ON lineaFactura.[BaseType] = 17
+         AND lineaFactura.[BaseEntry] = pedido.[DocEntry]
+        INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
         WHERE pedido.[DocNum] IN (${parametros.join(', ')})
           AND pedido.[CANCELED] = @noCancelado
-          AND (
-            EXISTS (SELECT 1 FROM dbo.[INV1] lineaFactura
-              INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
-              WHERE lineaFactura.[BaseType] = 17
-                AND lineaFactura.[BaseEntry] = pedido.[DocEntry]
-                AND factura.[CANCELED] = @noCancelado)
-            OR EXISTS (SELECT 1 FROM dbo.[DLN1] lineaEntrega
-              INNER JOIN dbo.[ODLN] entrega ON entrega.[DocEntry] = lineaEntrega.[DocEntry]
-              INNER JOIN dbo.[INV1] lineaFactura
-                ON lineaFactura.[BaseType] = 15
-               AND lineaFactura.[BaseEntry] = entrega.[DocEntry]
-              INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
-              WHERE lineaEntrega.[BaseType] = 17
-                AND lineaEntrega.[BaseEntry] = pedido.[DocEntry]
-                AND entrega.[CANCELED] = @noCancelado
-                AND factura.[CANCELED] = @noCancelado)
-          );
+          AND factura.[CANCELED] = @noCancelado
+        UNION
+        SELECT DISTINCT pedido.[DocNum] AS numeroPedido
+        FROM dbo.[ORDR] pedido
+        INNER JOIN dbo.[DLN1] lineaEntrega
+          ON lineaEntrega.[BaseType] = 17
+         AND lineaEntrega.[BaseEntry] = pedido.[DocEntry]
+        INNER JOIN dbo.[ODLN] entrega ON entrega.[DocEntry] = lineaEntrega.[DocEntry]
+        INNER JOIN dbo.[INV1] lineaFactura
+          ON lineaFactura.[BaseType] = 15
+         AND lineaFactura.[BaseEntry] = entrega.[DocEntry]
+        INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
+        WHERE pedido.[DocNum] IN (${parametros.join(', ')})
+          AND pedido.[CANCELED] = @noCancelado
+          AND entrega.[CANCELED] = @noCancelado
+          AND factura.[CANCELED] = @noCancelado;
       `, (solicitud) => {
         solicitud.input('noCancelado', sql.Char(1), 'N');
         numeros.forEach((numeroPedido, indice) =>
@@ -547,8 +553,7 @@ export class HistorialRepositorio {
           WHERE TRY_CONVERT(int,pedido.sapDocEntry)=fuente.docEntry
             OR pedido.numeroPedido=fuente.numeroPedido OR pedido.folioPedido=fuente.folioPedido
           ORDER BY fuente.docEntry DESC) evento
-        WHERE ((pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
-              AND pedido.estadoLocal = 'VALIDADO') OR pedido.estadoLocal = 'CERRADO')
+        WHERE pedido.estadoLocal IN ('VALIDADO', 'CERRADO')
           AND (@idOrigen IS NULL OR pedido.idOrigen = @idOrigen)
           AND ((pedido.fechaHoraPedido >= @fechaDesde
               AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
@@ -726,8 +731,7 @@ export class HistorialRepositorio {
         WHERE TRY_CONVERT(int,pedido.sapDocEntry)=fuente.docEntry
           OR pedido.numeroPedido=fuente.numeroPedido OR pedido.folioPedido=fuente.folioPedido
         ORDER BY fuente.docEntry DESC) evento
-      WHERE ((pedido.origenPedido = 'SAP' AND pedido.creadoEnR1 = 0
-            AND pedido.estadoLocal = 'VALIDADO') OR pedido.estadoLocal = 'CERRADO')
+      WHERE pedido.estadoLocal IN ('VALIDADO', 'CERRADO')
         AND ((pedido.fechaHoraPedido >= @fechaDesde
             AND pedido.fechaHoraPedido < DATEADD(day, 1, @fechaHasta))
           OR (pedido.fechaHoraPedido IS NULL AND pedido.despachadoEn >= @fechaDesde

@@ -16,7 +16,7 @@ describe('fuentes locales del Historial', () => {
     expect(String(query.mock.calls[0]?.[0])).toContain('dbo.DevolucionPedidoDetalle');
   });
 
-  it('incluye despachos cerrados y anulaciones persistidas como CERRADO', async () => {
+  it('incluye despachos validados y cerrados, y anulaciones persistidas como CERRADO', async () => {
     const query = vi.fn().mockResolvedValue({ recordset: [] });
     const request = { input: vi.fn().mockReturnThis(), query };
     const pool = { request: () => request } as unknown as sql.ConnectionPool;
@@ -30,7 +30,7 @@ describe('fuentes locales del Historial', () => {
     const consultas = query.mock.calls.map(([consulta]) => String(consulta));
     expect(consultas).toHaveLength(2);
     for (const consulta of consultas) {
-      expect(consulta).toContain("pedido.estadoLocal = 'CERRADO'");
+      expect(consulta).toContain("pedido.estadoLocal IN ('VALIDADO', 'CERRADO')");
       expect(consulta).toContain('dbo.CancelacionSapHistorial');
       expect(consulta).toContain("cancelado.activo=1");
       expect(consulta).toContain("CONVERT(varchar(12), 'CERRADO')");
