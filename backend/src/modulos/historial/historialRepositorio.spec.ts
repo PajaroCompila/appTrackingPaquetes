@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type sql from 'mssql';
-import { HistorialRepositorio } from './historialRepositorio.js';
+import { HistorialRepositorio, obtenerIdPedidoSapInsertado } from './historialRepositorio.js';
 
 describe('fuentes locales del Historial', () => {
+  it('tolera que una insercion condicional no devuelva recordset', () => {
+    expect(obtenerIdPedidoSapInsertado({})).toBeUndefined();
+  });
   it('obtiene el receptor real persistido de la devolución', async () => {
     const query = vi.fn().mockResolvedValue({ recordset: [{ recibidoPor: '  Marcos Pérez  ' }] });
     const request = { input: vi.fn().mockReturnThis(), query };

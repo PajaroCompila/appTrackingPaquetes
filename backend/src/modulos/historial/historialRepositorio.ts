@@ -52,6 +52,12 @@ interface FilaCerradaSap {
 }
 interface FilaNumeroCerradoR1 { numeroPedido: number | null }
 
+export function obtenerIdPedidoSapInsertado(
+  resultado: { recordset?: { idPedidoSapHistorial: number }[] },
+): number | undefined {
+  return resultado.recordset?.[0]?.idPedidoSapHistorial;
+}
+
 export class HistorialRepositorio {
   public async obtenerReceptorDevolucion(idOrigen: string): Promise<string | null> {
     const resultado = await this.proveedorPedidosBodega().request()
@@ -320,7 +326,7 @@ export class HistorialRepositorio {
                 OUTPUT inserted.idPedidoSapHistorial
                 VALUES(@sapDocEntry, @numeroPedido, @fechaHoraPedido, @nombreVendedor);
           `);
-        const idPedido = insertado.recordset[0]?.idPedidoSapHistorial;
+        const idPedido = obtenerIdPedidoSapInsertado(insertado);
         if (!idPedido) continue;
         guardados += 1;
         for (const fila of filas) {
