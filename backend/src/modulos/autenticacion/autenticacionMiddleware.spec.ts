@@ -1,13 +1,37 @@
 import type { NextFunction, Request, Response } from 'express';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
-import { requerirAccesoModulo, requerirRoles } from './autenticacionMiddleware.js';
+import { AutenticacionServicio } from './autenticacionServicio.js';
+import { nombreCookieSesion, requerirAccesoModulo, requerirAutenticacion, requerirRoles } from './autenticacionMiddleware.js';
 
 const identidad = {
   usuarioId: '11111111-1111-4111-8111-111111111111',
   nombreUsuario: 'usuario', nombreVisible: 'Usuario', codigoAlmacen: null,
   sesionId: '22222222-2222-4222-8222-222222222222', debeCambiarContrasena: false,
 };
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('renovacion de sesion activa', () => {
+  it('reemplaza la cookie cuando el token esta cerca de expirar', async () => {
+    const usuario = { ...identidad, codigoRol: 'ADMINISTRADOR' };
+    vi.spyOn(AutenticacionServicio.prototype, 'validarToken').mockResolvedValue(usuario);
+    vi.spyOn(AutenticacionServicio.prototype, 'renovarTokenSiCorresponde').mockResolvedValue({
+      token: 'token-renovado', duracionMs: 28_800_000,
+    });
+    const cookie = vi.fn();
+    const siguiente = vi.fn();
+
+    await requerirAutenticacion({ cookies: { [nombreCookieSesion]: 'token-anterior' },
+      baseUrl: '/api/pedidos', method: 'GET' } as unknown as Request,
+    { cookie } as unknown as Response, siguiente);
+
+    expect(cookie).toHaveBeenCalledWith(nombreCookieSesion, 'token-renovado', expect.objectContaining({
+      httpOnly: true, maxAge: 28_800_000,
+    }));
+    expect(siguiente).toHaveBeenCalledWith();
+  });
+});
 
 describe('requerirRoles', () => {
   it('permite continuar al administrador', () => {

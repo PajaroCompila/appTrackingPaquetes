@@ -22,6 +22,7 @@ describe('AutenticacionServicio', () => {
     repositorio = {
       buscarUsuario: vi.fn().mockResolvedValue({ ...usuarioBase, hashContrasena: hash }),
       crearSesion: vi.fn().mockResolvedValue(undefined),
+      renovarSesion: vi.fn().mockResolvedValue(true),
       obtenerIdentidadSesion: vi.fn(), revocarSesion: vi.fn().mockResolvedValue(undefined),
       registrarAccesoCorrecto: vi.fn().mockResolvedValue(undefined),
       cambiarContrasena: vi.fn().mockResolvedValue(undefined),

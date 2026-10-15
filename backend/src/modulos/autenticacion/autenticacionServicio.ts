@@ -64,6 +64,34 @@ export class AutenticacionServicio {
     }
   }
 
+  public async renovarTokenSiCorresponde(
+    token: string,
+    identidad: IdentidadAutenticada,
+  ): Promise<{ token: string; duracionMs: number } | null> {
+    const configuracion = obtenerConfiguracionAutenticacion();
+    const contenido = jwt.decode(token);
+    if (typeof contenido === 'string' || !contenido?.exp || contenido.jti !== identidad.sesionId
+      || contenido.sub !== identidad.usuarioId) return null;
+
+    const duracionSegundos = configuracion.duracionMinutos * 60;
+    const segundosRestantes = contenido.exp - Math.floor(Date.now() / 1000);
+    if (segundosRestantes > Math.floor(duracionSegundos / 4)) return null;
+
+    const duracionMs = duracionSegundos * 1_000;
+    const renovada = await this.repositorio.renovarSesion(
+      identidad.sesionId,
+      new Date(Date.now() + duracionMs),
+    );
+    if (!renovada) {
+      throw new ErrorAplicacion(401, 'SESION_INVALIDA', 'La sesiÃ³n no es vÃ¡lida o expirÃ³.');
+    }
+    const tokenRenovado = jwt.sign({}, configuracion.secretoJwt, {
+      algorithm: 'HS256', subject: identidad.usuarioId, jwtid: identidad.sesionId,
+      expiresIn: duracionSegundos, issuer: 'appPedidosBodega', audience: 'appPedidosBodega-web',
+    });
+    return { token: tokenRenovado, duracionMs };
+  }
+
   public async cerrarSesion(sesionId: string): Promise<void> { await this.repositorio.revocarSesion(sesionId); }
 
   public async cambiarContrasena(identidad: IdentidadAutenticada, actual: string, nueva: string): Promise<void> {

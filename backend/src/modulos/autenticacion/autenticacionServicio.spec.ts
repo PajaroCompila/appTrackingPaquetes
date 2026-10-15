@@ -1,5 +1,7 @@
 import argon2 from 'argon2';
+import jwt from 'jsonwebtoken';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { obtenerConfiguracionAutenticacion } from '../../configuracion/configuracion.js';
 import type { IdentidadAutenticada, UsuarioAutenticacion } from './autenticacion.interface.js';
 import type { IAutenticacionRepositorio } from './autenticacionRepositorio.js';
 import { AutenticacionServicio, opcionesArgon2 } from './autenticacionServicio.js';
@@ -24,6 +26,7 @@ describe('AutenticacionServicio', () => {
     repositorio = {
       buscarUsuario: vi.fn().mockResolvedValue(usuario),
       crearSesion: vi.fn().mockResolvedValue(undefined),
+      renovarSesion: vi.fn().mockResolvedValue(true),
       obtenerIdentidadSesion: vi.fn().mockImplementation(async (sesionId: string) => ({
         usuarioId: usuario.usuarioId, nombreUsuario: usuario.nombreUsuario,
         nombreVisible: usuario.nombreVisible, codigoRol: usuario.codigoRol,
@@ -46,6 +49,29 @@ describe('AutenticacionServicio', () => {
     expect(repositorio.registrarAccesoCorrecto).toHaveBeenCalledWith(usuario.usuarioId);
     expect(repositorio.crearSesion).toHaveBeenCalledOnce();
     expect(identidad).toMatchObject({ usuarioId: usuario.usuarioId, nombreUsuario: 'operador' });
+  });
+
+  it('renueva una sesion activa cuando esta cerca de expirar', async () => {
+    const servicio = new AutenticacionServicio(repositorio);
+    const sesion = await servicio.iniciarSesion('operador', 'contrasena-correcta');
+    const contenido = jwt.decode(sesion.token) as jwt.JwtPayload;
+    const tokenCercanoAVencer = jwt.sign({}, obtenerConfiguracionAutenticacion().secretoJwt, {
+      algorithm: 'HS256', subject: sesion.identidad.usuarioId, jwtid: contenido.jti,
+      expiresIn: 60, issuer: 'appPedidosBodega', audience: 'appPedidosBodega-web',
+    });
+
+    const renovacion = await servicio.renovarTokenSiCorresponde(tokenCercanoAVencer, sesion.identidad);
+
+    expect(renovacion?.token).toBeTruthy();
+    expect(repositorio.renovarSesion).toHaveBeenCalledWith(sesion.identidad.sesionId, expect.any(Date));
+  });
+
+  it('no escribe en base mientras la sesion conserva suficiente vigencia', async () => {
+    const servicio = new AutenticacionServicio(repositorio);
+    const sesion = await servicio.iniciarSesion('operador', 'contrasena-correcta');
+
+    await expect(servicio.renovarTokenSiCorresponde(sesion.token, sesion.identidad)).resolves.toBeNull();
+    expect(repositorio.renovarSesion).not.toHaveBeenCalled();
   });
 
   it('rechaza contraseñas incorrectas sin acumular intentos ni bloquear la cuenta', async () => {

@@ -1,13 +1,24 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
+import { configuracion } from '../../configuracion/configuracion.js';
 import { AutenticacionServicio } from './autenticacionServicio.js';
 
 export const nombreCookieSesion = 'pb_sesion';
 const servicio = new AutenticacionServicio();
 
+export function opcionesCookieSesion(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: configuracion.entorno === 'produccion',
+    sameSite: 'strict' as const,
+    path: '/',
+    maxAge,
+  };
+}
+
 export async function requerirAutenticacion(
   solicitud: Request,
-  _respuesta: Response,
+  respuesta: Response,
   siguiente: NextFunction,
 ): Promise<void> {
   try {
@@ -16,7 +27,11 @@ export async function requerirAutenticacion(
       throw new ErrorAplicacion(401, 'SESION_REQUERIDA', 'DebÃ©s iniciar sesiÃ³n.');
     }
     solicitud.user = await servicio.validarToken(token);
-    requerirAccesoModulo(solicitud, _respuesta, siguiente);
+    const renovacion = await servicio.renovarTokenSiCorresponde(token, solicitud.user);
+    if (renovacion) {
+      respuesta.cookie(nombreCookieSesion, renovacion.token, opcionesCookieSesion(renovacion.duracionMs));
+    }
+    requerirAccesoModulo(solicitud, respuesta, siguiente);
   } catch (error) {
     siguiente(error);
   }

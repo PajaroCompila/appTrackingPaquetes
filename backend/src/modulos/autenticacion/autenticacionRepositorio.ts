@@ -5,6 +5,7 @@ import type { IdentidadAutenticada, UsuarioAutenticacion } from './autenticacion
 export interface IAutenticacionRepositorio {
   buscarUsuario(nombreUsuario: string): Promise<UsuarioAutenticacion | null>;
   crearSesion(usuarioId: string, sesionId: string, expiraEn: Date): Promise<void>;
+  renovarSesion(sesionId: string, expiraEn: Date): Promise<boolean>;
   obtenerIdentidadSesion(sesionId: string): Promise<IdentidadAutenticada | null>;
   revocarSesion(sesionId: string): Promise<void>;
   registrarAccesoCorrecto(usuarioId: string): Promise<void>;
@@ -43,6 +44,20 @@ export class AutenticacionRepositorio implements IAutenticacionRepositorio {
         INSERT INTO dbo.SesionAutenticada(idSesion, idUsuario, expiraEn)
         VALUES (@sesionId, @usuarioId, @expiraEn);
       `);
+  }
+
+  public async renovarSesion(sesionId: string, expiraEn: Date): Promise<boolean> {
+    const resultado = await obtenerPoolPedidosBodega().request()
+      .input('sesionId', sql.UniqueIdentifier, sesionId)
+      .input('expiraEn', sql.DateTime2(3), expiraEn)
+      .query(`
+        UPDATE dbo.SesionAutenticada
+        SET expiraEn = @expiraEn
+        WHERE idSesion = @sesionId
+          AND revocadaEn IS NULL
+          AND expiraEn > SYSUTCDATETIME();
+      `);
+    return (resultado.rowsAffected[0] ?? 0) > 0;
   }
 
   public async obtenerIdentidadSesion(sesionId: string): Promise<IdentidadAutenticada | null> {

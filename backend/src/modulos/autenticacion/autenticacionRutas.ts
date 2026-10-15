@@ -1,21 +1,12 @@
 import { Router } from 'express';
-import { configuracion, obtenerConfiguracionAutenticacion } from '../../configuracion/configuracion.js';
+import { obtenerConfiguracionAutenticacion } from '../../configuracion/configuracion.js';
 import { ErrorAplicacion } from '../../compartido/errores/errorAplicacion.js';
-import { nombreCookieSesion, requerirAutenticacion } from './autenticacionMiddleware.js';
+import { nombreCookieSesion, opcionesCookieSesion, requerirAutenticacion } from './autenticacionMiddleware.js';
 import { AutenticacionServicio } from './autenticacionServicio.js';
 import { esquemaCambioContrasena, esquemaInicioSesion } from './autenticacionValidacion.js';
 
 export const autenticacionRutas = Router();
 const servicio = new AutenticacionServicio();
-function opcionesCookie(maxAge: number) {
-  return {
-    httpOnly: true,
-    secure: configuracion.entorno === 'produccion',
-    sameSite: 'strict' as const,
-    path: '/',
-    maxAge,
-  };
-}
 
 autenticacionRutas.post('/iniciar-sesion', async (solicitud, respuesta, siguiente) => {
   try {
@@ -24,7 +15,7 @@ autenticacionRutas.post('/iniciar-sesion', async (solicitud, respuesta, siguient
       throw new ErrorAplicacion(400, 'DATOS_ACCESO_INVALIDOS', 'Los datos de acceso no son vÃ¡lidos.');
     }
     const sesion = await servicio.iniciarSesion(validacion.data.nombreUsuario, validacion.data.contrasena);
-    respuesta.cookie(nombreCookieSesion, sesion.token, opcionesCookie(sesion.duracionMs));
+    respuesta.cookie(nombreCookieSesion, sesion.token, opcionesCookieSesion(sesion.duracionMs));
     const { sesionId: _sesionId, ...usuario } = sesion.identidad;
     void _sesionId;
     respuesta.json({ usuario });
@@ -41,7 +32,7 @@ autenticacionRutas.post('/cerrar-sesion', requerirAutenticacion, async (solicitu
   try {
     await servicio.cerrarSesion(solicitud.user!.sesionId);
     const autenticacion = obtenerConfiguracionAutenticacion();
-    respuesta.clearCookie(nombreCookieSesion, opcionesCookie(autenticacion.duracionMinutos * 60_000));
+    respuesta.clearCookie(nombreCookieSesion, opcionesCookieSesion(autenticacion.duracionMinutos * 60_000));
     respuesta.status(204).send();
   } catch (error) { siguiente(error); }
 });
