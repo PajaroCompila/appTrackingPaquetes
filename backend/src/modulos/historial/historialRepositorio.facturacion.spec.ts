@@ -46,4 +46,39 @@ describe('deteccion de facturas SAP para entregados', () => {
     expect(consulta).toContain('UNION');
     expect(consulta).not.toContain('OR EXISTS');
   });
+
+  it('detecta por folio una factura aunque aun no exista referencia local y persiste la relacion SAP', async () => {
+    consultaSap.mockResolvedValue({ recordset: [{
+      sapDocEntry: 970168, numeroPedido: 101478940, folioPedido: 'SPSS24PE387646',
+      cantidadPedidosFolio: 1,
+    }] } as never);
+    const guardar = vi.fn().mockResolvedValue([]);
+    const repositorio = new HistorialRepositorio(undefined, undefined, undefined, undefined,
+      { guardar } as never);
+
+    await expect(repositorio.obtenerFacturadosSapPorNumero([{
+      idOrigen: 'R1:TSPS01:SPSS24PE387646', folioPedido: 'SPSS24PE387646',
+      numeroPedido: 'SPSS24PE387646',
+    }])).resolves.toEqual(new Set(['R1:TSPS01:SPSS24PE387646']));
+
+    expect(String(consultaSap.mock.calls[0]?.[0])).toContain('U_SO1_01FOLIORETAIL1');
+    expect(guardar).toHaveBeenCalledWith([{
+      idOrigen: 'R1:TSPS01:SPSS24PE387646', codigoSucursal: 'TSPS01',
+      folioPedido: 'SPSS24PE387646', sapDocEntry: 970168, numeroPedidoSap: '101478940',
+    }]);
+  });
+
+  it('no asigna por folio cuando SAP devuelve una correspondencia ambigua', async () => {
+    consultaSap.mockResolvedValue({ recordset: [{
+      sapDocEntry: 970168, numeroPedido: 101478940, folioPedido: 'F1', cantidadPedidosFolio: 2,
+    }] } as never);
+    const guardar = vi.fn().mockResolvedValue([]);
+    const repositorio = new HistorialRepositorio(undefined, undefined, undefined, undefined,
+      { guardar } as never);
+
+    await expect(repositorio.obtenerFacturadosSapPorNumero([{
+      idOrigen: 'R1:TSPS01:F1', folioPedido: 'F1', numeroPedido: 'F1',
+    }])).resolves.toEqual(new Set());
+    expect(guardar).not.toHaveBeenCalled();
+  });
 });

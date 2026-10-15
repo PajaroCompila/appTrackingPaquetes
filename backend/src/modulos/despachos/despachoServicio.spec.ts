@@ -67,6 +67,7 @@ describe('DespachoServicio', () => {
   it.each([
     ['acalix', 'Ana Calix', 'jlara'],
     ['jlara', 'Jorge Lara', 'acalix'],
+    ['bod03', 'Bodega SPS', 'jlara'],
     ['tlopez', 'Tommy López', 'tlopez'],
   ])('permite a %s transferir después de una reasignación autorizada', async (
     nombreUsuario, nombreVisible, usuarioAsignado,

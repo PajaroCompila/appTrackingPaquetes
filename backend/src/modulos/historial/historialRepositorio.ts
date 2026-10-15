@@ -19,6 +19,10 @@ import {
   columnasEvidenciaCierreSap,
   type TipoCierreSap,
 } from './cierreSap.js';
+import {
+  ReferenciaPedidoSapR1Repositorio,
+  type ReferenciaPedidoSapR1,
+} from './referenciaPedidoSapR1Repositorio.js';
 
 export interface CandidatoValidacion { idOrigen: string; folioPedido: string; numeroPedido: string }
 export interface CandidatoSap { idOrigen: string; sapDocEntry: string }
@@ -124,6 +128,7 @@ export class HistorialRepositorio {
     private readonly proveedorPedidosBodega: () => sql.ConnectionPool = obtenerPoolPedidosBodega,
     private readonly sucursalesConfiguradas?: ConfiguracionSucursalR1[],
     private readonly proveedorSucursal: typeof obtenerPoolSucursalR1 = obtenerPoolSucursalR1,
+    private readonly referenciasSapR1 = new ReferenciaPedidoSapR1Repositorio(),
   ) {}
 
   public async obtenerDespachadosPendientes(): Promise<CandidatoValidacion[]> {
@@ -142,28 +147,52 @@ export class HistorialRepositorio {
   }
 
   public async obtenerFacturadosSapPorNumero(candidatos: CandidatoValidacion[]): Promise<Set<string>> {
-    const validos = candidatos.filter(({ numeroPedido }) => {
-      const numero = Number(numeroPedido);
-      return Number.isSafeInteger(numero) && numero > 0;
-    });
-    if (!validos.length) return new Set();
+    if (!candidatos.length) return new Set();
     const facturados = new Set<number>();
-    for (let inicio = 0; inicio < validos.length; inicio += 500) {
-      const lote = validos.slice(inicio, inicio + 500);
-      const numeros = [...new Set(lote.map(({ numeroPedido }) => Number(numeroPedido)))];
-      const parametros = numeros.map((_, indice) => `@numeroPedido${indice}`);
-      const resultado = await consultarSap<{ numeroPedido: number }>(`
-        SELECT DISTINCT pedido.[DocNum] AS numeroPedido
+    const referencias = new Map<string, ReferenciaPedidoSapR1>();
+    const idsFacturados = new Set<string>();
+    for (let inicio = 0; inicio < candidatos.length; inicio += 500) {
+      const lote = candidatos.slice(inicio, inicio + 500);
+      const numeros = [...new Set(lote.map(({ numeroPedido }) => Number(numeroPedido))
+        .filter((numero) => Number.isSafeInteger(numero) && numero > 0))];
+      const folios = [...new Set(lote.map(({ folioPedido }) => folioPedido.trim()).filter(Boolean))];
+      const parametrosNumero = numeros.map((_, indice) => `@numeroPedido${indice}`);
+      const parametrosFolio = folios.map((_, indice) => `@folioPedido${indice}`);
+      if (!parametrosNumero.length && !parametrosFolio.length) continue;
+      const filtros = [
+        parametrosNumero.length ? `pedido.[DocNum] IN (${parametrosNumero.join(', ')})` : '',
+        parametrosFolio.length
+          ? `LTRIM(RTRIM(CONVERT(nvarchar(100),pedido.[U_SO1_01FOLIORETAIL1]))) IN (${parametrosFolio.join(', ')})`
+          : '',
+      ].filter(Boolean).join(' OR ');
+      const resultado = await consultarSap<{
+        sapDocEntry: number;
+        numeroPedido: number;
+        folioPedido: string | null;
+        cantidadPedidosFolio: number;
+      }>(`
+        SELECT DISTINCT pedido.[DocEntry] sapDocEntry,pedido.[DocNum] numeroPedido,
+          NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(100),pedido.[U_SO1_01FOLIORETAIL1]))),'') folioPedido,
+          (SELECT COUNT(DISTINCT coincidencia.[DocEntry]) FROM dbo.[ORDR] coincidencia
+            WHERE coincidencia.[CANCELED]=@noCancelado
+              AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(100),coincidencia.[U_SO1_01FOLIORETAIL1]))),'')
+                =NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(100),pedido.[U_SO1_01FOLIORETAIL1]))),'')
+          ) cantidadPedidosFolio
         FROM dbo.[ORDR] pedido
         INNER JOIN dbo.[INV1] lineaFactura
           ON lineaFactura.[BaseType] = 17
          AND lineaFactura.[BaseEntry] = pedido.[DocEntry]
         INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
-        WHERE pedido.[DocNum] IN (${parametros.join(', ')})
-          AND pedido.[CANCELED] = @noCancelado
+        WHERE (${filtros}) AND pedido.[CANCELED] = @noCancelado
           AND factura.[CANCELED] = @noCancelado
         UNION
-        SELECT DISTINCT pedido.[DocNum] AS numeroPedido
+        SELECT DISTINCT pedido.[DocEntry] sapDocEntry,pedido.[DocNum] numeroPedido,
+          NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(100),pedido.[U_SO1_01FOLIORETAIL1]))),'') folioPedido,
+          (SELECT COUNT(DISTINCT coincidencia.[DocEntry]) FROM dbo.[ORDR] coincidencia
+            WHERE coincidencia.[CANCELED]=@noCancelado
+              AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(100),coincidencia.[U_SO1_01FOLIORETAIL1]))),'')
+                =NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(100),pedido.[U_SO1_01FOLIORETAIL1]))),'')
+          ) cantidadPedidosFolio
         FROM dbo.[ORDR] pedido
         INNER JOIN dbo.[DLN1] lineaEntrega
           ON lineaEntrega.[BaseType] = 17
@@ -173,20 +202,54 @@ export class HistorialRepositorio {
           ON lineaFactura.[BaseType] = 15
          AND lineaFactura.[BaseEntry] = entrega.[DocEntry]
         INNER JOIN dbo.[OINV] factura ON factura.[DocEntry] = lineaFactura.[DocEntry]
-        WHERE pedido.[DocNum] IN (${parametros.join(', ')})
-          AND pedido.[CANCELED] = @noCancelado
+        WHERE (${filtros}) AND pedido.[CANCELED] = @noCancelado
           AND entrega.[CANCELED] = @noCancelado
           AND factura.[CANCELED] = @noCancelado;
       `, (solicitud) => {
         solicitud.input('noCancelado', sql.Char(1), 'N');
         numeros.forEach((numeroPedido, indice) =>
           solicitud.input(`numeroPedido${indice}`, sql.Int, numeroPedido));
+        folios.forEach((folioPedido, indice) =>
+          solicitud.input(`folioPedido${indice}`, sql.NVarChar(100), folioPedido));
         return solicitud;
       });
       resultado.recordset.forEach(({ numeroPedido }) => facturados.add(numeroPedido));
+      const porFolio = new Map(resultado.recordset.filter(({ folioPedido, cantidadPedidosFolio }) =>
+        Boolean(folioPedido?.trim()) && Number(cantidadPedidosFolio) === 1)
+        .map((fila) => [fila.folioPedido!.trim(), fila]));
+      const candidatosPorFolio = new Map<string, CandidatoValidacion[]>();
+      lote.forEach((candidato) => {
+        const folio = candidato.folioPedido.trim();
+        if (folio) candidatosPorFolio.set(folio, [...(candidatosPorFolio.get(folio) ?? []), candidato]);
+      });
+      lote.forEach((candidato) => {
+        if (facturados.has(Number(candidato.numeroPedido))) {
+          idsFacturados.add(candidato.idOrigen);
+          return;
+        }
+        const folio = candidato.folioPedido.trim();
+        const fila = porFolio.get(folio);
+        if (!fila || candidatosPorFolio.get(folio)?.length !== 1) return;
+        idsFacturados.add(candidato.idOrigen);
+        const codigoSucursal = candidato.idOrigen.split(':')[1]?.trim();
+        if (!codigoSucursal) return;
+        referencias.set(candidato.idOrigen, {
+          idOrigen: candidato.idOrigen,
+          codigoSucursal,
+          folioPedido: folio,
+          sapDocEntry: Number(fila.sapDocEntry),
+          numeroPedidoSap: String(fila.numeroPedido),
+        });
+      });
     }
-    return new Set(validos.flatMap(({ idOrigen, numeroPedido }) =>
-      facturados.has(Number(numeroPedido)) ? [idOrigen] : []));
+    if (referencias.size > 0) {
+      try {
+        await this.referenciasSapR1.guardar([...referencias.values()]);
+      } catch {
+        console.error('No fue posible persistir una referencia SAP/R1 facturada; la factura conserva prioridad.');
+      }
+    }
+    return idsFacturados;
   }
 
   public async obtenerDespachadosSapPendientes(): Promise<CandidatoSap[]> {
